@@ -1,0 +1,139 @@
+<html>
+<head>
+<title>QrHandshakeActivity.kt</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cf8e6d;}
+.s1 { color: #bcbec4;}
+.s2 { color: #bcbec4;}
+.s3 { color: #2aacb8;}
+.s4 { color: #6aab73;}
+.s5 { color: #7a7e85;}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+QrHandshakeActivity.kt</font>
+</center></td></tr></table>
+<pre><span class="s0">package </span><span class="s1">com</span><span class="s2">.</span><span class="s1">core</span><span class="s2">.</span><span class="s1">talita</span>
+
+<span class="s1">import android</span><span class="s2">.</span><span class="s1">content</span><span class="s2">.</span><span class="s1">ActivityNotFoundException</span>
+<span class="s1">import android</span><span class="s2">.</span><span class="s1">content</span><span class="s2">.</span><span class="s1">Intent</span>
+<span class="s1">import android</span><span class="s2">.</span><span class="s1">graphics</span><span class="s2">.</span><span class="s1">Bitmap</span>
+<span class="s1">import android</span><span class="s2">.</span><span class="s1">graphics</span><span class="s2">.</span><span class="s1">Color</span>
+<span class="s1">import android</span><span class="s2">.</span><span class="s1">os</span><span class="s2">.</span><span class="s1">Bundle</span>
+<span class="s1">import android</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">Base64</span>
+<span class="s1">import android</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">Log</span>
+<span class="s1">import android</span><span class="s2">.</span><span class="s1">widget</span><span class="s2">.</span><span class="s1">Toast</span>
+<span class="s1">import androidx</span><span class="s2">.</span><span class="s1">appcompat</span><span class="s2">.</span><span class="s1">app</span><span class="s2">.</span><span class="s1">AppCompatActivity</span>
+<span class="s1">import com</span><span class="s2">.</span><span class="s1">google</span><span class="s2">.</span><span class="s1">zxing</span><span class="s2">.</span><span class="s1">BarcodeFormat</span>
+<span class="s1">import com</span><span class="s2">.</span><span class="s1">google</span><span class="s2">.</span><span class="s1">zxing</span><span class="s2">.</span><span class="s1">WriterException</span>
+<span class="s1">import com</span><span class="s2">.</span><span class="s1">google</span><span class="s2">.</span><span class="s1">zxing</span><span class="s2">.</span><span class="s1">qrcode</span><span class="s2">.</span><span class="s1">QRCodeWriter</span>
+<span class="s1">import com</span><span class="s2">.</span><span class="s1">google</span><span class="s2">.</span><span class="s1">zxing</span><span class="s2">.</span><span class="s1">common</span><span class="s2">.</span><span class="s1">BitMatrix</span>
+<span class="s1">import com</span><span class="s2">.</span><span class="s1">core</span><span class="s2">.</span><span class="s1">talita</span><span class="s2">.</span><span class="s1">databinding</span><span class="s2">.</span><span class="s1">ActivityQrHandshakeBinding</span>
+
+<span class="s0">class </span><span class="s1">QrHandshakeActivity : AppCompatActivity</span><span class="s2">() {</span>
+
+    <span class="s1">companion </span><span class="s0">object </span><span class="s2">{</span>
+        <span class="s1">private const </span><span class="s0">val </span><span class="s1">QR_SCAN_REQUEST </span><span class="s2">= </span><span class="s3">1001</span>
+        <span class="s1">private const </span><span class="s0">val </span><span class="s1">TAG </span><span class="s2">= </span><span class="s4">&quot;QrHandshakeActivity&quot;</span>
+    <span class="s2">}</span>
+
+    <span class="s1">private lateinit </span><span class="s0">var </span><span class="s1">binding: ActivityQrHandshakeBinding</span>
+
+    <span class="s1">override </span><span class="s0">fun </span><span class="s1">onCreate</span><span class="s2">(</span><span class="s1">savedInstanceState: Bundle?</span><span class="s2">) {</span>
+        <span class="s0">super</span><span class="s2">.</span><span class="s1">onCreate</span><span class="s2">(</span><span class="s1">savedInstanceState</span><span class="s2">)</span>
+        <span class="s1">binding </span><span class="s2">= </span><span class="s1">ActivityQrHandshakeBinding</span><span class="s2">.</span><span class="s1">inflate</span><span class="s2">(</span><span class="s1">layoutInflater</span><span class="s2">)</span>
+        <span class="s1">setContentView</span><span class="s2">(</span><span class="s1">binding</span><span class="s2">.</span><span class="s1">root</span><span class="s2">)</span>
+
+        <span class="s1">binding</span><span class="s2">.</span><span class="s1">btnGenerateQr</span><span class="s2">.</span><span class="s1">setOnClickListener </span><span class="s2">{</span>
+            <span class="s0">try </span><span class="s2">{</span>
+                <span class="s1">generateQrCode</span><span class="s2">()</span>
+            <span class="s2">} </span><span class="s1">catch </span><span class="s2">(</span><span class="s1">e: WriterException</span><span class="s2">) {</span>
+                <span class="s1">e</span><span class="s2">.</span><span class="s1">printStackTrace</span><span class="s2">()</span>
+            <span class="s2">}</span>
+        <span class="s2">}</span>
+
+        <span class="s1">binding</span><span class="s2">.</span><span class="s1">btnScanQr</span><span class="s2">.</span><span class="s1">setOnClickListener </span><span class="s2">{</span>
+            <span class="s1">launchQrScanner</span><span class="s2">()</span>
+        <span class="s2">}</span>
+    <span class="s2">}</span>
+
+    <span class="s1">@Throws</span><span class="s2">(</span><span class="s1">WriterException::</span><span class="s0">class</span><span class="s2">)</span>
+    <span class="s1">private </span><span class="s0">fun </span><span class="s1">generateQrCode</span><span class="s2">() {</span>
+        <span class="s5">// Generate cryptographic keys (simplified example)</span>
+        <span class="s0">val </span><span class="s1">publicKey </span><span class="s2">= </span><span class="s4">&quot;SAMPLE_PUBLIC_KEY_123&quot;</span><span class="s2">.</span><span class="s1">toByteArray</span><span class="s2">()</span>
+
+        <span class="s5">// QR Generation</span>
+        <span class="s0">val </span><span class="s1">writer </span><span class="s2">= </span><span class="s1">QRCodeWriter</span><span class="s2">()</span>
+        <span class="s0">val </span><span class="s1">bitMatrix </span><span class="s2">= </span><span class="s1">writer</span><span class="s2">.</span><span class="s1">encode</span><span class="s2">(</span>
+            <span class="s1">Base64</span><span class="s2">.</span><span class="s1">encodeToString</span><span class="s2">(</span><span class="s1">publicKey</span><span class="s2">, </span><span class="s1">Base64</span><span class="s2">.</span><span class="s1">DEFAULT</span><span class="s2">),</span>
+            <span class="s1">BarcodeFormat</span><span class="s2">.</span><span class="s1">QR_CODE</span><span class="s2">,</span>
+            <span class="s3">400</span><span class="s2">,</span>
+            <span class="s3">400</span>
+        <span class="s2">)</span>
+
+        <span class="s5">// Convert to Bitmap</span>
+        <span class="s0">val </span><span class="s1">bitmap </span><span class="s2">= </span><span class="s1">Bitmap</span><span class="s2">.</span><span class="s1">createBitmap</span><span class="s2">(</span><span class="s3">400</span><span class="s2">, </span><span class="s3">400</span><span class="s2">, </span><span class="s1">Bitmap</span><span class="s2">.</span><span class="s1">Config</span><span class="s2">.</span><span class="s1">RGB_565</span><span class="s2">).</span><span class="s1">apply </span><span class="s2">{</span>
+            <span class="s0">for </span><span class="s2">(</span><span class="s1">x </span><span class="s0">in </span><span class="s3">0 </span><span class="s1">until </span><span class="s3">400</span><span class="s2">) {</span>
+                <span class="s0">for </span><span class="s2">(</span><span class="s1">y </span><span class="s0">in </span><span class="s3">0 </span><span class="s1">until </span><span class="s3">400</span><span class="s2">) {</span>
+                    <span class="s1">setPixel</span><span class="s2">(</span><span class="s1">x</span><span class="s2">, </span><span class="s1">y</span><span class="s2">, </span><span class="s0">if </span><span class="s2">(</span><span class="s1">bitMatrix</span><span class="s2">[</span><span class="s1">x</span><span class="s2">, </span><span class="s1">y</span><span class="s2">]) </span><span class="s1">Color</span><span class="s2">.</span><span class="s1">BLACK </span><span class="s0">else </span><span class="s1">Color</span><span class="s2">.</span><span class="s1">WHITE</span><span class="s2">)</span>
+                <span class="s2">}</span>
+            <span class="s2">}</span>
+        <span class="s2">}</span>
+
+        <span class="s1">binding</span><span class="s2">.</span><span class="s1">ivQrCode</span><span class="s2">.</span><span class="s1">setImageBitmap</span><span class="s2">(</span><span class="s1">bitmap</span><span class="s2">)</span>
+    <span class="s2">}</span>
+
+    <span class="s1">private </span><span class="s0">fun </span><span class="s1">launchQrScanner</span><span class="s2">() {</span>
+        <span class="s0">try </span><span class="s2">{</span>
+            <span class="s0">val </span><span class="s1">intent </span><span class="s2">= </span><span class="s1">Intent</span><span class="s2">(</span><span class="s4">&quot;com.google.zxing.client.android.SCAN&quot;</span><span class="s2">).</span><span class="s1">apply </span><span class="s2">{</span>
+                <span class="s1">putExtra</span><span class="s2">(</span><span class="s4">&quot;SCAN_MODE&quot;</span><span class="s2">, </span><span class="s4">&quot;QR_CODE_MODE&quot;</span><span class="s2">)</span>
+            <span class="s2">}</span>
+            <span class="s1">startActivityForResult</span><span class="s2">(</span><span class="s1">intent</span><span class="s2">, </span><span class="s1">QR_SCAN_REQUEST</span><span class="s2">)</span>
+        <span class="s2">} </span><span class="s1">catch </span><span class="s2">(</span><span class="s1">e: ActivityNotFoundException</span><span class="s2">) {</span>
+            <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s4">&quot;Please install a QR scanner app&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_LONG</span><span class="s2">).</span><span class="s1">show</span><span class="s2">()</span>
+        <span class="s2">}</span>
+    <span class="s2">}</span>
+
+    <span class="s1">private </span><span class="s0">fun </span><span class="s1">startActivityForResult</span><span class="s2">(</span><span class="s1">intent: Intent</span><span class="s2">, </span><span class="s1">qrScanRequest: Int</span><span class="s2">) {</span>
+        <span class="s1">TODO</span><span class="s2">(</span><span class="s4">&quot;Not yet implemented&quot;</span><span class="s2">)</span>
+    <span class="s2">}</span>
+
+    <span class="s1">private </span><span class="s0">fun </span><span class="s1">putExtra</span><span class="s2">(</span><span class="s1">s: String</span><span class="s2">, </span><span class="s1">s1: String</span><span class="s2">) {</span>
+        <span class="s1">TODO</span><span class="s2">(</span><span class="s4">&quot;Not yet implemented&quot;</span><span class="s2">)</span>
+    <span class="s2">}</span>
+
+    <span class="s0">class </span><span class="s1">Intent</span><span class="s2">(</span><span class="s1">s: String</span><span class="s2">) {</span>
+
+    <span class="s2">}</span>
+
+    <span class="s1">override </span><span class="s0">fun </span><span class="s1">onActivityResult</span><span class="s2">(</span>
+        <span class="s1">requestCode: Int</span><span class="s2">,</span>
+        <span class="s1">resultCode: Int</span><span class="s2">,</span>
+        <span class="s1">data: android</span><span class="s2">.</span><span class="s1">content</span><span class="s2">.</span><span class="s1">Intent?</span>
+    <span class="s2">) {</span>
+        <span class="s0">super</span><span class="s2">.</span><span class="s1">onActivityResult</span><span class="s2">(</span><span class="s1">requestCode</span><span class="s2">, </span><span class="s1">resultCode</span><span class="s2">, </span><span class="s1">data</span><span class="s2">)</span>
+        <span class="s0">if </span><span class="s2">(</span><span class="s1">requestCode </span><span class="s2">== </span><span class="s1">QR_SCAN_REQUEST </span><span class="s2">&amp;&amp; </span><span class="s1">resultCode </span><span class="s2">== </span><span class="s1">RESULT_OK</span><span class="s2">) {</span>
+            <span class="s0">val </span><span class="s1">scannedContent </span><span class="s2">= </span><span class="s1">data?</span><span class="s2">.</span><span class="s1">getStringExtra</span><span class="s2">(</span><span class="s4">&quot;SCAN_RESULT&quot;</span><span class="s2">)</span>
+            <span class="s1">scannedContent?</span><span class="s2">.</span><span class="s1">let </span><span class="s2">{ </span><span class="s1">processScannedQr</span><span class="s2">(</span><span class="s1">it</span><span class="s2">) }</span>
+        <span class="s2">}</span>
+    <span class="s2">}</span>
+
+    <span class="s1">private </span><span class="s0">fun </span><span class="s1">processScannedQr</span><span class="s2">(</span><span class="s1">content: String</span><span class="s2">) {</span>
+        <span class="s0">try </span><span class="s2">{</span>
+            <span class="s0">val </span><span class="s1">decodedData </span><span class="s2">= </span><span class="s1">Base64</span><span class="s2">.</span><span class="s1">decode</span><span class="s2">(</span><span class="s1">content</span><span class="s2">, </span><span class="s1">Base64</span><span class="s2">.</span><span class="s1">DEFAULT</span><span class="s2">)</span>
+            <span class="s1">Log</span><span class="s2">.</span><span class="s1">d</span><span class="s2">(</span><span class="s1">TAG</span><span class="s2">, </span><span class="s4">&quot;Received contact: </span><span class="s0">${</span><span class="s1">decodedData</span><span class="s2">.</span><span class="s1">toString</span><span class="s2">(</span><span class="s1">Charsets</span><span class="s2">.</span><span class="s1">UTF_8</span><span class="s2">)</span><span class="s0">}</span><span class="s4">&quot;</span><span class="s2">)</span>
+            <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s4">&quot;Contact added!&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">()</span>
+            <span class="s5">// TODO: Store contact securely</span>
+        <span class="s2">} </span><span class="s1">catch </span><span class="s2">(</span><span class="s1">e: Exception</span><span class="s2">) {</span>
+            <span class="s1">Log</span><span class="s2">.</span><span class="s1">e</span><span class="s2">(</span><span class="s1">TAG</span><span class="s2">, </span><span class="s4">&quot;QR processing failed&quot;</span><span class="s2">, </span><span class="s1">e</span><span class="s2">)</span>
+            <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s4">&quot;Invalid QR code&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">()</span>
+        <span class="s2">}</span>
+    <span class="s2">}</span>
+<span class="s2">}</span>
+</pre>
+</body>
+</html>

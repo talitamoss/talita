@@ -1,0 +1,101 @@
+<html>
+<head>
+<title>EncryptionUtils.java</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cf8e6d;}
+.s1 { color: #bcbec4;}
+.s2 { color: #bcbec4;}
+.s3 { color: #6aab73;}
+.s4 { color: #2aacb8;}
+.s5 { color: #7a7e85;}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+EncryptionUtils.java</font>
+</center></td></tr></table>
+<pre><span class="s0">package </span><span class="s1">com</span><span class="s2">.</span><span class="s1">core</span><span class="s2">.</span><span class="s1">talita</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">security</span><span class="s2">.</span><span class="s1">keystore</span><span class="s2">.</span><span class="s1">KeyGenParameterSpec</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">security</span><span class="s2">.</span><span class="s1">keystore</span><span class="s2">.</span><span class="s1">KeyProperties</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">Base64</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">nio</span><span class="s2">.</span><span class="s1">charset</span><span class="s2">.</span><span class="s1">StandardCharsets</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">security</span><span class="s2">.</span><span class="s1">KeyStore</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">javax</span><span class="s2">.</span><span class="s1">crypto</span><span class="s2">.</span><span class="s1">Cipher</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">javax</span><span class="s2">.</span><span class="s1">crypto</span><span class="s2">.</span><span class="s1">KeyGenerator</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">javax</span><span class="s2">.</span><span class="s1">crypto</span><span class="s2">.</span><span class="s1">SecretKey</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">javax</span><span class="s2">.</span><span class="s1">crypto</span><span class="s2">.</span><span class="s1">spec</span><span class="s2">.</span><span class="s1">GCMParameterSpec</span><span class="s2">;</span>
+
+<span class="s0">public class </span><span class="s1">EncryptionUtils </span><span class="s2">{</span>
+
+    <span class="s0">private static final </span><span class="s1">String ANDROID_KEYSTORE </span><span class="s2">= </span><span class="s3">&quot;AndroidKeyStore&quot;</span><span class="s2">;</span>
+    <span class="s0">private static final </span><span class="s1">String KEY_ALIAS </span><span class="s2">= </span><span class="s3">&quot;TalitaEncryptionKey&quot;</span><span class="s2">;</span>
+    <span class="s0">private static final </span><span class="s1">String AES_MODE </span><span class="s2">= </span><span class="s3">&quot;AES/GCM/NoPadding&quot;</span><span class="s2">;</span>
+    <span class="s0">private static final int </span><span class="s1">IV_SIZE </span><span class="s2">= </span><span class="s4">12</span><span class="s2">;</span>
+    <span class="s0">private static final int </span><span class="s1">TAG_LENGTH </span><span class="s2">= </span><span class="s4">128</span><span class="s2">;</span>
+
+    <span class="s0">public static void </span><span class="s1">generateKey</span><span class="s2">() </span><span class="s0">throws </span><span class="s1">Exception </span><span class="s2">{</span>
+        <span class="s1">KeyStore keyStore </span><span class="s2">= </span><span class="s1">KeyStore</span><span class="s2">.</span><span class="s1">getInstance</span><span class="s2">(</span><span class="s1">ANDROID_KEYSTORE</span><span class="s2">);</span>
+        <span class="s1">keyStore</span><span class="s2">.</span><span class="s1">load</span><span class="s2">(</span><span class="s0">null</span><span class="s2">);</span>
+
+        <span class="s0">if </span><span class="s2">(!</span><span class="s1">keyStore</span><span class="s2">.</span><span class="s1">containsAlias</span><span class="s2">(</span><span class="s1">KEY_ALIAS</span><span class="s2">)) {</span>
+            <span class="s1">KeyGenParameterSpec keySpec </span><span class="s2">= </span><span class="s0">new </span><span class="s1">KeyGenParameterSpec</span><span class="s2">.</span><span class="s1">Builder</span><span class="s2">(</span>
+                    <span class="s1">KEY_ALIAS</span><span class="s2">,</span>
+                    <span class="s1">KeyProperties</span><span class="s2">.</span><span class="s1">PURPOSE_ENCRYPT </span><span class="s2">| </span><span class="s1">KeyProperties</span><span class="s2">.</span><span class="s1">PURPOSE_DECRYPT</span>
+            <span class="s2">)</span>
+                    <span class="s2">.</span><span class="s1">setBlockModes</span><span class="s2">(</span><span class="s1">KeyProperties</span><span class="s2">.</span><span class="s1">BLOCK_MODE_GCM</span><span class="s2">)</span>
+                    <span class="s2">.</span><span class="s1">setEncryptionPaddings</span><span class="s2">(</span><span class="s1">KeyProperties</span><span class="s2">.</span><span class="s1">ENCRYPTION_PADDING_NONE</span><span class="s2">)</span>
+                    <span class="s2">.</span><span class="s1">build</span><span class="s2">();</span>
+
+            <span class="s1">KeyGenerator keyGenerator </span><span class="s2">= </span><span class="s1">KeyGenerator</span><span class="s2">.</span><span class="s1">getInstance</span><span class="s2">(</span>
+                    <span class="s1">KeyProperties</span><span class="s2">.</span><span class="s1">KEY_ALGORITHM_AES</span><span class="s2">, </span><span class="s1">ANDROID_KEYSTORE</span><span class="s2">);</span>
+            <span class="s1">keyGenerator</span><span class="s2">.</span><span class="s1">init</span><span class="s2">(</span><span class="s1">keySpec</span><span class="s2">);</span>
+            <span class="s1">keyGenerator</span><span class="s2">.</span><span class="s1">generateKey</span><span class="s2">();</span>
+        <span class="s2">}</span>
+    <span class="s2">}</span>
+
+    <span class="s0">public static </span><span class="s1">String encrypt</span><span class="s2">(</span><span class="s1">String plaintext</span><span class="s2">) </span><span class="s0">throws </span><span class="s1">Exception </span><span class="s2">{</span>
+        <span class="s1">KeyStore keyStore </span><span class="s2">= </span><span class="s1">KeyStore</span><span class="s2">.</span><span class="s1">getInstance</span><span class="s2">(</span><span class="s1">ANDROID_KEYSTORE</span><span class="s2">);</span>
+        <span class="s1">keyStore</span><span class="s2">.</span><span class="s1">load</span><span class="s2">(</span><span class="s0">null</span><span class="s2">);</span>
+        <span class="s1">SecretKey key </span><span class="s2">= ((</span><span class="s1">SecretKey</span><span class="s2">) </span><span class="s1">keyStore</span><span class="s2">.</span><span class="s1">getKey</span><span class="s2">(</span><span class="s1">KEY_ALIAS</span><span class="s2">, </span><span class="s0">null</span><span class="s2">));</span>
+
+        <span class="s1">Cipher cipher </span><span class="s2">= </span><span class="s1">Cipher</span><span class="s2">.</span><span class="s1">getInstance</span><span class="s2">(</span><span class="s1">AES_MODE</span><span class="s2">);</span>
+        <span class="s1">cipher</span><span class="s2">.</span><span class="s1">init</span><span class="s2">(</span><span class="s1">Cipher</span><span class="s2">.</span><span class="s1">ENCRYPT_MODE</span><span class="s2">, </span><span class="s1">key</span><span class="s2">);</span>
+        <span class="s0">byte</span><span class="s2">[] </span><span class="s1">iv </span><span class="s2">= </span><span class="s1">cipher</span><span class="s2">.</span><span class="s1">getIV</span><span class="s2">();</span>
+        <span class="s0">byte</span><span class="s2">[] </span><span class="s1">encrypted </span><span class="s2">= </span><span class="s1">cipher</span><span class="s2">.</span><span class="s1">doFinal</span><span class="s2">(</span><span class="s1">plaintext</span><span class="s2">.</span><span class="s1">getBytes</span><span class="s2">(</span><span class="s1">StandardCharsets</span><span class="s2">.</span><span class="s1">UTF_8</span><span class="s2">));</span>
+
+        <span class="s5">// Prepend IV to the encrypted message and Base64 encode</span>
+        <span class="s0">byte</span><span class="s2">[] </span><span class="s1">combined </span><span class="s2">= </span><span class="s0">new byte</span><span class="s2">[</span><span class="s1">iv</span><span class="s2">.</span><span class="s1">length </span><span class="s2">+ </span><span class="s1">encrypted</span><span class="s2">.</span><span class="s1">length</span><span class="s2">];</span>
+        <span class="s1">System</span><span class="s2">.</span><span class="s1">arraycopy</span><span class="s2">(</span><span class="s1">iv</span><span class="s2">, </span><span class="s4">0</span><span class="s2">, </span><span class="s1">combined</span><span class="s2">, </span><span class="s4">0</span><span class="s2">, </span><span class="s1">iv</span><span class="s2">.</span><span class="s1">length</span><span class="s2">);</span>
+        <span class="s1">System</span><span class="s2">.</span><span class="s1">arraycopy</span><span class="s2">(</span><span class="s1">encrypted</span><span class="s2">, </span><span class="s4">0</span><span class="s2">, </span><span class="s1">combined</span><span class="s2">, </span><span class="s1">iv</span><span class="s2">.</span><span class="s1">length</span><span class="s2">, </span><span class="s1">encrypted</span><span class="s2">.</span><span class="s1">length</span><span class="s2">);</span>
+
+        <span class="s0">return </span><span class="s1">Base64</span><span class="s2">.</span><span class="s1">encodeToString</span><span class="s2">(</span><span class="s1">combined</span><span class="s2">, </span><span class="s1">Base64</span><span class="s2">.</span><span class="s1">DEFAULT</span><span class="s2">);</span>
+    <span class="s2">}</span>
+
+    <span class="s0">public static </span><span class="s1">String decrypt</span><span class="s2">(</span><span class="s1">String encryptedData</span><span class="s2">) </span><span class="s0">throws </span><span class="s1">Exception </span><span class="s2">{</span>
+        <span class="s1">KeyStore keyStore </span><span class="s2">= </span><span class="s1">KeyStore</span><span class="s2">.</span><span class="s1">getInstance</span><span class="s2">(</span><span class="s1">ANDROID_KEYSTORE</span><span class="s2">);</span>
+        <span class="s1">keyStore</span><span class="s2">.</span><span class="s1">load</span><span class="s2">(</span><span class="s0">null</span><span class="s2">);</span>
+        <span class="s1">SecretKey key </span><span class="s2">= ((</span><span class="s1">SecretKey</span><span class="s2">) </span><span class="s1">keyStore</span><span class="s2">.</span><span class="s1">getKey</span><span class="s2">(</span><span class="s1">KEY_ALIAS</span><span class="s2">, </span><span class="s0">null</span><span class="s2">));</span>
+
+        <span class="s0">byte</span><span class="s2">[] </span><span class="s1">combined </span><span class="s2">= </span><span class="s1">Base64</span><span class="s2">.</span><span class="s1">decode</span><span class="s2">(</span><span class="s1">encryptedData</span><span class="s2">, </span><span class="s1">Base64</span><span class="s2">.</span><span class="s1">DEFAULT</span><span class="s2">);</span>
+        <span class="s0">byte</span><span class="s2">[] </span><span class="s1">iv </span><span class="s2">= </span><span class="s0">new byte</span><span class="s2">[</span><span class="s1">IV_SIZE</span><span class="s2">];</span>
+        <span class="s0">byte</span><span class="s2">[] </span><span class="s1">encrypted </span><span class="s2">= </span><span class="s0">new byte</span><span class="s2">[</span><span class="s1">combined</span><span class="s2">.</span><span class="s1">length </span><span class="s2">- </span><span class="s1">IV_SIZE</span><span class="s2">];</span>
+
+        <span class="s1">System</span><span class="s2">.</span><span class="s1">arraycopy</span><span class="s2">(</span><span class="s1">combined</span><span class="s2">, </span><span class="s4">0</span><span class="s2">, </span><span class="s1">iv</span><span class="s2">, </span><span class="s4">0</span><span class="s2">, </span><span class="s1">IV_SIZE</span><span class="s2">);</span>
+        <span class="s1">System</span><span class="s2">.</span><span class="s1">arraycopy</span><span class="s2">(</span><span class="s1">combined</span><span class="s2">, </span><span class="s1">IV_SIZE</span><span class="s2">, </span><span class="s1">encrypted</span><span class="s2">, </span><span class="s4">0</span><span class="s2">, </span><span class="s1">encrypted</span><span class="s2">.</span><span class="s1">length</span><span class="s2">);</span>
+
+        <span class="s1">Cipher cipher </span><span class="s2">= </span><span class="s1">Cipher</span><span class="s2">.</span><span class="s1">getInstance</span><span class="s2">(</span><span class="s1">AES_MODE</span><span class="s2">);</span>
+        <span class="s1">GCMParameterSpec spec </span><span class="s2">= </span><span class="s0">new </span><span class="s1">GCMParameterSpec</span><span class="s2">(</span><span class="s1">TAG_LENGTH</span><span class="s2">, </span><span class="s1">iv</span><span class="s2">);</span>
+        <span class="s1">cipher</span><span class="s2">.</span><span class="s1">init</span><span class="s2">(</span><span class="s1">Cipher</span><span class="s2">.</span><span class="s1">DECRYPT_MODE</span><span class="s2">, </span><span class="s1">key</span><span class="s2">, </span><span class="s1">spec</span><span class="s2">);</span>
+
+        <span class="s0">byte</span><span class="s2">[] </span><span class="s1">decrypted </span><span class="s2">= </span><span class="s1">cipher</span><span class="s2">.</span><span class="s1">doFinal</span><span class="s2">(</span><span class="s1">encrypted</span><span class="s2">);</span>
+        <span class="s0">return new </span><span class="s1">String</span><span class="s2">(</span><span class="s1">decrypted</span><span class="s2">, </span><span class="s1">StandardCharsets</span><span class="s2">.</span><span class="s1">UTF_8</span><span class="s2">);</span>
+    <span class="s2">}</span>
+<span class="s2">}</span>
+</pre>
+</body>
+</html>

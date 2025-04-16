@@ -1,0 +1,156 @@
+<html>
+<head>
+<title>LocationTracker.java</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cf8e6d;}
+.s1 { color: #bcbec4;}
+.s2 { color: #bcbec4;}
+.s3 { color: #7a7e85;}
+.s4 { color: #6aab73;}
+.s5 { color: #2aacb8;}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+LocationTracker.java</font>
+</center></td></tr></table>
+<pre><span class="s0">package </span><span class="s1">com</span><span class="s2">.</span><span class="s1">core</span><span class="s2">.</span><span class="s1">talita</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">Manifest</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">content</span><span class="s2">.</span><span class="s1">Context</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">location</span><span class="s2">.</span><span class="s1">Location</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">location</span><span class="s2">.</span><span class="s1">LocationListener</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">location</span><span class="s2">.</span><span class="s1">LocationManager</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">os</span><span class="s2">.</span><span class="s1">Bundle</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">widget</span><span class="s2">.</span><span class="s1">TextView</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">widget</span><span class="s2">.</span><span class="s1">Toast</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">content</span><span class="s2">.</span><span class="s1">pm</span><span class="s2">.</span><span class="s1">PackageManager</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">androidx</span><span class="s2">.</span><span class="s1">core</span><span class="s2">.</span><span class="s1">app</span><span class="s2">.</span><span class="s1">ActivityCompat</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">json</span><span class="s2">.</span><span class="s1">JSONException</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">json</span><span class="s2">.</span><span class="s1">JSONObject</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">osmdroid</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">GeoPoint</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">osmdroid</span><span class="s2">.</span><span class="s1">views</span><span class="s2">.</span><span class="s1">MapView</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">osmdroid</span><span class="s2">.</span><span class="s1">views</span><span class="s2">.</span><span class="s1">overlay</span><span class="s2">.</span><span class="s1">Marker</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">osmdroid</span><span class="s2">.</span><span class="s1">views</span><span class="s2">.</span><span class="s1">overlay</span><span class="s2">.</span><span class="s1">Polyline</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">io</span><span class="s2">.</span><span class="s1">FileOutputStream</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">io</span><span class="s2">.</span><span class="s1">IOException</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">ArrayList</span><span class="s2">;</span>
+
+<span class="s0">public class </span><span class="s1">LocationTracker </span><span class="s0">implements </span><span class="s1">LocationListener </span><span class="s2">{</span>
+
+    <span class="s0">private final </span><span class="s1">LocationManager locationManager</span><span class="s2">;</span>
+    <span class="s0">private final </span><span class="s1">Context context</span><span class="s2">;</span>
+    <span class="s0">private final </span><span class="s1">TextView locationTextView</span><span class="s2">;</span>
+    <span class="s0">private final </span><span class="s1">MapView mapView</span><span class="s2">;</span>
+    <span class="s0">private final </span><span class="s1">Polyline polyline</span><span class="s2">;</span>
+    <span class="s0">private final </span><span class="s1">ArrayList</span><span class="s2">&lt;</span><span class="s1">GeoPoint</span><span class="s2">&gt; </span><span class="s1">routePoints</span><span class="s2">;</span>
+
+    <span class="s3">// Constructor</span>
+    <span class="s0">public </span><span class="s1">LocationTracker</span><span class="s2">(</span><span class="s1">Context context</span><span class="s2">, </span><span class="s1">TextView locationTextView</span><span class="s2">, </span><span class="s1">MapView mapView</span><span class="s2">, </span><span class="s1">Polyline polyline</span><span class="s2">, </span><span class="s1">ArrayList</span><span class="s2">&lt;</span><span class="s1">GeoPoint</span><span class="s2">&gt; </span><span class="s1">routePoints</span><span class="s2">) {</span>
+        <span class="s0">this</span><span class="s2">.</span><span class="s1">context </span><span class="s2">= </span><span class="s1">context</span><span class="s2">;</span>
+        <span class="s0">this</span><span class="s2">.</span><span class="s1">locationTextView </span><span class="s2">= </span><span class="s1">locationTextView</span><span class="s2">;</span>
+        <span class="s0">this</span><span class="s2">.</span><span class="s1">mapView </span><span class="s2">= </span><span class="s1">mapView</span><span class="s2">;</span>
+        <span class="s0">this</span><span class="s2">.</span><span class="s1">polyline </span><span class="s2">= </span><span class="s1">polyline</span><span class="s2">;</span>
+        <span class="s0">this</span><span class="s2">.</span><span class="s1">routePoints </span><span class="s2">= </span><span class="s1">routePoints</span><span class="s2">;</span>
+        <span class="s1">locationManager </span><span class="s2">= (</span><span class="s1">LocationManager</span><span class="s2">) </span><span class="s1">context</span><span class="s2">.</span><span class="s1">getSystemService</span><span class="s2">(</span><span class="s1">Context</span><span class="s2">.</span><span class="s1">LOCATION_SERVICE</span><span class="s2">);</span>
+    <span class="s2">}</span>
+
+    <span class="s3">// Start location tracking</span>
+    <span class="s0">public void </span><span class="s1">startTracking</span><span class="s2">() {</span>
+        <span class="s3">// Check for location permissions</span>
+        <span class="s0">if </span><span class="s2">(</span><span class="s1">ActivityCompat</span><span class="s2">.</span><span class="s1">checkSelfPermission</span><span class="s2">(</span><span class="s1">context</span><span class="s2">, </span><span class="s1">Manifest</span><span class="s2">.</span><span class="s1">permission</span><span class="s2">.</span><span class="s1">ACCESS_FINE_LOCATION</span><span class="s2">) != </span><span class="s1">PackageManager</span><span class="s2">.</span><span class="s1">PERMISSION_GRANTED</span><span class="s2">) {</span>
+            <span class="s3">// If permission isn't granted, request it</span>
+            <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s1">context</span><span class="s2">, </span><span class="s4">&quot;Location permission not granted&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">();</span>
+            <span class="s0">return</span><span class="s2">;</span>
+        <span class="s2">}</span>
+
+        <span class="s3">// Request location updates using GPS</span>
+        <span class="s0">try </span><span class="s2">{</span>
+            <span class="s1">locationManager</span><span class="s2">.</span><span class="s1">requestLocationUpdates</span><span class="s2">(</span>
+                    <span class="s1">LocationManager</span><span class="s2">.</span><span class="s1">GPS_PROVIDER</span><span class="s2">, </span><span class="s3">// GPS for high accuracy</span>
+                    <span class="s5">10000</span><span class="s2">, </span><span class="s3">// Update every 10 seconds</span>
+                    <span class="s5">10</span><span class="s2">,    </span><span class="s3">// Update every 10 meters</span>
+                    <span class="s0">this   </span><span class="s3">// LocationListener</span>
+            <span class="s2">);</span>
+        <span class="s2">} </span><span class="s0">catch </span><span class="s2">(</span><span class="s1">SecurityException e</span><span class="s2">) {</span>
+            <span class="s1">e</span><span class="s2">.</span><span class="s1">printStackTrace</span><span class="s2">();</span>
+        <span class="s2">}</span>
+    <span class="s2">}</span>
+
+    <span class="s3">// Stop location tracking</span>
+    <span class="s0">public void </span><span class="s1">stopTracking</span><span class="s2">() {</span>
+        <span class="s1">locationManager</span><span class="s2">.</span><span class="s1">removeUpdates</span><span class="s2">(</span><span class="s0">this</span><span class="s2">);</span>
+    <span class="s2">}</span>
+
+    <span class="s3">// This method is called when the location is updated</span>
+        <span class="s1">@Override</span>
+        <span class="s0">public void </span><span class="s1">onLocationChanged</span><span class="s2">(</span><span class="s1">Location location</span><span class="s2">) {</span>
+            <span class="s3">// Get current location</span>
+            <span class="s0">double </span><span class="s1">latitude </span><span class="s2">= </span><span class="s1">location</span><span class="s2">.</span><span class="s1">getLatitude</span><span class="s2">();</span>
+            <span class="s0">double </span><span class="s1">longitude </span><span class="s2">= </span><span class="s1">location</span><span class="s2">.</span><span class="s1">getLongitude</span><span class="s2">();</span>
+            <span class="s1">GeoPoint geoPoint </span><span class="s2">= </span><span class="s0">new </span><span class="s1">GeoPoint</span><span class="s2">(</span><span class="s1">latitude</span><span class="s2">, </span><span class="s1">longitude</span><span class="s2">);</span>
+
+            <span class="s3">// Add to route points</span>
+            <span class="s1">routePoints</span><span class="s2">.</span><span class="s1">add</span><span class="s2">(</span><span class="s1">geoPoint</span><span class="s2">);</span>
+
+            <span class="s3">// Update polyline</span>
+            <span class="s1">polyline</span><span class="s2">.</span><span class="s1">setPoints</span><span class="s2">(</span><span class="s1">routePoints</span><span class="s2">);</span>
+
+            <span class="s3">// Add marker for the new point</span>
+            <span class="s1">Marker marker </span><span class="s2">= </span><span class="s0">new </span><span class="s1">Marker</span><span class="s2">(</span><span class="s1">mapView</span><span class="s2">);</span>
+            <span class="s1">marker</span><span class="s2">.</span><span class="s1">setPosition</span><span class="s2">(</span><span class="s1">geoPoint</span><span class="s2">);</span>
+            <span class="s1">marker</span><span class="s2">.</span><span class="s1">setTitle</span><span class="s2">(</span><span class="s4">&quot;Timestamp: &quot; </span><span class="s2">+ </span><span class="s1">System</span><span class="s2">.</span><span class="s1">currentTimeMillis</span><span class="s2">());</span>
+            <span class="s1">mapView</span><span class="s2">.</span><span class="s1">getOverlays</span><span class="s2">().</span><span class="s1">add</span><span class="s2">(</span><span class="s1">marker</span><span class="s2">);</span>
+
+            <span class="s1">mapView</span><span class="s2">.</span><span class="s1">getController</span><span class="s2">().</span><span class="s1">setCenter</span><span class="s2">(</span><span class="s1">geoPoint</span><span class="s2">);</span>
+            <span class="s1">mapView</span><span class="s2">.</span><span class="s1">getController</span><span class="s2">().</span><span class="s1">setZoom</span><span class="s2">(</span><span class="s5">15</span><span class="s2">);</span>
+
+            <span class="s1">locationTextView</span><span class="s2">.</span><span class="s1">setText</span><span class="s2">(</span><span class="s4">&quot;Lat: &quot; </span><span class="s2">+ </span><span class="s1">latitude </span><span class="s2">+ </span><span class="s4">&quot;, Lon: &quot; </span><span class="s2">+ </span><span class="s1">longitude</span><span class="s2">);</span>
+
+            <span class="s0">long </span><span class="s1">timestamp </span><span class="s2">= </span><span class="s1">System</span><span class="s2">.</span><span class="s1">currentTimeMillis</span><span class="s2">();</span>
+
+            <span class="s1">saveLocationToFile</span><span class="s2">(</span><span class="s1">latitude</span><span class="s2">, </span><span class="s1">longitude</span><span class="s2">, </span><span class="s1">timestamp</span><span class="s2">);</span>
+        <span class="s2">}</span>
+
+        <span class="s0">private void </span><span class="s1">saveLocationToFile</span><span class="s2">(</span><span class="s0">double </span><span class="s1">latitude</span><span class="s2">, </span><span class="s0">double </span><span class="s1">longitude</span><span class="s2">, </span><span class="s0">long </span><span class="s1">timestamp</span><span class="s2">) {</span>
+            <span class="s0">try </span><span class="s2">{</span>
+                <span class="s1">JSONObject locationData </span><span class="s2">= </span><span class="s0">new </span><span class="s1">JSONObject</span><span class="s2">();</span>
+                <span class="s1">locationData</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s4">&quot;latitude&quot;</span><span class="s2">, </span><span class="s1">latitude</span><span class="s2">);</span>
+                <span class="s1">locationData</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s4">&quot;longitude&quot;</span><span class="s2">, </span><span class="s1">longitude</span><span class="s2">);</span>
+                <span class="s1">locationData</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s4">&quot;timestamp&quot;</span><span class="s2">, </span><span class="s1">timestamp</span><span class="s2">);</span>
+
+                <span class="s1">FileOutputStream fos </span><span class="s2">= </span><span class="s1">context</span><span class="s2">.</span><span class="s1">openFileOutput</span><span class="s2">(</span><span class="s4">&quot;location_data.txt&quot;</span><span class="s2">, </span><span class="s1">Context</span><span class="s2">.</span><span class="s1">MODE_APPEND</span><span class="s2">);</span>
+                <span class="s1">fos</span><span class="s2">.</span><span class="s1">write</span><span class="s2">(</span><span class="s1">locationData</span><span class="s2">.</span><span class="s1">toString</span><span class="s2">().</span><span class="s1">getBytes</span><span class="s2">());</span>
+                <span class="s1">fos</span><span class="s2">.</span><span class="s1">close</span><span class="s2">();</span>
+
+                <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s1">context</span><span class="s2">, </span><span class="s4">&quot;Location saved&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">();</span>
+
+            <span class="s2">} </span><span class="s0">catch </span><span class="s2">(</span><span class="s1">IOException e</span><span class="s2">) {</span>
+                <span class="s1">e</span><span class="s2">.</span><span class="s1">printStackTrace</span><span class="s2">();</span>
+                <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s1">context</span><span class="s2">, </span><span class="s4">&quot;File write error&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">();</span>
+
+            <span class="s2">} </span><span class="s0">catch </span><span class="s2">(</span><span class="s1">JSONException e</span><span class="s2">) {</span>
+                <span class="s1">e</span><span class="s2">.</span><span class="s1">printStackTrace</span><span class="s2">();</span>
+                <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s1">context</span><span class="s2">, </span><span class="s4">&quot;JSON formatting error&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">();</span>
+            <span class="s2">}</span>
+        <span class="s2">}</span>
+
+
+        <span class="s3">// These methods are required by the LocationListener interface, but we're not using them here</span>
+        <span class="s1">@Override</span>
+        <span class="s0">public void </span><span class="s1">onStatusChanged</span><span class="s2">(</span><span class="s1">String provider</span><span class="s2">, </span><span class="s0">int </span><span class="s1">status</span><span class="s2">, </span><span class="s1">Bundle extras</span><span class="s2">) {}</span>
+
+        <span class="s1">@Override</span>
+        <span class="s0">public void </span><span class="s1">onProviderEnabled</span><span class="s2">(</span><span class="s1">String provider</span><span class="s2">) {}</span>
+
+        <span class="s1">@Override</span>
+        <span class="s0">public void </span><span class="s1">onProviderDisabled</span><span class="s2">(</span><span class="s1">String provider</span><span class="s2">) {}</span>
+    <span class="s2">}</span>
+</pre>
+</body>
+</html>

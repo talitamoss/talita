@@ -1,0 +1,131 @@
+<html>
+<head>
+<title>MainActivity.java</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cf8e6d;}
+.s1 { color: #bcbec4;}
+.s2 { color: #bcbec4;}
+.s3 { color: #2aacb8;}
+.s4 { color: #7a7e85;}
+.s5 { color: #6aab73;}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+MainActivity.java</font>
+</center></td></tr></table>
+<pre><span class="s0">package </span><span class="s1">com</span><span class="s2">.</span><span class="s1">core</span><span class="s2">.</span><span class="s1">talita</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">Manifest</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">content</span><span class="s2">.</span><span class="s1">pm</span><span class="s2">.</span><span class="s1">PackageManager</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">os</span><span class="s2">.</span><span class="s1">Bundle</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">widget</span><span class="s2">.</span><span class="s1">Toast</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">widget</span><span class="s2">.</span><span class="s1">TextView</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">androidx</span><span class="s2">.</span><span class="s1">appcompat</span><span class="s2">.</span><span class="s1">app</span><span class="s2">.</span><span class="s1">AppCompatActivity</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">androidx</span><span class="s2">.</span><span class="s1">core</span><span class="s2">.</span><span class="s1">app</span><span class="s2">.</span><span class="s1">ActivityCompat</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">view</span><span class="s2">.</span><span class="s1">View</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">widget</span><span class="s2">.</span><span class="s1">Button</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">widget</span><span class="s2">.</span><span class="s1">ScrollView</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">preference</span><span class="s2">.</span><span class="s1">PreferenceManager</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">osmdroid</span><span class="s2">.</span><span class="s1">views</span><span class="s2">.</span><span class="s1">MapView</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">osmdroid</span><span class="s2">.</span><span class="s1">config</span><span class="s2">.</span><span class="s1">Configuration</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">osmdroid</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">GeoPoint</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">osmdroid</span><span class="s2">.</span><span class="s1">tileprovider</span><span class="s2">.</span><span class="s1">tilesource</span><span class="s2">.</span><span class="s1">TileSourceFactory</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">osmdroid</span><span class="s2">.</span><span class="s1">views</span><span class="s2">.</span><span class="s1">overlay</span><span class="s2">.</span><span class="s1">Polyline</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">ArrayList</span><span class="s2">;</span>
+
+
+
+<span class="s0">public class </span><span class="s1">MainActivity </span><span class="s0">extends </span><span class="s1">AppCompatActivity </span><span class="s2">{</span>
+    <span class="s0">private static final int </span><span class="s1">REQUEST_LOCATION_PERMISSION </span><span class="s2">= </span><span class="s3">1</span><span class="s2">;</span>
+    <span class="s0">private </span><span class="s1">LocationTracker locationTracker</span><span class="s2">;</span>
+
+    <span class="s0">private </span><span class="s1">MapView mapView</span><span class="s2">;</span>
+    <span class="s0">private </span><span class="s1">Polyline polyline</span><span class="s2">; </span><span class="s4">// To track the route</span>
+    <span class="s0">private final </span><span class="s1">ArrayList</span><span class="s2">&lt;</span><span class="s1">GeoPoint</span><span class="s2">&gt; </span><span class="s1">routePoints </span><span class="s2">= </span><span class="s0">new </span><span class="s1">ArrayList</span><span class="s2">&lt;&gt;(); </span><span class="s4">// To store the locations</span>
+
+
+    <span class="s1">@Override</span>
+    <span class="s0">protected void </span><span class="s1">onCreate</span><span class="s2">(</span><span class="s1">Bundle savedInstanceState</span><span class="s2">) {</span>
+        <span class="s0">super</span><span class="s2">.</span><span class="s1">onCreate</span><span class="s2">(</span><span class="s1">savedInstanceState</span><span class="s2">);</span>
+        <span class="s1">Configuration</span><span class="s2">.</span><span class="s1">getInstance</span><span class="s2">().</span><span class="s1">load</span><span class="s2">(</span>
+                <span class="s1">getApplicationContext</span><span class="s2">(),</span>
+                <span class="s1">PreferenceManager</span><span class="s2">.</span><span class="s1">getDefaultSharedPreferences</span><span class="s2">(</span><span class="s1">getApplicationContext</span><span class="s2">())</span>
+        <span class="s2">);</span>
+        <span class="s1">Configuration</span><span class="s2">.</span><span class="s1">getInstance</span><span class="s2">().</span><span class="s1">setUserAgentValue</span><span class="s2">(</span><span class="s5">&quot;com.core.talita&quot;</span><span class="s2">);</span>
+
+        <span class="s1">setContentView</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">layout</span><span class="s2">.</span><span class="s1">activity_main</span><span class="s2">);</span>
+
+        <span class="s1">mapView </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">mapView</span><span class="s2">);</span>
+        <span class="s1">mapView</span><span class="s2">.</span><span class="s1">setTileSource</span><span class="s2">(</span><span class="s1">TileSourceFactory</span><span class="s2">.</span><span class="s1">MAPNIK</span><span class="s2">);</span>
+        <span class="s1">mapView</span><span class="s2">.</span><span class="s1">setMultiTouchControls</span><span class="s2">(</span><span class="s0">true</span><span class="s2">);</span>
+        <span class="s1">GeoPoint startPoint </span><span class="s2">= </span><span class="s0">new </span><span class="s1">GeoPoint</span><span class="s2">(</span><span class="s3">0.0</span><span class="s2">, </span><span class="s3">0.0</span><span class="s2">);</span>
+        <span class="s1">mapView</span><span class="s2">.</span><span class="s1">getController</span><span class="s2">().</span><span class="s1">setZoom</span><span class="s2">(</span><span class="s3">15.0</span><span class="s2">);</span>
+        <span class="s1">mapView</span><span class="s2">.</span><span class="s1">getController</span><span class="s2">().</span><span class="s1">setCenter</span><span class="s2">(</span><span class="s1">startPoint</span><span class="s2">);</span>
+
+
+        <span class="s1">TextView locationTextView </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">location_info</span><span class="s2">);</span>
+        <span class="s1">ScrollView locationList </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">location_display_scrollview</span><span class="s2">);</span>
+        <span class="s1">mapView </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">mapView</span><span class="s2">);</span>
+        <span class="s1">Button toggleButton </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">show_location_button</span><span class="s2">);</span>
+
+        <span class="s4">// Toggle logic</span>
+        <span class="s1">toggleButton</span><span class="s2">.</span><span class="s1">setOnClickListener</span><span class="s2">(</span><span class="s1">v -&gt; </span><span class="s2">{</span>
+            <span class="s0">if </span><span class="s2">(</span><span class="s1">locationList</span><span class="s2">.</span><span class="s1">getVisibility</span><span class="s2">() == </span><span class="s1">View</span><span class="s2">.</span><span class="s1">VISIBLE</span><span class="s2">) {</span>
+                <span class="s1">locationList</span><span class="s2">.</span><span class="s1">setVisibility</span><span class="s2">(</span><span class="s1">View</span><span class="s2">.</span><span class="s1">GONE</span><span class="s2">);</span>
+                <span class="s1">mapView</span><span class="s2">.</span><span class="s1">setVisibility</span><span class="s2">(</span><span class="s1">View</span><span class="s2">.</span><span class="s1">VISIBLE</span><span class="s2">);</span>
+                <span class="s1">toggleButton</span><span class="s2">.</span><span class="s1">setText</span><span class="s2">(</span><span class="s5">&quot;Show Recorded Locations&quot;</span><span class="s2">);</span>
+            <span class="s2">} </span><span class="s0">else </span><span class="s2">{</span>
+                <span class="s1">locationList</span><span class="s2">.</span><span class="s1">setVisibility</span><span class="s2">(</span><span class="s1">View</span><span class="s2">.</span><span class="s1">VISIBLE</span><span class="s2">);</span>
+                <span class="s1">mapView</span><span class="s2">.</span><span class="s1">setVisibility</span><span class="s2">(</span><span class="s1">View</span><span class="s2">.</span><span class="s1">GONE</span><span class="s2">);</span>
+                <span class="s1">toggleButton</span><span class="s2">.</span><span class="s1">setText</span><span class="s2">(</span><span class="s5">&quot;Show Map&quot;</span><span class="s2">);</span>
+            <span class="s2">}</span>
+        <span class="s2">});</span>
+
+
+        <span class="s4">// Initialize polyline</span>
+        <span class="s1">polyline </span><span class="s2">= </span><span class="s0">new </span><span class="s1">Polyline</span><span class="s2">();</span>
+        <span class="s1">mapView</span><span class="s2">.</span><span class="s1">getOverlays</span><span class="s2">().</span><span class="s1">add</span><span class="s2">(</span><span class="s1">polyline</span><span class="s2">); </span><span class="s4">// Add polyline to map overlays</span>
+
+        <span class="s1">locationTracker </span><span class="s2">= </span><span class="s0">new </span><span class="s1">LocationTracker</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s1">locationTextView</span><span class="s2">, </span><span class="s1">mapView</span><span class="s2">, </span><span class="s1">polyline</span><span class="s2">,</span><span class="s1">routePoints</span><span class="s2">);</span>
+
+
+        <span class="s4">// Check and request location permission</span>
+        <span class="s0">if </span><span class="s2">(</span><span class="s1">ActivityCompat</span><span class="s2">.</span><span class="s1">checkSelfPermission</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s1">Manifest</span><span class="s2">.</span><span class="s1">permission</span><span class="s2">. </span><span class="s1">ACCESS_FINE_LOCATION</span><span class="s2">)</span>
+            <span class="s2">!= </span><span class="s1">PackageManager</span><span class="s2">.</span><span class="s1">PERMISSION_GRANTED</span><span class="s2">) {</span>
+            <span class="s1">ActivityCompat</span><span class="s2">.</span><span class="s1">requestPermissions</span><span class="s2">(</span>
+                    <span class="s0">this</span><span class="s2">,</span>
+                    <span class="s0">new </span><span class="s1">String</span><span class="s2">[]{</span><span class="s1">Manifest</span><span class="s2">.</span><span class="s1">permission</span><span class="s2">.</span><span class="s1">ACCESS_FINE_LOCATION</span><span class="s2">},</span>
+                    <span class="s1">REQUEST_LOCATION_PERMISSION</span>
+            <span class="s2">);</span>
+        <span class="s2">} </span><span class="s0">else </span><span class="s2">{</span>
+            <span class="s1">locationTracker</span><span class="s2">.</span><span class="s1">startTracking</span><span class="s2">(); </span><span class="s4">// start tracking immediately if permission is already granted</span>
+        <span class="s2">}</span>
+    <span class="s2">}</span>
+
+    <span class="s1">@Override</span>
+    <span class="s0">protected void </span><span class="s1">onPause</span><span class="s2">() {</span>
+        <span class="s0">super</span><span class="s2">.</span><span class="s1">onPause</span><span class="s2">();</span>
+        <span class="s1">locationTracker</span><span class="s2">.</span><span class="s1">stopTracking</span><span class="s2">();</span>
+    <span class="s2">}</span>
+
+    <span class="s1">@Override</span>
+    <span class="s0">public void </span><span class="s1">onRequestPermissionsResult</span><span class="s2">(</span><span class="s0">int </span><span class="s1">requestCode</span><span class="s2">, </span><span class="s1">String</span><span class="s2">[] </span><span class="s1">permissions</span><span class="s2">, </span><span class="s0">int</span><span class="s2">[] </span><span class="s1">grantResults</span><span class="s2">) {</span>
+        <span class="s0">super</span><span class="s2">.</span><span class="s1">onRequestPermissionsResult</span><span class="s2">(</span><span class="s1">requestCode</span><span class="s2">, </span><span class="s1">permissions</span><span class="s2">, </span><span class="s1">grantResults</span><span class="s2">);</span>
+        <span class="s0">if </span><span class="s2">(</span><span class="s1">requestCode </span><span class="s2">==</span><span class="s1">REQUEST_LOCATION_PERMISSION</span><span class="s2">) {</span>
+            <span class="s0">if </span><span class="s2">(</span><span class="s1">grantResults</span><span class="s2">.</span><span class="s1">length </span><span class="s2">&gt; </span><span class="s3">0 </span><span class="s2">&amp;&amp; </span><span class="s1">grantResults</span><span class="s2">[</span><span class="s3">0</span><span class="s2">] == </span><span class="s1">PackageManager</span><span class="s2">.</span><span class="s1">PERMISSION_GRANTED</span><span class="s2">) {</span>
+                <span class="s1">locationTracker</span><span class="s2">.</span><span class="s1">startTracking</span><span class="s2">();</span>
+            <span class="s2">} </span><span class="s0">else </span><span class="s2">{</span>
+                <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s5">&quot;Location permission denied&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">();</span>
+            <span class="s2">}</span>
+        <span class="s2">}</span>
+    <span class="s2">}</span>
+<span class="s2">}</span>
+</pre>
+</body>
+</html>
