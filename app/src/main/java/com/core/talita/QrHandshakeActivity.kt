@@ -14,6 +14,13 @@ import com.google.zxing.WriterException
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.common.BitMatrix
 import com.core.talita.databinding.ActivityQrHandshakeBinding
+import java.security.KeyPair
+import java.security.KeyPairGenerator
+import java.security.PrivateKey
+import java.security.PublicKey
+import java.security.KeyFactory
+import java.security.spec.X509EncodedKeySpec
+import java.security.MessageDigest
 
 class QrHandshakeActivity : AppCompatActivity() {
 
@@ -23,6 +30,7 @@ class QrHandshakeActivity : AppCompatActivity() {
     }
 
     private lateinit var binding: ActivityQrHandshakeBinding
+    private lateinit var keyPair: KeyPair
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,12 +53,17 @@ class QrHandshakeActivity : AppCompatActivity() {
     @Throws(WriterException::class)
     private fun generateQrCode() {
         // Generate cryptographic keys (simplified example)
-        val publicKey = "SAMPLE_PUBLIC_KEY_123".toByteArray()
+        if (!::keyPair.isInitialized) {
+            generateKeyPair()
+        }
+
+        val publicKeyBytes = keyPair.public.encoded
+        val publicKeyBase64 = Base64.encodeToString(publicKeyBytes, Base64.DEFAULT)
 
         // QR Generation
         val writer = QRCodeWriter()
         val bitMatrix = writer.encode(
-            Base64.encodeToString(publicKey, Base64.DEFAULT),
+            publicKeyBase64,
             BarcodeFormat.QR_CODE,
             400,
             400
@@ -66,6 +79,12 @@ class QrHandshakeActivity : AppCompatActivity() {
         }
 
         binding.ivQrCode.setImageBitmap(bitmap)
+    }
+
+    private fun generateKeyPair() {
+        val keyGen = KeyPairGenerator.getInstance("RSA")
+        keyGen.initialize(2048)
+        keyPair = keyGen.generateKeyPair()
     }
 
     private fun launchQrScanner() {
@@ -105,10 +124,21 @@ class QrHandshakeActivity : AppCompatActivity() {
 
     private fun processScannedQr(content: String) {
         try {
-            val decodedData = Base64.decode(content, Base64.DEFAULT)
-            Log.d(TAG, "Received contact: ${decodedData.toString(Charsets.UTF_8)}")
+            val decodedBytes = Base64.decode(content, Base64.DEFAULT)
+            val keySpec = X509EncodedKeySpec(decodedBytes)
+            val keyFactory = KeyFactory.getInstance("RSA")
+            val publicKey = keyFactory.generatePublic(keySpec)
+
+            // Optional: generate a fingerprint to identify the contact
+            val fingerprint = MessageDigest.getInstance("SHA-256")
+                .digest(decodedBytes)
+                .joinToString("") { "%02x".format(it) }
+
+            Log.d(TAG, "Trusted key added. Fingerprint: $fingerprint")
             Toast.makeText(this, "Contact added!", Toast.LENGTH_SHORT).show()
-            // TODO: Store contact securely
+
+            // TODO: Store publicKey somewhere secure (like EncryptedSharedPreferences)
+
         } catch (e: Exception) {
             Log.e(TAG, "QR processing failed", e)
             Toast.makeText(this, "Invalid QR code", Toast.LENGTH_SHORT).show()
