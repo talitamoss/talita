@@ -11,6 +11,7 @@ material = "1.12.0"
 osmdroidAndroid = "6.1.16"
 zxing = "4.3.0"
 androidxDatabinding = "8.1.2"
+appcompatVersion = "1.7.1"
 
 [libraries]
 constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
@@ -21,12 +22,12 @@ espresso-core = { group = "androidx.test.espresso", name = "espresso-core", vers
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 kotlin = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-osmdroid-android = { module = "org.osmdroid:osmdroid-android", version.ref = "osmdroidAndroid" }
+osmdroidAndroid = { module = "org.osmdroid:osmdroid-android", version = "6.1.16" }
 zxing-android-embedded= { group = "com.journeyapps", name = "zxing-android-embedded", version.ref = "zxing"}
 androidx-databinding-runtime = { group = "androidx.databinding", name = "databinding-runtime",version.ref = "androidxDatabinding"}
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompatVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version = "2.1.0" }
-
 

@@ -31,6 +31,7 @@ public class LocationTracker implements LocationListener {
     private final Polyline polyline;
     private final ArrayList<GeoPoint> routePoints;
 
+
     // Constructor
     public LocationTracker(Context context, TextView locationTextView, MapView mapView, Polyline polyline, ArrayList<GeoPoint> routePoints) {
         this.context = context;
@@ -94,6 +95,9 @@ public class LocationTracker implements LocationListener {
             locationTextView.setText("Lat: " + latitude + ", Lon: " + longitude);
 
             long timestamp = System.currentTimeMillis();
+
+            String locationJson = "{\" latitude\":" + latitude + ",\"longitude\":" + longitude + ",\"timestamp\":" + timestamp + "}";
+
 
             saveLocationToFile(latitude, longitude, timestamp);
         }

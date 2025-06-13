@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("kotlin-kapt")
 }
 
 android {
@@ -9,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.core.talita"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -40,16 +41,19 @@ android {
     }
 }
 
+
 dependencies {
     implementation(libs.core.ktx)
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.constraintlayout)
-    implementation(libs.osmdroid.android)
+    implementation(libs.osmdroidAndroid)
     implementation(libs.kotlin)
     implementation(libs.zxing.android.embedded)
     implementation(libs.androidx.databinding.runtime)
-
+    implementation("com.google.dagger:dagger:2.51.1")
+    implementation(libs.androidx.appcompat)
+    kapt("com.google.dagger:dagger-compiler:2.51.1")
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
