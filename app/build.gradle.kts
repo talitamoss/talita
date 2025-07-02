@@ -53,9 +53,12 @@ dependencies {
     implementation(libs.androidx.databinding.runtime)
     implementation("com.google.dagger:dagger:2.51.1")
     implementation(libs.androidx.appcompat)
+    implementation("androidx.cardview:cardview:1.0.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
     kapt("com.google.dagger:dagger-compiler:2.51.1")
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+
 
 }

@@ -20,18 +20,22 @@ public class AudioRecorder {
 
     private static final String TAG = "AudioRecorder";
     private final Context context;
-    private final TextView statusTextView;
-    private final Button recordButton;
+    private final TextView statusTextView; // Can be null for dashboard mode
+    private final Button recordButton; // Can be null for dashboard mode
     private MediaRecorder mediaRecorder;
     private boolean isRecording = false;
     private String currentRecordingPath;
 
-    // Constructor
+    // Constructor - now handles null UI elements for dashboard mode
     public AudioRecorder(Context context, TextView statusTextView, Button recordButton) {
         this.context = context;
         this.statusTextView = statusTextView;
         this.recordButton = recordButton;
-        setupRecordButton();
+
+        // Only setup button if it exists (for backwards compatibility)
+        if (recordButton != null) {
+            setupRecordButton();
+        }
 
         // LOG THE AUDIO STORAGE PATHS
         logAudioStoragePaths();
@@ -133,12 +137,15 @@ public class AudioRecorder {
     }
 
     private void updateUI() {
-        if (isRecording) {
-            recordButton.setText("Stop Recording");
-            statusTextView.setText("Recording audio...");
-        } else {
-            recordButton.setText("Start Recording");
-            statusTextView.setText("Ready to record");
+        // Only update UI if elements exist (dashboard mode might not have them)
+        if (recordButton != null && statusTextView != null) {
+            if (isRecording) {
+                recordButton.setText("Stop Recording");
+                statusTextView.setText("Recording audio...");
+            } else {
+                recordButton.setText("Start Recording");
+                statusTextView.setText("Ready to record");
+            }
         }
     }
 

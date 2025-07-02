@@ -1,90 +1,115 @@
 package com.core.talita;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.view.View;
-import android.widget.Button;
-import android.widget.ScrollView;
-import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
 import org.osmdroid.config.Configuration;
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.util.GeoPoint;
-import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Polyline;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int REQUEST_PERMISSIONS = 1; // Changed to handle multiple permissions
+    private static final int REQUEST_PERMISSIONS = 1;
     private LocationTracker locationTracker;
-    private AudioRecorder audioRecorder; // ADD THIS
+    private AudioRecorder audioRecorder;
 
-    private MapView mapView;
-    private Polyline polyline;
     private final ArrayList<GeoPoint> routePoints = new ArrayList<>();
-    private TextView locationDisplay;
+    private Polyline polyline;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Initialize OSMDroid
         Configuration.getInstance().load(
                 getApplicationContext(),
                 PreferenceManager.getDefaultSharedPreferences(getApplicationContext())
         );
-        Configuration.getInstance().setUserAgentValue("com.core.alita");
+        Configuration.getInstance().setUserAgentValue("com.core.talita");
 
         setContentView(R.layout.activity_main);
 
-        // Initialize views
-        mapView = findViewById(R.id.mapView);
-        mapView.setTileSource(TileSourceFactory.MAPNIK);
-        mapView.setMultiTouchControls(true);
-        GeoPoint startPoint = new GeoPoint(0.0, 0.0);
-        mapView.getController().setZoom(15.0);
-        mapView.getController().setCenter(startPoint);
+        // Initialize tracking components (but don't start UI yet)
+        polyline = new Polyline();
+        locationTracker = new LocationTracker(this, null, null, polyline, routePoints);
+        audioRecorder = new AudioRecorder(this, null, null);
 
-        locationDisplay = findViewById(R.id.location_display);
-        TextView locationInfo = findViewById(R.id.location_info); // ADD THIS
-        ScrollView locationList = findViewById(R.id.location_display_scrollview);
-        Button toggleButton = findViewById(R.id.show_location_button);
+        // Setup tile click listeners
+        setupTileClickListeners();
 
-        // ADD AUDIO RECORDING COMPONENTS
-        TextView audioStatusTextView = findViewById(R.id.audio_status);
-        Button recordButton = findViewById(R.id.record_button);
+        // Check and request permissions
+        checkAndRequestPermissions();
+    }
 
-        // Toggle logic for map/location list
-        toggleButton.setOnClickListener(v -> {
-            if (locationList.getVisibility() == View.VISIBLE) {
-                locationList.setVisibility(View.GONE);
-                mapView.setVisibility(View.VISIBLE);
-                toggleButton.setText("Show Recorded Locations");
-            } else {
-                locationList.setVisibility(View.VISIBLE);
-                mapView.setVisibility(View.GONE);
-                toggleButton.setText("Show Map");
-            }
+    private void setupTileClickListeners() {
+        // Location Tile
+        CardView locationTile = findViewById(R.id.location_tile);
+        locationTile.setOnClickListener(v -> {
+            Intent intent = new Intent(this, LocationActivity.class);
+            startActivity(intent);
         });
 
-        // Initialize polyline
-        polyline = new Polyline();
-        mapView.getOverlays().add(polyline);
+        // Audio Tile
+        CardView audioTile = findViewById(R.id.audio_tile);
+        audioTile.setOnClickListener(v -> {
+            Intent intent = new Intent(this, AudioActivity.class);
+            startActivity(intent);
+        });
 
-        // Initialize trackers
-        locationTracker = new LocationTracker(this, locationInfo, mapView, polyline, routePoints);
-        audioRecorder = new AudioRecorder(this, audioStatusTextView, recordButton); // ADD THIS
+        // Files Tile
+        CardView filesTile = findViewById(R.id.files_tile);
+        filesTile.setOnClickListener(v -> {
+            Toast.makeText(this, "File manager - Coming soon!", Toast.LENGTH_SHORT).show();
+            // TODO: Open file manager activity
+        });
 
-        // Check and request all permissions
-        checkAndRequestPermissions();
+        // Export Tile
+        CardView exportTile = findViewById(R.id.export_tile);
+        exportTile.setOnClickListener(v -> {
+            Toast.makeText(this, "Export data - Coming soon!", Toast.LENGTH_SHORT).show();
+            // TODO: Open export functionality
+        });
+
+        // Settings Tile
+        CardView settingsTile = findViewById(R.id.settings_tile);
+        settingsTile.setOnClickListener(v -> {
+            Toast.makeText(this, "Settings - Coming soon!", Toast.LENGTH_SHORT).show();
+            // TODO: Open settings activity
+        });
+
+        // Stats Tile
+        CardView statsTile = findViewById(R.id.stats_tile);
+        statsTile.setOnClickListener(v -> {
+            Toast.makeText(this, "Statistics - Coming soon!", Toast.LENGTH_SHORT).show();
+            // TODO: Open statistics activity
+        });
+
+        // Privacy Tile
+        CardView privacyTile = findViewById(R.id.privacy_tile);
+        privacyTile.setOnClickListener(v -> {
+            Toast.makeText(this, "Privacy settings - Coming soon!", Toast.LENGTH_SHORT).show();
+            // TODO: Open privacy settings
+        });
+
+        // Cleanup Tile
+        CardView cleanupTile = findViewById(R.id.cleanup_tile);
+        cleanupTile.setOnClickListener(v -> {
+            Toast.makeText(this, "Data cleanup - Coming soon!", Toast.LENGTH_SHORT).show();
+            // TODO: Open cleanup functionality
+        });
     }
 
     private void checkAndRequestPermissions() {
         String[] permissions = {
                 Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.RECORD_AUDIO  // ADD AUDIO PERMISSION
+                Manifest.permission.RECORD_AUDIO
         };
 
         boolean allPermissionsGranted = true;
@@ -98,6 +123,7 @@ public class MainActivity extends AppCompatActivity {
         if (!allPermissionsGranted) {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_PERMISSIONS);
         } else {
+            // Permissions already granted - start background tracking
             locationTracker.startTracking();
         }
     }
@@ -105,9 +131,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        locationTracker.stopTracking();
-        // Stop recording if it's in progress
-        if (audioRecorder.isRecording()) {
+        if (locationTracker != null) {
+            locationTracker.stopTracking();
+        }
+        if (audioRecorder != null && audioRecorder.isRecording()) {
             audioRecorder.stopRecording();
         }
     }
@@ -115,7 +142,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        audioRecorder.cleanup(); // ADD THIS
+        if (audioRecorder != null) {
+            audioRecorder.cleanup();
+        }
     }
 
     @Override
@@ -138,6 +167,7 @@ public class MainActivity extends AppCompatActivity {
 
             if (locationGranted) {
                 locationTracker.startTracking();
+                Toast.makeText(this, "Location tracking enabled", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show();
             }
