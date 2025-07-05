@@ -103,18 +103,24 @@ public class LocationTracker implements LocationListener {
         routePoints.add(geoPoint);
 
         // Update polyline
-        polyline.setPoints(routePoints);
+        if (polyline != null) {
+            polyline.setPoints(routePoints);
+        }
 
         // Add marker for the new point
-        Marker marker = new Marker(mapView);
-        marker.setPosition(geoPoint);
-        marker.setTitle("Timestamp: " + System.currentTimeMillis());
-        mapView.getOverlays().add(marker);
+        if (mapView != null && mapView.getContext() != null) {
+            Marker marker = new Marker(mapView);
+            marker.setPosition(geoPoint);
+            marker.setTitle("Timestamp: " + System.currentTimeMillis());
+            mapView.getOverlays().add(marker);
 
-        mapView.getController().setCenter(geoPoint);
-        mapView.getController().setZoom(15);
+            mapView.getController().setCenter(geoPoint);
+            mapView.getController().setZoom(15);
+        }
 
-        locationTextView.setText("Lat: " + latitude + ", Lon: " + longitude);
+        if (locationTextView != null) {
+            locationTextView.setText("Lat: " + latitude + ", Lon: " + longitude);
+        }
 
         long timestamp = System.currentTimeMillis();
 
