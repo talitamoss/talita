@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -13,14 +14,8 @@ import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import org.json.JSONException;
-import org.json.JSONObject;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 
 public class AudioActivity extends AppCompatActivity {
+    private static final String TAG = "AudioActivity";
     private static final int REQUEST_AUDIO_PERMISSION = 1;
 
     private AudioRecorder audioRecorder;
@@ -44,6 +40,9 @@ public class AudioActivity extends AppCompatActivity {
     private AudioRecordingsAdapter adapter;
     private List<AudioRecord> audioRecordings = new ArrayList<>();
 
+    // Universal data service
+    private UniversalDataService dataService;
+
     private Handler timerHandler = new Handler();
     private Runnable timerRunnable;
     private long startTime = 0;
@@ -54,11 +53,16 @@ public class AudioActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_audio);
 
+        // Initialize universal data service
+        dataService = new UniversalDataService(this);
+
         initializeViews();
         setupRecordButton();
         setupRecyclerView();
         loadAudioHistory();
         checkAudioPermission();
+
+        Log.d(TAG, "AudioActivity initialized with Universal Data Service");
     }
 
     private void initializeViews() {
@@ -116,7 +120,7 @@ public class AudioActivity extends AppCompatActivity {
         updateRecordingUI();
         stopTimer();
 
-        // Refresh recordings list
+        // Refresh recordings list using universal service
         loadAudioHistory();
     }
 
@@ -163,15 +167,77 @@ public class AudioActivity extends AppCompatActivity {
 
     private void loadAudioHistory() {
         try {
-            FileInputStream fis = openFileInput("audio_recordings.txt");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(fis));
+            Log.d(TAG, "Loading audio history via Universal Data Service...");
+
+            // 🎉 USE UNIVERSAL DATA SERVICE FOR GENERIC DATA
+            java.util.List<UniversalDataService.GenericDataItem> universalAudioData =
+                    dataService.getGenericDataByType("audio");
+
+            audioRecordings.clear();
+
+            for (UniversalDataService.GenericDataItem dataItem : universalAudioData) {
+                try {
+                    String filepath = dataItem.filePath;
+                    long timestamp = dataItem.timestamp;
+
+                    // Parse duration from the data JSON
+                    long durationMs = dataItem.data.optLong("duration_ms", 0);
+                    int durationSeconds = (int) (durationMs / 1000);
+
+                    // Check if file still exists
+                    File audioFile = new File(filepath);
+                    if (audioFile.exists()) {
+                        AudioRecord record = new AudioRecord(
+                                audioFile.getName(),
+                                filepath,
+                                timestamp,
+                                durationSeconds
+                        );
+                        audioRecordings.add(record);
+
+                        Log.d(TAG, "✅ Loaded audio: " + audioFile.getName() + " (" + durationSeconds + "s)");
+                    } else {
+                        Log.w(TAG, "⚠️ Audio file missing: " + filepath);
+                    }
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing audio data: " + e.getMessage());
+                }
+            }
+
+            // Sort by timestamp (most recent first)
+            Collections.sort(audioRecordings, (a, b) -> Long.compare(b.timestamp, a.timestamp));
+
+            // Update UI
+            updateRecordingsCount();
+            adapter.notifyDataSetChanged();
+
+            Log.d(TAG, "✅ Loaded " + audioRecordings.size() + " audio recordings via Universal Data Service");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to load via Universal Data Service, trying fallback...", e);
+
+            // Fallback to old method
+            loadAudioHistoryFallback();
+        }
+    }
+
+    // Remove the loadFromUniversalDataFile method since we're using the service directly now
+
+    // Fallback method - keep the old approach as backup
+    private void loadAudioHistoryFallback() {
+        try {
+            Log.d(TAG, "Using fallback JSON file loading...");
+
+            java.io.FileInputStream fis = openFileInput("audio_recordings.txt");
+            java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(fis));
             String line;
 
             audioRecordings.clear();
 
             while ((line = reader.readLine()) != null) {
                 try {
-                    JSONObject recordingData = new JSONObject(line);
+                    org.json.JSONObject recordingData = new org.json.JSONObject(line);
                     String filename = recordingData.getString("filename");
                     String filepath = recordingData.getString("filepath");
                     long timestamp = recordingData.getLong("timestamp");
@@ -179,11 +245,11 @@ public class AudioActivity extends AppCompatActivity {
                     // Check if file still exists
                     File audioFile = new File(filepath);
                     if (audioFile.exists()) {
-                        AudioRecord record = new AudioRecord(filename, filepath, timestamp);
+                        AudioRecord record = new AudioRecord(filename, filepath, timestamp, 0); // Duration unknown in old format
                         audioRecordings.add(record);
                     }
 
-                } catch (JSONException e) {
+                } catch (org.json.JSONException e) {
                     e.printStackTrace();
                 }
             }
@@ -196,8 +262,11 @@ public class AudioActivity extends AppCompatActivity {
             updateRecordingsCount();
             adapter.notifyDataSetChanged();
 
-        } catch (IOException e) {
+            Log.d(TAG, "⚠️ Loaded " + audioRecordings.size() + " recordings via fallback method");
+
+        } catch (java.io.IOException e) {
             // File doesn't exist yet - that's ok
+            Log.d(TAG, "No audio recordings found (this is normal for first run)");
             updateRecordingsCount();
         }
     }
@@ -212,6 +281,7 @@ public class AudioActivity extends AppCompatActivity {
         intent.putExtra("audio_file_path", record.filepath);
         intent.putExtra("audio_filename", record.filename);
         intent.putExtra("audio_timestamp", record.timestamp);
+        intent.putExtra("audio_duration", record.duration);
         startActivity(intent);
     }
 
@@ -245,18 +315,21 @@ public class AudioActivity extends AppCompatActivity {
         }
     }
 
-    // Helper class for audio records
+    // Enhanced AudioRecord class with duration support
     public static class AudioRecord {
         public final String filename;
         public final String filepath;
         public final long timestamp;
+        public final int duration; // in seconds
         public final String formattedTime;
         public final String displayName;
+        public final String durationText;
 
-        public AudioRecord(String filename, String filepath, long timestamp) {
+        public AudioRecord(String filename, String filepath, long timestamp, int duration) {
             this.filename = filename;
             this.filepath = filepath;
             this.timestamp = timestamp;
+            this.duration = duration;
 
             SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault());
             this.formattedTime = sdf.format(new Date(timestamp));
@@ -264,6 +337,20 @@ public class AudioActivity extends AppCompatActivity {
             // Create a friendly display name
             SimpleDateFormat nameSdf = new SimpleDateFormat("MMM dd - HH:mm", Locale.getDefault());
             this.displayName = "Recording " + nameSdf.format(new Date(timestamp));
+
+            // Format duration
+            if (duration > 0) {
+                int minutes = duration / 60;
+                int seconds = duration % 60;
+                this.durationText = String.format(Locale.getDefault(), "%d:%02d", minutes, seconds);
+            } else {
+                this.durationText = "Unknown";
+            }
+        }
+
+        // Backwards compatibility constructor
+        public AudioRecord(String filename, String filepath, long timestamp) {
+            this(filename, filepath, timestamp, 0);
         }
     }
 }

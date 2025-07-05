@@ -9,11 +9,8 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 
 public class AudioRecorder {
@@ -25,12 +22,19 @@ public class AudioRecorder {
     private MediaRecorder mediaRecorder;
     private boolean isRecording = false;
     private String currentRecordingPath;
+    private long recordingStartTime;
+
+    // Universal data service
+    private UniversalDataService dataService;
 
     // Constructor - now handles null UI elements for dashboard mode
     public AudioRecorder(Context context, TextView statusTextView, Button recordButton) {
         this.context = context;
         this.statusTextView = statusTextView;
         this.recordButton = recordButton;
+
+        // Initialize universal data service
+        this.dataService = new UniversalDataService(context);
 
         // Only setup button if it exists (for backwards compatibility)
         if (recordButton != null) {
@@ -44,11 +48,10 @@ public class AudioRecorder {
     private void logAudioStoragePaths() {
         File filesDir = context.getFilesDir();
         File recordingsDir = new File(filesDir, "recordings");
-        File audioMetaFile = new File(filesDir, "audio_recordings.txt");
 
         Log.d(TAG, "=== TALITA AUDIO STORAGE PATHS ===");
         Log.d(TAG, "Audio recordings directory: " + recordingsDir.getAbsolutePath());
-        Log.d(TAG, "Audio metadata file: " + audioMetaFile.getAbsolutePath());
+        Log.d(TAG, "Using Universal Data Service: " + dataService.getClass().getSimpleName());
         Log.d(TAG, "Recordings directory exists: " + recordingsDir.exists());
         Log.d(TAG, "==================================");
     }
@@ -95,6 +98,7 @@ public class AudioRecorder {
             mediaRecorder.start();
 
             isRecording = true;
+            recordingStartTime = System.currentTimeMillis();
             updateUI();
 
             Log.d(TAG, "Recording started successfully");
@@ -117,14 +121,20 @@ public class AudioRecorder {
                 isRecording = false;
                 updateUI();
 
+                // Calculate recording duration
+                long recordingEndTime = System.currentTimeMillis();
+                long durationMs = recordingEndTime - recordingStartTime;
+                int durationSeconds = (int) (durationMs / 1000);
+
                 // Log file details
                 File recordingFile = new File(currentRecordingPath);
                 Log.d(TAG, "Recording stopped and saved to: " + currentRecordingPath);
                 Log.d(TAG, "Recording file size: " + recordingFile.length() + " bytes");
                 Log.d(TAG, "Recording file exists: " + recordingFile.exists());
+                Log.d(TAG, "Recording duration: " + durationSeconds + " seconds");
 
-                // Save recording metadata
-                saveRecordingMetadata();
+                // 🎉 USE UNIVERSAL DATA SERVICE INSTEAD OF MANUAL FILE HANDLING
+                saveRecordingWithUniversalService(recordingFile, durationSeconds);
 
                 Toast.makeText(context, "Recording saved", Toast.LENGTH_SHORT).show();
 
@@ -133,6 +143,59 @@ public class AudioRecorder {
                 Log.e(TAG, "Failed to stop recording: " + e.getMessage());
                 Toast.makeText(context, "Failed to stop recording", Toast.LENGTH_SHORT).show();
             }
+        }
+    }
+
+    private void saveRecordingWithUniversalService(File recordingFile, int durationSeconds) {
+        try {
+            // Get current location (optional - you might want to add location permission)
+            double latitude = 0.0;  // TODO: Get actual location if needed
+            double longitude = 0.0; // TODO: Get actual location if needed
+
+            // Create AudioData object using universal interface
+            AudioData audioData = new AudioData(
+                    recordingFile.getAbsolutePath(),
+                    durationSeconds * 1000L, // Convert seconds to milliseconds
+                    latitude,
+                    longitude
+            );
+
+            // Use universal data service - handles database, future cloud backup, etc.
+            dataService.capture(audioData);
+
+            Log.d(TAG, "✅ Audio recording saved via Universal Data Service");
+            Log.d(TAG, "Audio ID: " + audioData.getId());
+            Log.d(TAG, "File path: " + audioData.getFilePath());
+            Log.d(TAG, "Duration: " + (audioData.getDurationMs() / 1000) + " seconds");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to save via Universal Data Service: " + e.getMessage());
+            e.printStackTrace();
+
+            // Fallback to old method if universal service fails
+            fallbackSaveRecordingMetadata();
+        }
+    }
+
+    // Fallback method - keep the old approach as backup
+    private void fallbackSaveRecordingMetadata() {
+        try {
+            // Old JSON file approach as fallback
+            org.json.JSONObject recordingData = new org.json.JSONObject();
+            recordingData.put("filename", new File(currentRecordingPath).getName());
+            recordingData.put("filepath", currentRecordingPath);
+            recordingData.put("timestamp", System.currentTimeMillis());
+            recordingData.put("duration", "unknown");
+
+            java.io.FileOutputStream fos = context.openFileOutput("audio_recordings.txt", Context.MODE_APPEND);
+            fos.write((recordingData.toString() + "\n").getBytes());
+            fos.close();
+
+            Log.d(TAG, "⚠️ Used fallback JSON metadata saving");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Even fallback saving failed: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -146,29 +209,6 @@ public class AudioRecorder {
                 recordButton.setText("Start Recording");
                 statusTextView.setText("Ready to record");
             }
-        }
-    }
-
-    private void saveRecordingMetadata() {
-        try {
-            JSONObject recordingData = new JSONObject();
-            recordingData.put("filename", new File(currentRecordingPath).getName());
-            recordingData.put("filepath", currentRecordingPath);
-            recordingData.put("timestamp", System.currentTimeMillis());
-            recordingData.put("duration", "unknown"); // You could calculate this if needed
-
-            File metadataFile = new File(context.getFilesDir(), "audio_recordings.txt");
-            FileOutputStream fos = context.openFileOutput("audio_recordings.txt", Context.MODE_APPEND);
-            fos.write((recordingData.toString() + "\n").getBytes());
-            fos.close();
-
-            Log.d(TAG, "Recording metadata saved to: " + metadataFile.getAbsolutePath());
-            Log.d(TAG, "Metadata: " + recordingData.toString());
-
-        } catch (IOException | JSONException e) {
-            e.printStackTrace();
-            Log.e(TAG, "Failed to save recording metadata: " + e.getMessage());
-            Toast.makeText(context, "Failed to save recording metadata", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -188,5 +228,15 @@ public class AudioRecorder {
     // Check if currently recording
     public boolean isRecording() {
         return isRecording;
+    }
+
+    // Method to get all audio recordings via universal service
+    public java.util.List<LocalDataManager.DataItem> getAllRecordings() {
+        try {
+            return dataService.getDataByType("audio");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get recordings via universal service: " + e.getMessage());
+            return new java.util.ArrayList<>();
+        }
     }
 }

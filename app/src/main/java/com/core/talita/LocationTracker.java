@@ -23,6 +23,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import com.core.talita.LocationData;
+import com.core.talita.UniversalDataService;
 
 public class LocationTracker implements LocationListener {
 
@@ -33,6 +35,8 @@ public class LocationTracker implements LocationListener {
     private final MapView mapView;
     private final Polyline polyline;
     private final ArrayList<GeoPoint> routePoints;
+    private final LocalDataManager dataManager;
+
 
     // Constructor
     public LocationTracker(Context context, TextView locationTextView, MapView mapView, Polyline polyline, ArrayList<GeoPoint> routePoints) {
@@ -41,6 +45,7 @@ public class LocationTracker implements LocationListener {
         this.mapView = mapView;
         this.polyline = polyline;
         this.routePoints = routePoints;
+        this.dataManager = new LocalDataManager(context); // ADD THIS LINE
         locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
 
         // LOG THE STORAGE PATHS
@@ -124,32 +129,30 @@ public class LocationTracker implements LocationListener {
 
         long timestamp = System.currentTimeMillis();
 
-        saveLocationToFile(latitude, longitude, timestamp);
+        saveLocationToDatabase(latitude, longitude, timestamp);
     }
 
-    private void saveLocationToFile(double latitude, double longitude, long timestamp) {
+    private void saveLocationToDatabase(double latitude, double longitude, long timestamp) {
         try {
-            JSONObject locationData = new JSONObject();
-            locationData.put("latitude", latitude);
-            locationData.put("longitude", longitude);
-            locationData.put("timestamp", timestamp);
+            // Create LocationData using our new universal system
+            LocationData locationData = new LocationData(latitude, longitude, 10.0, "gps");
 
-            File locationFile = new File(context.getFilesDir(), "location_data.txt");
-            FileOutputStream fos = context.openFileOutput("location_data.txt", Context.MODE_APPEND);
-            fos.write((locationData.toString() + "\n").getBytes()); // Added newline for readability
-            fos.close();
+            // Use UniversalDataService to handle everything automatically
+            UniversalDataService dataService = new UniversalDataService(context);
+            String dataId = dataService.capture(locationData);
 
-            Log.d(TAG, "Location saved to: " + locationFile.getAbsolutePath());
-            Log.d(TAG, "Location data: " + locationData.toString());
-            Toast.makeText(context, "Location saved", Toast.LENGTH_SHORT).show();
+            if (dataId != null) {
+                Log.d(TAG, "Location saved via Universal Service with ID: " + dataId);
+                // Success toast is handled automatically by UniversalDataService
+            } else {
+                Log.e(TAG, "Failed to save location via Universal Service");
+                // Error toast is handled automatically by UniversalDataService
+            }
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(context, "File write error", Toast.LENGTH_SHORT).show();
-
-        } catch (JSONException e) {
-            e.printStackTrace();
-            Toast.makeText(context, "JSON formatting error", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error in universal location save: " + e.getMessage());
+            Toast.makeText(context, "Location save error", Toast.LENGTH_SHORT).show();
         }
     }
 

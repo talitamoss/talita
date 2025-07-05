@@ -104,20 +104,20 @@ public class LocationActivity extends AppCompatActivity {
 
     private void loadLocationHistory() {
         try {
-            FileInputStream fis = openFileInput("location_data.txt");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(fis));
-            String line;
+            // Use our new database instead of file
+            LocalDataManager dataManager = new LocalDataManager(this);
+            List<LocalDataManager.DataItem> databaseItems = dataManager.getItemsByType("location");
 
             locationHistory.clear();
+            routePoints.clear();
 
-            while ((line = reader.readLine()) != null) {
+            for (LocalDataManager.DataItem item : databaseItems) {
                 try {
-                    JSONObject locationData = new JSONObject(line);
+                    JSONObject locationData = new JSONObject(item.dataJson);
                     double latitude = locationData.getDouble("latitude");
                     double longitude = locationData.getDouble("longitude");
-                    long timestamp = locationData.getLong("timestamp");
 
-                    LocationRecord record = new LocationRecord(latitude, longitude, timestamp);
+                    LocationRecord record = new LocationRecord(latitude, longitude, item.createdAt);
                     locationHistory.add(record);
 
                     // Add to route points for map display
@@ -127,7 +127,6 @@ public class LocationActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
             }
-            reader.close();
 
             // Sort by timestamp (most recent first)
             Collections.sort(locationHistory, (a, b) -> Long.compare(b.timestamp, a.timestamp));
@@ -136,7 +135,7 @@ public class LocationActivity extends AppCompatActivity {
             updateLocationCount();
             adapter.notifyDataSetChanged();
 
-            // Update map with route (but no historical markers)
+            // Update map with route
             if (!routePoints.isEmpty()) {
                 routePolyline.setPoints(routePoints);
 
@@ -148,8 +147,8 @@ public class LocationActivity extends AppCompatActivity {
                 }
             }
 
-        } catch (IOException e) {
-            // File doesn't exist yet - that's ok
+        } catch (Exception e) {
+            e.printStackTrace();
             updateLocationCount();
         }
     }
