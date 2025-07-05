@@ -5,6 +5,7 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -20,10 +21,16 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+/**
+ * Audio Playback Activity with Encryption Support
+ * Compatible with existing layout while adding decryption capabilities
+ */
 public class AudioPlaybackActivity extends AppCompatActivity {
 
+    private static final String TAG = "AudioPlaybackActivity";
+
     private MediaPlayer mediaPlayer;
-    private SeekBar audioProgress;
+    private SeekBar audioProgress; // Using your existing layout IDs
     private TextView currentTime;
     private TextView totalTime;
     private TextView playPauseIcon;
@@ -39,17 +46,28 @@ public class AudioPlaybackActivity extends AppCompatActivity {
     private String audioFilePath;
     private String audioFilename;
     private long audioTimestamp;
+    private int audioDuration;
+
+    // Encryption support
+    private EncryptionService encryptionService;
+    private String tempDecryptedPath;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_audio_playback);
 
+        // Initialize encryption service
+        encryptionService = new EncryptionService(this);
+
         getIntentData();
         initializeViews();
+        setupAudioFile(); // NEW: Handle encryption/decryption
         setupAudioPlayer();
         setupControls();
         displayRecordingInfo();
+
+        Log.d(TAG, "🔓 AudioPlaybackActivity initialized with encryption support");
     }
 
     private void getIntentData() {
@@ -57,6 +75,7 @@ public class AudioPlaybackActivity extends AppCompatActivity {
         audioFilePath = intent.getStringExtra("audio_file_path");
         audioFilename = intent.getStringExtra("audio_filename");
         audioTimestamp = intent.getLongExtra("audio_timestamp", 0);
+        audioDuration = intent.getIntExtra("audio_duration", 0);
     }
 
     private void initializeViews() {
@@ -72,11 +91,56 @@ public class AudioPlaybackActivity extends AppCompatActivity {
         backButton.setOnClickListener(v -> finish());
     }
 
+    /**
+     * NEW METHOD: Handle encrypted audio files
+     */
+    private void setupAudioFile() {
+        if (audioFilePath == null) {
+            Log.e(TAG, "❌ No audio file path provided");
+            Toast.makeText(this, "Error: No audio file specified", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        // Check if file is encrypted and decrypt if needed
+        if (encryptionService.isFileEncrypted(audioFilePath)) {
+            Log.d(TAG, "🔓 Audio file is encrypted, decrypting for playback: " + audioFilePath);
+
+            try {
+                tempDecryptedPath = encryptionService.decryptFileToTemp(audioFilePath);
+                Log.d(TAG, "✅ Audio decrypted to temp file: " + tempDecryptedPath);
+
+                // Debug info
+                File tempFile = new File(tempDecryptedPath);
+                File originalFile = new File(audioFilePath);
+                Log.d(TAG, "📊 Temp file exists: " + tempFile.exists());
+                Log.d(TAG, "📊 Temp file size: " + tempFile.length() + " bytes");
+                Log.d(TAG, "📊 Original encrypted file size: " + originalFile.length() + " bytes");
+
+                if (!tempFile.exists()) {
+                    throw new RuntimeException("Decrypted temp file not found");
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Failed to decrypt audio file: " + e.getMessage());
+                e.printStackTrace();
+                Toast.makeText(this, "❌ Failed to decrypt audio file", Toast.LENGTH_SHORT).show();
+                finish();
+                return;
+            }
+        } else {
+            Log.d(TAG, "📄 Audio file is not encrypted: " + audioFilePath);
+            tempDecryptedPath = audioFilePath; // Use original path
+        }
+    }
+
     private void setupAudioPlayer() {
         try {
             mediaPlayer = new MediaPlayer();
-            mediaPlayer.setDataSource(audioFilePath);
-            mediaPlayer.prepareAsync();
+            // Use the decrypted temp file (or original if not encrypted)
+            mediaPlayer.setDataSource(tempDecryptedPath);
+
+            Log.d(TAG, "🎵 Setting MediaPlayer data source: " + tempDecryptedPath);
 
             mediaPlayer.setOnPreparedListener(mp -> {
                 isPrepared = true;
@@ -86,6 +150,8 @@ public class AudioPlaybackActivity extends AppCompatActivity {
 
                 // Update duration display
                 recordingDuration.setText("Duration: " + formatTime(duration));
+
+                Log.d(TAG, "✅ MediaPlayer prepared for encrypted audio playback");
             });
 
             mediaPlayer.setOnCompletionListener(mp -> {
@@ -94,11 +160,22 @@ public class AudioPlaybackActivity extends AppCompatActivity {
                 audioProgress.setProgress(0);
                 currentTime.setText("00:00");
                 stopProgressUpdate();
+
+                Log.d(TAG, "🎵 Audio playback completed");
             });
 
+            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                Log.e(TAG, "❌ MediaPlayer error: what=" + what + ", extra=" + extra);
+                Toast.makeText(this, "❌ Audio playback error", Toast.LENGTH_SHORT).show();
+                return true;
+            });
+
+            mediaPlayer.prepareAsync();
+
         } catch (IOException e) {
+            Log.e(TAG, "❌ Failed to setup MediaPlayer: " + e.getMessage());
             e.printStackTrace();
-            Toast.makeText(this, "Error loading audio file", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "❌ Failed to load audio file", Toast.LENGTH_SHORT).show();
             finish();
         }
     }
@@ -169,8 +246,9 @@ public class AudioPlaybackActivity extends AppCompatActivity {
         SimpleDateFormat dateSdf = new SimpleDateFormat("EEEE, MMMM dd, yyyy 'at' HH:mm", Locale.getDefault());
         recordingDate.setText(dateSdf.format(new Date(audioTimestamp)));
 
-        // Duration will be set when audio is prepared
-        recordingDuration.setText("Duration: Loading...");
+        // Show encryption status
+        String encryptionStatus = encryptionService.isFileEncrypted(audioFilePath) ? " 🔒 Encrypted" : "";
+        recordingDuration.setText("Duration: Loading..." + encryptionStatus);
     }
 
     private void togglePlayPause() {
@@ -184,11 +262,15 @@ public class AudioPlaybackActivity extends AppCompatActivity {
             isPlaying = false;
             playPauseIcon.setText("▶");
             stopProgressUpdate();
+
+            Log.d(TAG, "⏸️ Paused encrypted audio playback");
         } else {
             mediaPlayer.start();
             isPlaying = true;
             playPauseIcon.setText("⏸");
             startProgressUpdate();
+
+            Log.d(TAG, "▶️ Started encrypted audio playback");
         }
     }
 
@@ -235,22 +317,25 @@ public class AudioPlaybackActivity extends AppCompatActivity {
             mediaPlayer.release();
         }
 
-        // Delete the file
+        // Delete the encrypted file (not the temp file)
         File audioFile = new File(audioFilePath);
         if (audioFile.exists()) {
             boolean deleted = audioFile.delete();
             if (deleted) {
-                Toast.makeText(this, "Recording deleted", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "🔒 Encrypted recording deleted", Toast.LENGTH_SHORT).show();
                 finish(); // Return to recordings list
             } else {
-                Toast.makeText(this, "Failed to delete recording", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "❌ Failed to delete recording", Toast.LENGTH_SHORT).show();
             }
         }
     }
 
     private void exportAudioFile() {
         try {
-            File audioFile = new File(audioFilePath);
+            // For encrypted files, we need to export the decrypted version
+            String fileToExport = tempDecryptedPath != null ? tempDecryptedPath : audioFilePath;
+            File audioFile = new File(fileToExport);
+
             Uri fileUri = FileProvider.getUriForFile(this,
                     getApplicationContext().getPackageName() + ".fileprovider", audioFile);
 
@@ -263,8 +348,9 @@ public class AudioPlaybackActivity extends AppCompatActivity {
             startActivity(Intent.createChooser(shareIntent, "Export Audio Recording"));
 
         } catch (Exception e) {
+            Log.e(TAG, "❌ Export failed: " + e.getMessage());
             e.printStackTrace();
-            Toast.makeText(this, "Export failed", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "❌ Export failed", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -280,9 +366,18 @@ public class AudioPlaybackActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         stopProgressUpdate();
+
         if (mediaPlayer != null) {
             mediaPlayer.release();
             mediaPlayer = null;
         }
+
+        // 🔐 CRITICAL: Clean up temporary decrypted file
+        if (tempDecryptedPath != null && !tempDecryptedPath.equals(audioFilePath)) {
+            encryptionService.cleanupTempFile(tempDecryptedPath);
+            Log.d(TAG, "🧹 Cleaned up temporary decrypted audio file");
+        }
+
+        Log.d(TAG, "🔓 AudioPlaybackActivity destroyed");
     }
 }

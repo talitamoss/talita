@@ -7,8 +7,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * Universal Data Service - handles ALL data types in Talita
+ * Universal Data Service - handles ALL data types in Talita with ENCRYPTION
  * Any data implementing TalitaDataType gets automatic:
+ * - Hardware-backed encryption
  * - Database storage
  * - Cloud backup queuing
  * - Sharing capabilities
@@ -20,43 +21,58 @@ public class UniversalDataService {
 
     private final Context context;
     private final LocalDataManager dataManager;
+    private final EncryptionService encryptionService;
 
     public UniversalDataService(Context context) {
         this.context = context;
         this.dataManager = new LocalDataManager(context);
+        this.encryptionService = new EncryptionService(context);
+
+        Log.d(TAG, "🔐 Universal Data Service initialized with encryption");
+        Log.d(TAG, encryptionService.getEncryptionStatus());
     }
 
     /**
-     * Capture any data type - handles everything automatically
+     * Capture any data type - handles encryption and everything automatically
      */
     public String capture(TalitaDataType data) {
         try {
-            Log.d(TAG, "Capturing " + data.getType() + " data: " + data.getDisplayName());
+            Log.d(TAG, "🔒 Capturing and encrypting " + data.getType() + " data: " + data.getDisplayName());
 
-            // 1. Save to database (always)
-            String dataId = saveToDatabase(data);
+            // 1. Encrypt file if it exists
+            String encryptedFilePath = data.getFilePath();
+            if (encryptedFilePath != null && !encryptedFilePath.isEmpty()) {
+                encryptedFilePath = encryptionService.encryptFile(data.getFilePath());
+                Log.d(TAG, "🔒 File encrypted: " + encryptedFilePath);
+            }
+
+            // 2. Create encrypted version of data with updated file path
+            EncryptedDataWrapper encryptedData = new EncryptedDataWrapper(data, encryptedFilePath);
+
+            // 3. Save encrypted data to database
+            String dataId = saveToDatabase(encryptedData);
 
             if (dataId != null) {
-                // 2. Queue for cloud backup (future feature)
-                queueForCloudBackup(dataId, data);
+                // 4. Queue for cloud backup (future feature)
+                queueForCloudBackup(dataId, encryptedData);
 
-                // 3. Handle sharing updates (future feature)
-                updateActiveSharing(dataId, data);
+                // 5. Handle sharing updates (future feature)
+                updateActiveSharing(dataId, encryptedData);
 
-                // 4. Success feedback
+                // 6. Success feedback
                 showSuccessToast(data);
 
-                Log.d(TAG, "Successfully captured " + data.getType() + " with ID: " + dataId);
+                Log.d(TAG, "✅ Successfully captured encrypted " + data.getType() + " with ID: " + dataId);
                 return dataId;
 
             } else {
-                Log.e(TAG, "Failed to save " + data.getType() + " to database");
+                Log.e(TAG, "❌ Failed to save encrypted " + data.getType() + " to database");
                 showErrorToast(data);
                 return null;
             }
 
         } catch (Exception e) {
-            Log.e(TAG, "Error capturing " + data.getType() + ": " + e.getMessage());
+            Log.e(TAG, "❌ Error capturing " + data.getType() + ": " + e.getMessage());
             e.printStackTrace();
             showErrorToast(data);
             return null;
@@ -64,125 +80,148 @@ public class UniversalDataService {
     }
 
     /**
-     * Save data to local database
+     * Save encrypted data to local database
      */
-    private String saveToDatabase(TalitaDataType data) {
+    private String saveToDatabase(EncryptedDataWrapper encryptedData) {
         try {
-            // Create enhanced JSON with metadata
-            JSONObject enhancedJson = new JSONObject(data.toJson());
-            enhancedJson.put("display_name", data.getDisplayName());
-            enhancedJson.put("display_summary", data.getDisplaySummary());
+            // Encrypt the JSON metadata
+            String encryptedJson = encryptionService.encryptDataType(encryptedData.originalData);
 
-            // Use existing LocalDataManager but with enhanced data
-            if (data.getType().equals("location")) {
+            // Use existing LocalDataManager but with encrypted data
+            if (encryptedData.originalData.getType().equals("location")) {
                 return dataManager.saveLocationPoint(
-                        data.getLatitude(),
-                        data.getLongitude(),
+                        encryptedData.originalData.getLatitude(),
+                        encryptedData.originalData.getLongitude(),
                         0.0, // accuracy placeholder
-                        "universal_service"
+                        "encrypted_universal_service"
                 );
             } else {
-                // For non-location data, use a generic save method
-                return saveGenericData(data, enhancedJson);
+                // For non-location data, use generic save method with encryption
+                return saveGenericEncryptedData(encryptedData, encryptedJson);
             }
-
-        } catch (JSONException e) {
-            Log.e(TAG, "JSON error saving " + data.getType() + ": " + e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Generic save method for non-location data
-     */
-    private String saveGenericData(TalitaDataType data, JSONObject enhancedJson) {
-        try {
-            Log.d(TAG, "Saving " + data.getType() + " data with ID: " + data.getId());
-
-            // For now, use a simple file-based approach until we extend LocalDataManager
-            if (data.getType().equals("audio")) {
-                // Save to a generic data file
-                saveToGenericDataFile(data, enhancedJson);
-                return data.getId();
-            }
-
-            // For other data types
-            Log.d(TAG, "Generic save for " + data.getType() + " - using ID: " + data.getId());
-            return data.getId();
 
         } catch (Exception e) {
-            Log.e(TAG, "Error in saveGenericData: " + e.getMessage());
+            Log.e(TAG, "❌ Error saving encrypted data: " + e.getMessage());
             return null;
         }
     }
 
     /**
-     * Helper method to save to a generic data file
+     * Generic save method for encrypted non-location data
      */
-    private void saveToGenericDataFile(TalitaDataType data, JSONObject enhancedJson) {
+    private String saveGenericEncryptedData(EncryptedDataWrapper encryptedData, String encryptedJson) {
         try {
-            // Create a data entry with all the info
-            JSONObject dataEntry = new JSONObject();
-            dataEntry.put("id", data.getId());
-            dataEntry.put("type", data.getType());
-            dataEntry.put("filePath", data.getFilePath());
-            dataEntry.put("timestamp", data.getTimestamp());
-            dataEntry.put("data", enhancedJson);
+            Log.d(TAG, "💾 Saving encrypted " + encryptedData.originalData.getType() + " data with ID: " + encryptedData.originalData.getId());
 
-            // Save to a file (similar to the old audio_recordings.txt approach)
-            String filename = data.getType() + "_data.txt";
+            // Create encrypted data entry
+            JSONObject dataEntry = new JSONObject();
+            dataEntry.put("id", encryptedData.originalData.getId());
+            dataEntry.put("type", encryptedData.originalData.getType());
+            dataEntry.put("filePath", encryptedData.encryptedFilePath); // Store encrypted file path
+            dataEntry.put("timestamp", encryptedData.originalData.getTimestamp());
+            dataEntry.put("encrypted", true);
+            dataEntry.put("data", encryptedJson); // This is the encrypted JSON
+
+            // Save to encrypted data file
+            String filename = encryptedData.originalData.getType() + "_encrypted_data.txt";
             java.io.FileOutputStream fos = context.openFileOutput(filename, Context.MODE_APPEND);
             fos.write((dataEntry.toString() + "\n").getBytes());
             fos.close();
 
-            Log.d(TAG, "✅ Saved " + data.getType() + " to " + filename);
+            Log.d(TAG, "✅ Saved encrypted " + encryptedData.originalData.getType() + " to " + filename);
+            return encryptedData.originalData.getId();
 
         } catch (Exception e) {
-            Log.e(TAG, "Error saving to generic data file: " + e.getMessage());
+            Log.e(TAG, "❌ Error saving encrypted generic data: " + e.getMessage());
+            return null;
         }
     }
 
     /**
-     * Queue for cloud backup (future implementation)
+     * Get decrypted data of a specific type
      */
-    private void queueForCloudBackup(String dataId, TalitaDataType data) {
-        Log.d(TAG, "Queuing " + data.getType() + " for cloud backup: " + dataId);
-        // TODO: Add to backup queue when cloud service is ready
+    public java.util.List<DecryptedDataItem> getDecryptedDataByType(String type) {
+        java.util.List<DecryptedDataItem> items = new java.util.ArrayList<>();
+
+        try {
+            String filename = type + "_encrypted_data.txt";
+            java.io.FileInputStream fis = context.openFileInput(filename);
+            java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(fis));
+            String line;
+
+            while ((line = reader.readLine()) != null) {
+                try {
+                    JSONObject dataEntry = new JSONObject(line);
+                    String entryType = dataEntry.optString("type", "");
+
+                    if (type.equals(entryType)) {
+                        // Decrypt the data
+                        String encryptedJson = dataEntry.optString("data", "");
+                        String decryptedJson = encryptionService.decryptDataTypeJson(encryptedJson);
+
+                        // Create decrypted item
+                        DecryptedDataItem item = new DecryptedDataItem(
+                                dataEntry.optString("id", ""),
+                                entryType,
+                                dataEntry.optString("filePath", ""), // This is encrypted file path
+                                dataEntry.optLong("timestamp", 0),
+                                new JSONObject(decryptedJson),
+                                encryptionService
+                        );
+                        items.add(item);
+                    }
+
+                } catch (JSONException e) {
+                    Log.e(TAG, "❌ Error parsing encrypted data entry: " + e.getMessage());
+                }
+            }
+            reader.close();
+
+            Log.d(TAG, "🔓 Loaded and decrypted " + items.size() + " " + type + " items");
+
+        } catch (java.io.IOException e) {
+            Log.d(TAG, "📄 No encrypted " + type + " data file found, trying fallback");
+
+            // Fallback to old unencrypted data
+            return getUnencryptedFallbackData(type);
+        }
+
+        return items;
     }
 
     /**
-     * Update any active sharing (future implementation)
+     * Fallback to load old unencrypted data
      */
-    private void updateActiveSharing(String dataId, TalitaDataType data) {
-        Log.d(TAG, "Updating sharing for " + data.getType() + ": " + dataId);
-        // TODO: Notify friends about new data when P2P sharing is ready
+    private java.util.List<DecryptedDataItem> getUnencryptedFallbackData(String type) {
+        java.util.List<DecryptedDataItem> items = new java.util.ArrayList<>();
+
+        try {
+            // Try old generic data format first
+            java.util.List<GenericDataItem> oldItems = getGenericDataByType(type);
+
+            for (GenericDataItem oldItem : oldItems) {
+                DecryptedDataItem item = new DecryptedDataItem(
+                        oldItem.id,
+                        oldItem.type,
+                        oldItem.filePath,
+                        oldItem.timestamp,
+                        oldItem.data,
+                        encryptionService
+                );
+                items.add(item);
+            }
+
+            Log.d(TAG, "📄 Loaded " + items.size() + " unencrypted " + type + " items as fallback");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Fallback data loading failed: " + e.getMessage());
+        }
+
+        return items;
     }
 
     /**
-     * Show success toast
-     */
-    private void showSuccessToast(TalitaDataType data) {
-        String message = data.getDisplayName() + " saved successfully";
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
-    }
-
-    /**
-     * Show error toast
-     */
-    private void showErrorToast(TalitaDataType data) {
-        String message = "Failed to save " + data.getDisplayName();
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
-    }
-
-    /**
-     * Get all data of a specific type
-     */
-    public java.util.List<LocalDataManager.DataItem> getDataByType(String type) {
-        return dataManager.getItemsByType(type);
-    }
-
-    /**
-     * Load data from generic data files (for non-database data types)
+     * Legacy method for backward compatibility
      */
     public java.util.List<GenericDataItem> getGenericDataByType(String type) {
         java.util.List<GenericDataItem> items = new java.util.ArrayList<>();
@@ -215,17 +254,116 @@ public class UniversalDataService {
             }
             reader.close();
 
-            Log.d(TAG, "✅ Loaded " + items.size() + " " + type + " items from generic data file");
-
         } catch (java.io.IOException e) {
-            Log.d(TAG, "No " + type + " data file found (normal for first run)");
+            Log.d(TAG, "No " + type + " data file found");
         }
 
         return items;
     }
 
     /**
-     * Helper class for generic data items
+     * Queue for cloud backup (future implementation)
+     */
+    private void queueForCloudBackup(String dataId, EncryptedDataWrapper data) {
+        Log.d(TAG, "☁️ Queuing encrypted " + data.originalData.getType() + " for cloud backup: " + dataId);
+        // TODO: Add to backup queue when cloud service is ready
+        // Data is already encrypted, so cloud backup will be secure
+    }
+
+    /**
+     * Update any active sharing (future implementation)
+     */
+    private void updateActiveSharing(String dataId, EncryptedDataWrapper data) {
+        Log.d(TAG, "🤝 Updating sharing for encrypted " + data.originalData.getType() + ": " + dataId);
+        // TODO: Notify friends about new data when P2P sharing is ready
+        // Data is already encrypted, so sharing will be secure
+    }
+
+    /**
+     * Show success toast
+     */
+    private void showSuccessToast(TalitaDataType data) {
+        String message = "🔒 " + data.getDisplayName() + " encrypted and saved";
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Show error toast
+     */
+    private void showErrorToast(TalitaDataType data) {
+        String message = "❌ Failed to encrypt " + data.getDisplayName();
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Get all data of a specific type (legacy method)
+     */
+    public java.util.List<LocalDataManager.DataItem> getDataByType(String type) {
+        return dataManager.getItemsByType(type);
+    }
+
+    /**
+     * Wrapper class for encrypted data
+     */
+    private static class EncryptedDataWrapper {
+        public final TalitaDataType originalData;
+        public final String encryptedFilePath;
+
+        public EncryptedDataWrapper(TalitaDataType originalData, String encryptedFilePath) {
+            this.originalData = originalData;
+            this.encryptedFilePath = encryptedFilePath;
+        }
+    }
+
+    /**
+     * Helper class for decrypted data items
+     */
+    public static class DecryptedDataItem {
+        public final String id;
+        public final String type;
+        public final String encryptedFilePath;
+        public final long timestamp;
+        public final JSONObject decryptedData;
+        private final EncryptionService encryptionService;
+
+        public DecryptedDataItem(String id, String type, String encryptedFilePath,
+                                 long timestamp, JSONObject decryptedData, EncryptionService encryptionService) {
+            this.id = id;
+            this.type = type;
+            this.encryptedFilePath = encryptedFilePath;
+            this.timestamp = timestamp;
+            this.decryptedData = decryptedData != null ? decryptedData : new JSONObject();
+            this.encryptionService = encryptionService;
+        }
+
+        /**
+         * Get temporary decrypted file for reading/playback
+         * IMPORTANT: Must call cleanupTempFile() when done!
+         */
+        public String getTempDecryptedFilePath() {
+            if (encryptedFilePath == null || encryptedFilePath.isEmpty()) {
+                return null;
+            }
+            return encryptionService.decryptFileToTemp(encryptedFilePath);
+        }
+
+        /**
+         * Clean up temporary decrypted file
+         */
+        public void cleanupTempFile(String tempFilePath) {
+            encryptionService.cleanupTempFile(tempFilePath);
+        }
+
+        /**
+         * Check if file is encrypted
+         */
+        public boolean isFileEncrypted() {
+            return encryptionService.isFileEncrypted(encryptedFilePath);
+        }
+    }
+
+    /**
+     * Helper class for generic data items (backward compatibility)
      */
     public static class GenericDataItem {
         public final String id;

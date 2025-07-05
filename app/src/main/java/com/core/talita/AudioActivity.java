@@ -15,7 +15,11 @@ import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,7 +44,7 @@ public class AudioActivity extends AppCompatActivity {
     private AudioRecordingsAdapter adapter;
     private List<AudioRecord> audioRecordings = new ArrayList<>();
 
-    // Universal data service
+    // Universal data service with encryption
     private UniversalDataService dataService;
 
     private Handler timerHandler = new Handler();
@@ -53,7 +57,7 @@ public class AudioActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_audio);
 
-        // Initialize universal data service
+        // Initialize universal data service with encryption
         dataService = new UniversalDataService(this);
 
         initializeViews();
@@ -62,7 +66,7 @@ public class AudioActivity extends AppCompatActivity {
         loadAudioHistory();
         checkAudioPermission();
 
-        Log.d(TAG, "AudioActivity initialized with Universal Data Service");
+        Log.d(TAG, "🔐 AudioActivity initialized with encryption support");
     }
 
     private void initializeViews() {
@@ -120,7 +124,7 @@ public class AudioActivity extends AppCompatActivity {
         updateRecordingUI();
         stopTimer();
 
-        // Refresh recordings list using universal service
+        // Refresh recordings list using encrypted universal service
         loadAudioHistory();
     }
 
@@ -167,41 +171,53 @@ public class AudioActivity extends AppCompatActivity {
 
     private void loadAudioHistory() {
         try {
-            Log.d(TAG, "Loading audio history via Universal Data Service...");
+            Log.d(TAG, "🔓 Loading encrypted audio history via Universal Data Service...");
 
-            // 🎉 USE UNIVERSAL DATA SERVICE FOR GENERIC DATA
-            java.util.List<UniversalDataService.GenericDataItem> universalAudioData =
-                    dataService.getGenericDataByType("audio");
+            // 🔐 USE ENCRYPTED UNIVERSAL DATA SERVICE
+            List<UniversalDataService.DecryptedDataItem> encryptedAudioData =
+                    dataService.getDecryptedDataByType("audio");
 
             audioRecordings.clear();
 
-            for (UniversalDataService.GenericDataItem dataItem : universalAudioData) {
+            for (UniversalDataService.DecryptedDataItem dataItem : encryptedAudioData) {
                 try {
-                    String filepath = dataItem.filePath;
+                    String encryptedFilePath = dataItem.encryptedFilePath;
                     long timestamp = dataItem.timestamp;
 
-                    // Parse duration from the data JSON
-                    long durationMs = dataItem.data.optLong("duration_ms", 0);
+                    // Parse duration from the decrypted data JSON
+                    long durationMs = dataItem.decryptedData.optLong("duration_ms", 0);
                     int durationSeconds = (int) (durationMs / 1000);
 
-                    // Check if file still exists
-                    File audioFile = new File(filepath);
-                    if (audioFile.exists()) {
+                    // For UI purposes, we'll show the original filename but store encrypted path
+                    String displayName = "audio_recording.3gp"; // Default name
+                    if (encryptedFilePath != null) {
+                        String originalName = new File(encryptedFilePath).getName();
+                        // Remove .enc extension for display
+                        if (originalName.endsWith(".enc")) {
+                            displayName = originalName.substring(0, originalName.length() - 4);
+                        } else {
+                            displayName = originalName;
+                        }
+                    }
+
+                    // Check if encrypted file exists
+                    if (encryptedFilePath != null && new File(encryptedFilePath).exists()) {
+                        // Create AudioRecord with encrypted file path (will be decrypted on playback)
                         AudioRecord record = new AudioRecord(
-                                audioFile.getName(),
-                                filepath,
+                                displayName,
+                                encryptedFilePath, // Store encrypted path
                                 timestamp,
                                 durationSeconds
                         );
                         audioRecordings.add(record);
 
-                        Log.d(TAG, "✅ Loaded audio: " + audioFile.getName() + " (" + durationSeconds + "s)");
+                        Log.d(TAG, "🔓 Loaded encrypted audio: " + displayName + " (" + durationSeconds + "s)");
                     } else {
-                        Log.w(TAG, "⚠️ Audio file missing: " + filepath);
+                        Log.w(TAG, "⚠️ Encrypted audio file missing: " + encryptedFilePath);
                     }
 
                 } catch (Exception e) {
-                    Log.e(TAG, "Error parsing audio data: " + e.getMessage());
+                    Log.e(TAG, "❌ Error parsing encrypted audio data: " + e.getMessage());
                 }
             }
 
@@ -212,25 +228,23 @@ public class AudioActivity extends AppCompatActivity {
             updateRecordingsCount();
             adapter.notifyDataSetChanged();
 
-            Log.d(TAG, "✅ Loaded " + audioRecordings.size() + " audio recordings via Universal Data Service");
+            Log.d(TAG, "✅ Loaded " + audioRecordings.size() + " encrypted audio recordings");
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to load via Universal Data Service, trying fallback...", e);
+            Log.e(TAG, "❌ Failed to load encrypted audio, trying fallback...", e);
 
-            // Fallback to old method
+            // Fallback to old unencrypted method
             loadAudioHistoryFallback();
         }
     }
 
-    // Remove the loadFromUniversalDataFile method since we're using the service directly now
-
     // Fallback method - keep the old approach as backup
     private void loadAudioHistoryFallback() {
         try {
-            Log.d(TAG, "Using fallback JSON file loading...");
+            Log.d(TAG, "📄 Using fallback JSON file loading...");
 
-            java.io.FileInputStream fis = openFileInput("audio_recordings.txt");
-            java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(fis));
+            FileInputStream fis = openFileInput("audio_recordings.txt");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(fis));
             String line;
 
             audioRecordings.clear();
@@ -264,9 +278,9 @@ public class AudioActivity extends AppCompatActivity {
 
             Log.d(TAG, "⚠️ Loaded " + audioRecordings.size() + " recordings via fallback method");
 
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             // File doesn't exist yet - that's ok
-            Log.d(TAG, "No audio recordings found (this is normal for first run)");
+            Log.d(TAG, "📄 No audio recordings found (this is normal for first run)");
             updateRecordingsCount();
         }
     }
