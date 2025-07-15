@@ -9,7 +9,6 @@ public class HomeActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         setContentView(R.layout.activity_home);
 
         Button btnMe = findViewById(R.id.btn_me);
@@ -25,5 +24,4 @@ public class HomeActivity extends AppCompatActivity {
             startActivity(intent);
         });
     }
-
 }

@@ -5,9 +5,10 @@ import android.util.Log;
 import android.widget.Toast;
 import org.json.JSONException;
 import org.json.JSONObject;
+import com.core.talita.cloud.CloudBackupManager;
 
 /**
- * Universal Data Service - handles ALL data types in Talita with ENCRYPTION
+ * Universal Data Service - handles ALL data types in Talita with ENCRYPTION and CLOUD BACKUP
  * Any data implementing TalitaDataType gets automatic:
  * - Hardware-backed encryption
  * - Database storage
@@ -22,13 +23,15 @@ public class UniversalDataService {
     private final Context context;
     private final LocalDataManager dataManager;
     private final EncryptionService encryptionService;
+    private final CloudBackupManager cloudBackupManager;
 
     public UniversalDataService(Context context) {
         this.context = context;
         this.dataManager = new LocalDataManager(context);
         this.encryptionService = new EncryptionService(context);
+        this.cloudBackupManager = new CloudBackupManager(context);
 
-        Log.d(TAG, "🔐 Universal Data Service initialized with encryption");
+        Log.d(TAG, "🔐☁️ Universal Data Service initialized with encryption and cloud backup");
         Log.d(TAG, encryptionService.getEncryptionStatus());
     }
 
@@ -53,7 +56,7 @@ public class UniversalDataService {
             String dataId = saveToDatabase(encryptedData);
 
             if (dataId != null) {
-                // 4. Queue for cloud backup (future feature)
+                // 4. Queue for cloud backup
                 queueForCloudBackup(dataId, encryptedData);
 
                 // 5. Handle sharing updates (future feature)
@@ -135,6 +138,41 @@ public class UniversalDataService {
             Log.e(TAG, "❌ Error saving encrypted generic data: " + e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Queue for cloud backup - NOW ACTUALLY IMPLEMENTED!
+     */
+    private void queueForCloudBackup(String dataId, EncryptedDataWrapper data) {
+        Log.d(TAG, "☁️ Queuing encrypted " + data.originalData.getType() + " for cloud backup: " + dataId);
+
+        // Queue the original data for backup (it's already encrypted)
+        cloudBackupManager.queueForBackup(data.originalData);
+    }
+
+    /**
+     * Update any active sharing (future implementation)
+     */
+    private void updateActiveSharing(String dataId, EncryptedDataWrapper data) {
+        Log.d(TAG, "🤝 Updating sharing for encrypted " + data.originalData.getType() + ": " + dataId);
+        // TODO: Notify friends about new data when P2P sharing is ready
+        // Data is already encrypted, so sharing will be secure
+    }
+
+    /**
+     * Show success toast
+     */
+    private void showSuccessToast(TalitaDataType data) {
+        String message = "🔒 " + data.getDisplayName() + " encrypted and saved";
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Show error toast
+     */
+    private void showErrorToast(TalitaDataType data) {
+        String message = "❌ Failed to encrypt " + data.getDisplayName();
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -262,44 +300,42 @@ public class UniversalDataService {
     }
 
     /**
-     * Queue for cloud backup (future implementation)
-     */
-    private void queueForCloudBackup(String dataId, EncryptedDataWrapper data) {
-        Log.d(TAG, "☁️ Queuing encrypted " + data.originalData.getType() + " for cloud backup: " + dataId);
-        // TODO: Add to backup queue when cloud service is ready
-        // Data is already encrypted, so cloud backup will be secure
-    }
-
-    /**
-     * Update any active sharing (future implementation)
-     */
-    private void updateActiveSharing(String dataId, EncryptedDataWrapper data) {
-        Log.d(TAG, "🤝 Updating sharing for encrypted " + data.originalData.getType() + ": " + dataId);
-        // TODO: Notify friends about new data when P2P sharing is ready
-        // Data is already encrypted, so sharing will be secure
-    }
-
-    /**
-     * Show success toast
-     */
-    private void showSuccessToast(TalitaDataType data) {
-        String message = "🔒 " + data.getDisplayName() + " encrypted and saved";
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
-    }
-
-    /**
-     * Show error toast
-     */
-    private void showErrorToast(TalitaDataType data) {
-        String message = "❌ Failed to encrypt " + data.getDisplayName();
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
-    }
-
-    /**
      * Get all data of a specific type (legacy method)
      */
     public java.util.List<LocalDataManager.DataItem> getDataByType(String type) {
         return dataManager.getItemsByType(type);
+    }
+
+    /**
+     * Manual backup trigger
+     */
+    public void triggerManualBackup() {
+        Log.d(TAG, "🚀 Triggering manual cloud backup");
+        cloudBackupManager.processBackupQueue();
+    }
+
+    /**
+     * Cloud backup configuration
+     */
+    public CloudBackupManager getCloudBackupManager() {
+        return cloudBackupManager;
+    }
+
+    public void setCloudBackupEnabled(boolean enabled) {
+        cloudBackupManager.setBackupEnabled(enabled);
+        Log.d(TAG, enabled ? "☁️ Cloud backup enabled" : "📴 Cloud backup disabled");
+    }
+
+    public void setAutoBackupEnabled(boolean enabled) {
+        cloudBackupManager.setAutoBackupEnabled(enabled);
+        Log.d(TAG, enabled ? "🔄 Auto cloud backup enabled" : "⏸️ Auto cloud backup disabled");
+    }
+
+    /**
+     * Check cloud backup status for a data item
+     */
+    public CloudBackupManager.BackupStatus getBackupStatus(String dataId) {
+        return cloudBackupManager.getBackupStatus(dataId);
     }
 
     /**

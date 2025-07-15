@@ -33,14 +33,14 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = "11" // Set to 1.8 or 11 based on your preference
+        jvmTarget = "11"
     }
 
     buildFeatures {
         dataBinding = true
+        viewBinding = true
     }
 }
-
 
 dependencies {
     implementation(libs.core.ktx)
@@ -51,14 +51,18 @@ dependencies {
     implementation(libs.kotlin)
     implementation(libs.zxing.android.embedded)
     implementation(libs.androidx.databinding.runtime)
-    implementation("com.google.dagger:dagger:2.51.1")
     implementation(libs.androidx.appcompat)
-    implementation("androidx.cardview:cardview:1.0.0")
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
+
+    // QR Code scanning
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.google.zxing:core:3.5.2")
+
+    // Dependency Injection
+    implementation("com.google.dagger:dagger:2.51.1")
     kapt("com.google.dagger:dagger-compiler:2.51.1")
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-
-
 }

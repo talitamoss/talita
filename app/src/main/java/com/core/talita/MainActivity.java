@@ -5,7 +5,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.view.View;
+import android.util.Log;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
@@ -17,8 +17,11 @@ import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_PERMISSIONS = 1;
-    private LocationTracker locationTracker;
+
+    // Tracking components
+    private LocationTracker locationTracker; // Keep for manual location activity
     private AudioRecorder audioRecorder;
+    private TrackingManager trackingManager; // For background tracking management
 
     private final ArrayList<GeoPoint> routePoints = new ArrayList<>();
     private Polyline polyline;
@@ -27,27 +30,32 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Initialize OSMDroid
-        Configuration.getInstance().load(
-                getApplicationContext(),
-                PreferenceManager.getDefaultSharedPreferences(getApplicationContext())
-        );
-        Configuration.getInstance().setUserAgentValue("com.core.talita");
+        // Test collectors
+        testCollectorSystem();
 
+        // Set a simple layout for now
         setContentView(R.layout.activity_main);
-
-        // Initialize tracking components (but don't start UI yet)
-        polyline = new Polyline();
-        locationTracker = new LocationTracker(this, null, null, polyline, routePoints);
-        audioRecorder = new AudioRecorder(this, null, null);
-
-        // Setup tile click listeners
-        setupTileClickListeners();
-
-        // Check and request permissions
-        checkAndRequestPermissions();
     }
 
+    private void testCollectorSystem() {
+        try {
+            Log.d("MainActivity", "🧪 Testing collector system...");
+
+            DataCollectorManager manager = new DataCollectorManager(this);
+
+            DataCollectorManager.CollectionStats stats = manager.getCollectionStats();
+            Log.d("MainActivity", "✅ Collector system loaded: " + stats.getSummary());
+            Log.d("MainActivity", "📊 Found " + stats.totalCollectors + " collectors");
+
+            // Test water logging
+            manager.quickLogWater(250);
+            Log.d("MainActivity", "💧 Water logging test completed");
+
+        } catch (Exception e) {
+            Log.e("MainActivity", "❌ Collector system failed: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
     private void setupTileClickListeners() {
         // Location Tile
         CardView locationTile = findViewById(R.id.location_tile);
@@ -80,8 +88,8 @@ public class MainActivity extends AppCompatActivity {
         // Settings Tile
         CardView settingsTile = findViewById(R.id.settings_tile);
         settingsTile.setOnClickListener(v -> {
-            Toast.makeText(this, "Settings - Coming soon!", Toast.LENGTH_SHORT).show();
-            // TODO: Open settings activity
+            Intent intent = new Intent(this, SettingsActivity.class);
+            startActivity(intent);
         });
 
         // Stats Tile
@@ -109,28 +117,43 @@ public class MainActivity extends AppCompatActivity {
     private void checkAndRequestPermissions() {
         String[] permissions = {
                 Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.RECORD_AUDIO
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION, // For background location
+                Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.ACTIVITY_RECOGNITION, // For step counting
+                Manifest.permission.FOREGROUND_SERVICE // For background service
         };
 
-        boolean allPermissionsGranted = true;
-        for (String permission : permissions) {
-            if (ActivityCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                allPermissionsGranted = false;
-                break;
-            }
-        }
+        boolean allPermissionsGranted = hasRequiredPermissions();
 
         if (!allPermissionsGranted) {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_PERMISSIONS);
         } else {
-            // Permissions already granted - start background tracking
+            // Permissions already granted - start the old location tracker for compatibility
             locationTracker.startTracking();
         }
+    }
+
+    /**
+     * Check if basic permissions are granted (location, audio)
+     */
+    private boolean hasRequiredPermissions() {
+        String[] basicPermissions = {
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.RECORD_AUDIO
+        };
+
+        for (String permission : basicPermissions) {
+            if (ActivityCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        // Stop the old location tracker (background service will continue if enabled)
         if (locationTracker != null) {
             locationTracker.stopTracking();
         }
@@ -145,6 +168,7 @@ public class MainActivity extends AppCompatActivity {
         if (audioRecorder != null) {
             audioRecorder.cleanup();
         }
+        // Note: We don't stop background tracking here - it should continue even when app is closed
     }
 
     @Override
@@ -165,15 +189,16 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
+            // Handle permission results
             if (locationGranted) {
                 locationTracker.startTracking();
-                Toast.makeText(this, "Location tracking enabled", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "✅ Location tracking enabled", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "❌ Location permission required for tracking", Toast.LENGTH_SHORT).show();
             }
 
             if (!audioGranted) {
-                Toast.makeText(this, "Audio recording permission denied", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "⚠️ Audio permission denied - audio recording disabled", Toast.LENGTH_SHORT).show();
             }
         }
     }
