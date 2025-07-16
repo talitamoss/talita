@@ -1,0 +1,35 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_marginBottom="16dp">
+
+    <!-- Category Header -->
+    <TextView
+        android:id="@+id/category_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Movement &amp; Fitness"
+        android:textSize="18sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Category Description -->
+    <TextView
+        android:id="@+id/category_description"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Track physical activity and movement patterns"
+        android:textSize="14sp"
+        android:textColor="#CCCCCC"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Collectors in Category -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/category_collectors_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+</LinearLayout>
