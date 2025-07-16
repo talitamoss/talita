@@ -13,3 +13,22 @@
 .externalNativeBuild
 .cxx
 local.properties
+# APK and app files
+*.apk
+*.aab
+*.dex
+
+# Keystore files
+*.jks
+*.keystore
+
+# Log files
+*.log
+
+# Additional IDE files
+.idea/gradle.xml
+.idea/dictionaries
+.idea/tasks.xml
+
+# Android profiling
+*.hprof

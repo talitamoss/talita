@@ -327,7 +327,7 @@ public class BackgroundTrackingService extends Service implements LocationListen
      * Create persistent notification
      */
     private Notification createNotification() {
-        Intent notificationIntent = new Intent(this, MainActivity.class);
+        Intent notificationIntent = new Intent(this, DataCollectionActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE
         );

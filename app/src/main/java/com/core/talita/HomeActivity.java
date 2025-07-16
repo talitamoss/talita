@@ -3,6 +3,7 @@ package com.core.talita;
 import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class HomeActivity extends AppCompatActivity {
@@ -11,16 +12,27 @@ public class HomeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        Button btnMe = findViewById(R.id.btn_me);
-        Button btnOthers = findViewById(R.id.btn_others);
+        Button btnMyData = findViewById(R.id.btn_my_data);
+        Button btnRecord = findViewById(R.id.btn_record);
+        Button btnConnect = findViewById(R.id.btn_connect);
+        Button btnSettings = findViewById(R.id.btn_settings);
 
-        btnMe.setOnClickListener(v -> {
-            Intent intent = new Intent(this, MainActivity.class);
+        btnMyData.setOnClickListener(v -> {
+            Intent intent = new Intent(this, DataSummaryActivity.class);
             startActivity(intent);
         });
 
-        btnOthers.setOnClickListener(v -> {
-            Intent intent = new Intent(this, QrHandshakeActivity.class);
+        btnRecord.setOnClickListener(v -> {
+            Intent intent = new Intent(this, DashboardActivity.class);
+            startActivity(intent);
+        });
+
+        btnConnect.setOnClickListener(v -> {
+            Toast.makeText(this, "🔗 Connect - Coming soon!", Toast.LENGTH_SHORT).show();
+        });
+
+        btnSettings.setOnClickListener(v -> {
+            Intent intent = new Intent(this, SettingsActivity.class);
             startActivity(intent);
         });
     }

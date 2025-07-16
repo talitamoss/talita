@@ -4,53 +4,83 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
-    android:padding="24dp"
-    android:background="@android:color/white">
+    android:padding="32dp"
+    android:background="#1A1A1A">
 
+    <!-- App Title -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Talita"
-        android:textSize="32sp"
+        android:text="TALITA"
+        android:textSize="36sp"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp"
-        android:textColor="@color/purple_500" />
+        android:textColor="#FFFFFF"
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginBottom="8dp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Personal Data Sovereignty"
-        android:textSize="14sp"
-        android:layout_marginBottom="48dp"
-        android:textColor="@color/purple_700" />
+        android:textSize="16sp"
+        android:textColor="#888888"
+        android:layout_marginBottom="64dp" />
 
+    <!-- My Data Button -->
     <Button
-        android:id="@+id/btn_me"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:text="My Data"
-        android:layout_marginBottom="16dp"
+        android:id="@+id/btn_my_data"
+        android:layout_width="280dp"
+        android:layout_height="60dp"
+        android:text="📊 My Data"
+        android:layout_marginBottom="20dp"
         android:textSize="18sp"
-        android:drawableLeft="@android:drawable/ic_menu_myplaces"
-        android:drawablePadding="8dp" />
+        android:textColor="#FFFFFF"
+        android:background="#2A2A2A"
+        android:drawablePadding="12dp" />
 
+    <!-- Record Button -->
     <Button
-        android:id="@+id/btn_others"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:text="Connect"
-        android:layout_marginBottom="16dp"
+        android:id="@+id/btn_record"
+        android:layout_width="280dp"
+        android:layout_height="60dp"
+        android:text="📝 Record"
+        android:layout_marginBottom="20dp"
         android:textSize="18sp"
-        android:drawableLeft="@android:drawable/ic_menu_share"
-        android:drawablePadding="8dp" />
+        android:textColor="#FFFFFF"
+        android:background="#2A2A2A"
+        android:drawablePadding="12dp" />
 
+    <!-- Connect Button -->
+    <Button
+        android:id="@+id/btn_connect"
+        android:layout_width="280dp"
+        android:layout_height="60dp"
+        android:text="🔗 Connect"
+        android:layout_marginBottom="20dp"
+        android:textSize="18sp"
+        android:textColor="#FFFFFF"
+        android:background="#2A2A2A"
+        android:drawablePadding="12dp" />
+
+    <!-- Settings Button -->
     <Button
         android:id="@+id/btn_settings"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:text="Settings"
+        android:layout_width="280dp"
+        android:layout_height="60dp"
+        android:text="⚙️ Settings"
         android:textSize="18sp"
-        android:drawableLeft="@android:drawable/ic_menu_preferences"
-        android:drawablePadding="8dp" />
+        android:textColor="#FFFFFF"
+        android:background="#2A2A2A"
+        android:drawablePadding="12dp" />
+
+    <!-- Footer -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Your data, your control"
+        android:textColor="#666666"
+        android:textSize="14sp"
+        android:textStyle="italic"
+        android:layout_marginTop="48dp" />
 
 </LinearLayout>

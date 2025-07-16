@@ -24,7 +24,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Quick Add Dashboard - Main activity for easy data entry
+ * Dashboard Activity - Main activity for easy data entry
+ * Renamed from QuickAddDashboardActivity
  *
  * Features:
  * - Quick add buttons for common activities
@@ -32,9 +33,9 @@ import java.util.Locale;
  * - Daily summary stats
  * - Background tracking status
  */
-public class QuickAddDashboardActivity extends AppCompatActivity {
+public class DashboardActivity extends AppCompatActivity {
 
-    private static final String TAG = "QuickAddDashboard";
+    private static final String TAG = "DashboardActivity";
 
     private DataCollectorManager collectorManager;
     private TrackingManager trackingManager;
@@ -53,7 +54,7 @@ public class QuickAddDashboardActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_quick_add_dashboard);
+        setContentView(R.layout.activity_dashboard);
 
         // Initialize services
         collectorManager = new DataCollectorManager(this);
@@ -64,7 +65,13 @@ public class QuickAddDashboardActivity extends AppCompatActivity {
         setupRecentActivityFeed();
         updateDashboard();
 
-        Log.d(TAG, "📊 Quick Add Dashboard initialized");
+        // Check for focus collector from intent
+        String focusCollector = getIntent().getStringExtra("focus_collector");
+        if (focusCollector != null) {
+            focusOnCollector(focusCollector);
+        }
+
+        Log.d(TAG, "📊 Dashboard Activity initialized");
     }
 
     private void initializeViews() {
@@ -79,20 +86,20 @@ public class QuickAddDashboardActivity extends AppCompatActivity {
         trackingStatusText = findViewById(R.id.tracking_status_text);
         trackingStatusCard = findViewById(R.id.tracking_status_card);
 
-        // Navigation buttons
+        // Navigation buttons - these are CardViews, not Buttons!
         Button settingsButton = findViewById(R.id.settings_button);
         settingsButton.setOnClickListener(v -> {
             Intent intent = new Intent(this, SettingsActivity.class);
             startActivity(intent);
         });
 
-        Button locationButton = findViewById(R.id.location_button);
+        CardView locationButton = findViewById(R.id.location_button);
         locationButton.setOnClickListener(v -> {
             Intent intent = new Intent(this, LocationActivity.class);
             startActivity(intent);
         });
 
-        Button audioButton = findViewById(R.id.audio_button);
+        CardView audioButton = findViewById(R.id.audio_button);
         audioButton.setOnClickListener(v -> {
             Intent intent = new Intent(this, AudioActivity.class);
             startActivity(intent);
@@ -114,6 +121,14 @@ public class QuickAddDashboardActivity extends AppCompatActivity {
         recentActivityAdapter = new RecentActivityAdapter(new ArrayList<>());
         recentActivityRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         recentActivityRecyclerView.setAdapter(recentActivityAdapter);
+    }
+
+    private void focusOnCollector(String collectorType) {
+        // Show a quick action for the specific collector
+        Toast.makeText(this, "📊 Focus on " + collectorType + " collection", Toast.LENGTH_SHORT).show();
+
+        // Could scroll to or highlight the specific collector
+        // For now, just show a toast
     }
 
     private List<QuickAddItem> createQuickAddItems() {
