@@ -42,52 +42,57 @@
 
         <!-- Background Tracking Section -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/background_tracking_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             app:cardBackgroundColor="#FF2A2A2A"
             app:cardCornerRadius="12dp"
-            app:cardElevation="4dp">
+            app:cardElevation="4dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground">    
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:padding="16dp">
-
+                
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
                         android:text="🎯 Background Tracking"
                         android:textSize="18sp"
                         android:textColor="#FFFFFF"
                         android:textStyle="bold" />
-
-                    <Switch
-                        android:id="@+id/switch_background_tracking"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-
+                        
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Location, activity recognition, step counting"
+                        android:textSize="14sp"
+                        android:textColor="#CCCCCC"
+                        android:layout_marginTop="4dp" />
+                        
                 </LinearLayout>
-
+                
                 <TextView
-                    android:id="@+id/collectors_status_text"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="0/0 collectors active"
-                    android:textSize="14sp"
-                    android:textColor="#CCCCCC"
-                    android:layout_marginTop="8dp" />
-
+                    android:text="→"
+                    android:textSize="24sp"
+                    android:textColor="#888888" />
+                    
             </LinearLayout>
-
+            
         </androidx.cardview.widget.CardView>
 
         <!-- Data Collectors Section -->
@@ -100,104 +105,17 @@
             android:textStyle="bold"
             android:layout_marginBottom="12dp" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/collectors_recycler_view"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp" />
-
-        <!-- Cloud Backup Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Cloud Backup"
-            android:textSize="20sp"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:layout_marginBottom="12dp" />
-
         <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="#FF2A2A2A"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="12dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="☁️ Cloud Backup"
-                        android:textSize="18sp"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold" />
-
-                    <Switch
-                        android:id="@+id/switch_cloud_backup"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/cloud_status_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Cloud backup disabled"
-                    android:textSize="14sp"
-                    android:textColor="#888888"
-                    android:layout_marginBottom="12dp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="🔄 Auto-backup"
-                        android:textSize="16sp"
-                        android:textColor="#FFFFFF" />
-
-                    <Switch
-                        android:id="@+id/switch_auto_backup"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-
-                </LinearLayout>
-
-            </LinearLayout>
-
-        </androidx.cardview.widget.CardView>
-
-        <androidx.cardview.widget.CardView
-            android:id="@+id/manual_backup_card"
+            android:id="@+id/data_collectors_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
-            app:cardBackgroundColor="#FF2A2A2A"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
             android:clickable="true"
             android:focusable="true"
-            android:foreground="?android:attr/selectableItemBackground">
+            android:foreground="?android:attr/selectableItemBackground"
+            app:cardBackgroundColor="#FF2A2A2A"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -210,18 +128,89 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="🚀 Manual Backup"
+                    android:text="📊 Manage Data Collectors"
                     android:textSize="16sp"
                     android:textColor="#FFFFFF" />
 
-                <Button
-                    android:id="@+id/manual_backup_button"
+                <TextView
+                    android:id="@+id/collectors_status_text_card"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:text="Backup Now"
+                    android:layout_height="wrap_content"
+                    android:text="12 active"
                     android:textSize="14sp"
-                    android:background="@android:color/transparent"
-                    android:textColor="#4285F4" />
+                    android:textColor="#888888"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="→"
+                    android:textSize="20sp"
+                    android:textColor="#888888" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Cloud Backup Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Cloud Backup"
+            android:textSize="20sp"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp" />
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cloud_backup_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground"
+            app:cardBackgroundColor="#FF2A2A2A"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="☁️ Cloud Backup"
+                        android:textSize="18sp"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Configure providers and sync settings"
+                        android:textSize="14sp"
+                        android:textColor="#CCCCCC"
+                        android:layout_marginTop="4dp" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="→"
+                    android:textSize="24sp"
+                    android:textColor="#888888" />
 
             </LinearLayout>
 
@@ -238,9 +227,13 @@
             android:layout_marginBottom="12dp" />
 
         <androidx.cardview.widget.CardView
+            android:id="@+id/security_privacy_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="24dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground"
             app:cardBackgroundColor="#FF2A2A2A"
             app:cardCornerRadius="12dp"
             app:cardElevation="4dp">
@@ -248,34 +241,40 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:padding="16dp">
 
-                <TextView
-                    android:layout_width="match_parent"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="🔒 Encryption Status"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="8dp" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="🔒 Security &amp; Privacy"
+                        android:textSize="18sp"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Encryption status and privacy controls"
+                        android:textSize="14sp"
+                        android:textColor="#CCCCCC"
+                        android:layout_marginTop="4dp" />
+
+                </LinearLayout>
 
                 <TextView
-                    android:id="@+id/encryption_status_text"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🔒 Hardware encryption active"
-                    android:textSize="14sp"
-                    android:textColor="#4CAF50"
-                    android:layout_marginBottom="12dp" />
-
-                <Button
-                    android:id="@+id/btn_view_encryption_status"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="View Encryption Details"
-                    android:textColor="#4285F4"
-                    android:background="@android:color/transparent" />
+                    android:text="→"
+                    android:textSize="24sp"
+                    android:textColor="#888888" />
 
             </LinearLayout>
 
@@ -283,9 +282,13 @@
 
         <!-- Data Export Section -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/data_export_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground"
             app:cardBackgroundColor="#FF2A2A2A"
             app:cardCornerRadius="12dp"
             app:cardElevation="4dp">
@@ -293,33 +296,40 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:padding="16dp">
 
-                <TextView
-                    android:layout_width="match_parent"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="📤 Data Export"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="8dp" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="📤 Data Export"
+                        android:textSize="18sp"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Export your data in various formats"
+                        android:textSize="14sp"
+                        android:textColor="#CCCCCC"
+                        android:layout_marginTop="4dp" />
+
+                </LinearLayout>
 
                 <TextView
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Export your data in various formats"
-                    android:textSize="14sp"
-                    android:textColor="#CCCCCC"
-                    android:layout_marginBottom="12dp" />
-
-                <Button
-                    android:id="@+id/btn_export_data"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Export My Data"
-                    android:textColor="#4285F4"
-                    android:background="@android:color/transparent" />
+                    android:text="→"
+                    android:textSize="24sp"
+                    android:textColor="#888888" />
 
             </LinearLayout>
 
@@ -336,8 +346,12 @@
             android:layout_marginBottom="12dp" />
 
         <androidx.cardview.widget.CardView
+            android:id="@+id/about_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground"
             app:cardBackgroundColor="#FF2A2A2A"
             app:cardCornerRadius="12dp"
             app:cardElevation="4dp">
@@ -345,35 +359,40 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="ℹ️ About Talita"
+                        android:textSize="18sp"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Version info and credits"
+                        android:textSize="14sp"
+                        android:textColor="#CCCCCC"
+                        android:layout_marginTop="4dp" />
+
+                </LinearLayout>
 
                 <TextView
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="TALITA v1.0"
-                    android:textSize="18sp"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold"
-                    android:gravity="center"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Personal Data Sovereignty Platform"
-                    android:textSize="14sp"
-                    android:textColor="#CCCCCC"
-                    android:gravity="center"
-                    android:layout_marginBottom="8dp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="🔒 Your data, your control"
-                    android:textSize="12sp"
-                    android:textColor="#888888"
-                    android:gravity="center" />
+                    android:text="→"
+                    android:textSize="24sp"
+                    android:textColor="#888888" />
 
             </LinearLayout>
 

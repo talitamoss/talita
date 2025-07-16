@@ -49,9 +49,6 @@
         <activity android:name=".SettingsActivity" />
 	<activity android:name=".ConnectActivity" />
 	<activity android:name=".DataViewActivity" />
-	<activity android:name=".SettingsActivity" />
-	<activity android:name=".ConnectActivity" />
-	<activity android:name=".DataViewActivity" />
 	<activity android:name=".AboutSettingsActivity" />
 	<activity android:name=".BackgroundTrackingSettingsActivity" />
 	<activity android:name=".CloudBackupSettingsActivity" />
