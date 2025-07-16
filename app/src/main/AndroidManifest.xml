@@ -47,6 +47,19 @@
 
         <!-- SETTINGS & CONFIG -->
         <activity android:name=".SettingsActivity" />
+	<activity android:name=".ConnectActivity" />
+	<activity android:name=".DataViewActivity" />
+	<activity android:name=".SettingsActivity" />
+	<activity android:name=".ConnectActivity" />
+	<activity android:name=".DataViewActivity" />
+	<activity android:name=".AboutSettingsActivity" />
+	<activity android:name=".BackgroundTrackingSettingsActivity" />
+	<activity android:name=".CloudBackupSettingsActivity" />
+	<activity android:name=".DataCollectorsSettingsActivity" />
+	<activity android:name=".DataExportSettingsActivity" />
+	<activity android:name=".SecurityPrivacySettingsActivity" />
+	<activity android:name=".DataTypeDetailActivity" />
+	<activity android:name=".TileSelectionActivity" />
 
         <!-- LEGACY & P2P -->
         <activity android:name=".QrHandshakeActivity" />

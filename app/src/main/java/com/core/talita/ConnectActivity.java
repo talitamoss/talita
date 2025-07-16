@@ -40,8 +40,7 @@ public class ConnectActivity extends AppCompatActivity {
         // QR Handshake - the only implemented feature for now
         CardView qrHandshakeCard = findViewById(R.id.qr_handshake_card);
         qrHandshakeCard.setOnClickListener(v -> {
-            Intent intent = new Intent(this, QrHandshakeActivity.class);
-            startActivity(intent);
+            Toast.makeText(this, "🚧 QR Handshake - Coming Soon!", Toast.LENGTH_SHORT).show();
         });
 
         // Placeholder features - to be implemented later

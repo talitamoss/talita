@@ -25,7 +25,7 @@ public class HomeActivity extends AppCompatActivity {
         // Connect Button
         CardView btnConnect = findViewById(R.id.btn_connect_card);
         btnConnect.setOnClickListener(v -> {
-            Intent intent = new Intent(this, QrHandshakeActivity.class);
+            Intent intent = new Intent(this, ConnectActivity.class);
             startActivity(intent);
         });
 
@@ -39,7 +39,7 @@ public class HomeActivity extends AppCompatActivity {
         // Quick Add Button (Bottom Right)
         CardView btnQuickAdd = findViewById(R.id.btn_quick_add);
         btnQuickAdd.setOnClickListener(v -> {
-            Intent intent = new Intent(this, ConnectActivity.class);
+            Intent intent = new Intent(this, DashboardActivity.class);
             startActivity(intent);
         });
     }

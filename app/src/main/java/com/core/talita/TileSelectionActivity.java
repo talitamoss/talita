@@ -7,8 +7,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.CheckBox;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -147,14 +147,14 @@ public class TileSelectionActivity extends AppCompatActivity {
             private final TextView iconText;
             private final TextView nameText;
             private final TextView descriptionText;
-            private final Switch toggleSwitch;
+            private final CheckBox toggleSwitch;
 
             TileViewHolder(View itemView) {
                 super(itemView);
                 iconText = itemView.findViewById(R.id.tile_icon);
-                nameText = itemView.findViewById(R.id.tile_name);
+                nameText = itemView.findViewById(R.id.tile_title);
                 descriptionText = itemView.findViewById(R.id.tile_description);
-                toggleSwitch = itemView.findViewById(R.id.tile_toggle);
+                toggleSwitch = itemView.findViewById(R.id.tile_checkbox);
             }
 
             void bind(TileOption tile, TileToggleListener listener) {
