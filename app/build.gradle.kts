@@ -63,6 +63,7 @@ dependencies {
     implementation(libs.androidx.databinding.runtime)
     implementation("com.google.dagger:dagger:2.51.1")
     implementation(libs.androidx.appcompat)
+    implementation ("com.github.PhilJay:MPAndroidChart:v3.1.0")
     kapt("com.google.dagger:dagger-compiler:2.51.1")
 
     // Add core library desugaring
@@ -74,4 +75,5 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+
 }

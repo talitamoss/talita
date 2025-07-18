@@ -52,6 +52,68 @@ public class LocalDataManager {
         }
     }
 
+    // Add this method to your existing LocalDataManager class
+    public List<TalitaData> getDataInRange(long startTime, long endTime) {
+        List<TalitaData> talitaDataList = new ArrayList<>();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+
+        // Query for data within the time range
+        String selection = "created_at >= ? AND created_at <= ?";
+        String[] selectionArgs = {String.valueOf(startTime), String.valueOf(endTime)};
+
+        Cursor cursor = db.query("data_items", null, selection, selectionArgs, null, null, "created_at DESC");
+
+        while (cursor.moveToNext()) {
+            // Convert DataItem to TalitaData
+            TalitaData data = new TalitaData() {
+                @Override
+                public String getId() {
+                    return cursor.getString(cursor.getColumnIndexOrThrow("id"));
+                }
+
+                @Override
+                public String getType() {
+                    return cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                }
+
+                @Override
+                public long getTimestamp() {
+                    return cursor.getLong(cursor.getColumnIndexOrThrow("created_at"));
+                }
+
+                @Override
+                public String getValue() {
+                    return cursor.getString(cursor.getColumnIndexOrThrow("data_json"));
+                }
+
+                @Override
+                public String getMetadata() {
+                    return cursor.getString(cursor.getColumnIndexOrThrow("data_json"));
+                }
+
+                @Override
+                public String getDisplayName() {
+                    return getType(); // Simple display name
+                }
+
+                @Override
+                public boolean isEncrypted() {
+                    return false; // Update based on your encryption status
+                }
+
+                public boolean isBackedUp() {
+                    String cloudStatus = cursor.getString(cursor.getColumnIndexOrThrow("cloud_status"));
+                    return "backed_up".equals(cloudStatus);
+                }
+            };
+
+            talitaDataList.add(data);
+        }
+
+        cursor.close();
+        db.close();
+        return talitaDataList;
+    }
     // Save location point
     public String saveLocationPoint(double latitude, double longitude, double accuracy, String provider) {
         String id = UUID.randomUUID().toString();

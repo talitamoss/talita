@@ -17,4 +17,13 @@
     <color name="text_primary">#FFFFFFFF</color>
     <color name="text_secondary">#FFCCCCCC</color>
     <color name="text_tertiary">#FF888888</color>
+
+    <!-- My Data Page Colors -->
+    <color name="primary_purple">#FF7B1FA2</color>
+    <color name="primary_purple_light">#FF9C27B0</color>
+    <color name="success_green">#FF4CAF50</color>
+    <color name="warning_yellow">#FFFFC107</color>
+    <color name="error_red">#FFF44336</color>
+    <color name="background_dark">#FF121212</color>
+    <color name="background_darker">#FF1A1A1A</color>
 </resources>

@@ -58,6 +58,10 @@
 	<activity android:name=".DataTypeDetailActivity" />
 	<activity android:name=".TileSelectionActivity" />
 
+        <activity
+            android:name=".MyDataActivity"
+            android:theme="@style/Theme.Talita" />
+
         <!-- LEGACY & P2P -->
         <activity android:name=".QrHandshakeActivity" />
         <activity android:name=".MainActivity" />

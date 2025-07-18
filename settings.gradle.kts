@@ -19,6 +19,9 @@ dependencyResolutionManagement {
         maven {
             url = uri("https://briarproject.org/maven")
         }
+        maven {
+            url = uri("https://jitpack.io")
+        }
     }
 }
 

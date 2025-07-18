@@ -18,7 +18,7 @@ public class HomeActivity extends AppCompatActivity {
         // My Data Button
         CardView btnMyData = findViewById(R.id.btn_my_data_card);
         btnMyData.setOnClickListener(v -> {
-            Intent intent = new Intent(this, DataViewActivity.class);
+            Intent intent = new Intent(this, MyDataActivity.class);
             startActivity(intent);
         });
 
