@@ -13,6 +13,9 @@ import androidx.core.app.ActivityCompat;
 import java.io.File;
 import java.io.IOException;
 
+import com.core.talita.DataItem;
+
+
 public class AudioRecorder {
 
     private static final String TAG = "AudioRecorder";
@@ -231,7 +234,8 @@ public class AudioRecorder {
     }
 
     // Method to get all audio recordings via universal service
-    public java.util.List<LocalDataManager.DataItem> getAllRecordings() {
+	public java.util.List<DataItem> getAllRecordings() {
+
         try {
             return dataService.getDataByType("audio");
         } catch (Exception e) {

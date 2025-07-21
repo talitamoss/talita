@@ -39,6 +39,7 @@
         <activity android:name=".DataSummaryActivity" />
         <activity android:name=".DataCollectionActivity" />
         <activity android:name=".DashboardActivity" />
+	<activity android:name=".TrackingOptionsActivity" />
 
         <!-- SPECIFIC DATA ACTIVITIES -->
         <activity android:name=".AudioActivity" />
@@ -74,6 +75,10 @@
         <!-- RECEIVERS -->
         <receiver android:name=".ActivityRecognitionReceiver"
             android:exported="false" />
+
+	<!-- TEST -->
+	<activity android:name=".QuickAddTestActivity" />
+
 
     </application>
 </manifest>

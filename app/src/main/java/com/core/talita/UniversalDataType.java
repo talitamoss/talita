@@ -1,11 +1,10 @@
 package com.core.talita;
 
 /**
- * Universal interface for all data types in Talita
  * Implements this interface to get automatic database storage,
  * cloud backup, and sharing capabilities
  */
-public interface TalitaDataType {
+public interface UniversalDataType {
 
     // Basic identification
     String getType();          // "location", "audio", "steps", "expenses", etc.

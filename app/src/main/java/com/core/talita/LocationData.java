@@ -5,10 +5,10 @@ import org.json.JSONObject;
 import java.util.UUID;
 
 /**
- * Location data that implements TalitaDataType
+ * Location data that implements UniversalDataType
  * Gets automatic database storage, cloud backup, and sharing
  */
-public class LocationData implements TalitaDataType {
+public class LocationData implements UniversalDataType {
 
     private final String id;
     private final double latitude;

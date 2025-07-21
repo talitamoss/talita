@@ -3,7 +3,7 @@ package com.core.talita.cloud;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
-import com.core.talita.TalitaDataType;
+import com.core.talita.UniversalDataType;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -94,7 +94,7 @@ public class CloudBackupManager {
     /**
      * Backup Operations
      */
-    public void queueForBackup(TalitaDataType data) {
+    public void queueForBackup(UniversalDataType data) {
         if (!isBackupEnabled) {
             Log.d(TAG, "📴 Backup disabled, skipping: " + data.getDisplayName());
             return;
@@ -120,7 +120,7 @@ public class CloudBackupManager {
         }
     }
 
-    public void queueUrgentBackup(TalitaDataType data) {
+    public void queueUrgentBackup(UniversalDataType data) {
         BackupItem item = new BackupItem(
                 data.getId(),
                 data.getType(),

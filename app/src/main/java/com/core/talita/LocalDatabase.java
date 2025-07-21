@@ -4,14 +4,14 @@ import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
-public class TalitaDataBase extends SQLiteOpenHelper {
+public class LocalDatabase extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "talita.db";
     private static final int DATABASE_VERSION = 1;
 
     // We'll add the table creation SQL here
 
-    public TalitaDataBase(Context context) {
+    public LocalDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
 

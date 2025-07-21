@@ -8,7 +8,7 @@ import java.util.UUID;
 /**
  * Enhanced Location Data with activity context and step correlation
  */
-class EnhancedLocationData implements TalitaDataType {
+class EnhancedLocationData implements UniversalDataType {
 
     private final String id;
     private final double latitude;
@@ -86,7 +86,7 @@ class EnhancedLocationData implements TalitaDataType {
 /**
  * Step Counter Data
  */
-class StepData implements TalitaDataType {
+class StepData implements UniversalDataType {
 
     private final String id;
     private final int dailySteps;
@@ -152,7 +152,7 @@ class StepData implements TalitaDataType {
 /**
  * Activity Recognition Data
  */
-class ActivityData implements TalitaDataType {
+class ActivityData implements UniversalDataType {
 
     private final String id;
     private final String activity;

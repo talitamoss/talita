@@ -6,10 +6,10 @@ import java.io.File;
 import java.util.UUID;
 
 /**
- * Audio data that implements TalitaDataType
+ * Audio data that implements UniversalDataType
  * Gets automatic database storage, cloud backup, and sharing
  */
-public class AudioData implements TalitaDataType {
+public class AudioData implements UniversalDataType {
 
     private final String id;
     private final String filePath;

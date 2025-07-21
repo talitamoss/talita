@@ -1,6 +1,6 @@
 package com.core.talita;
 
-public class PersonalDataAdapter implements TalitaDataType {
+public class PersonalDataAdapter implements UniversalDataType {
     private final PersonalData personalData;
 
     public PersonalDataAdapter(PersonalData personalData) {

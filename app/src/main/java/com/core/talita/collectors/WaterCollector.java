@@ -1,12 +1,11 @@
-// ============================================================================
-// FILE: app/src/main/java/com/core/talita/collectors/WaterCollector.java
-// ============================================================================
 package com.core.talita.collectors;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.util.Log;
 import com.core.talita.*;
 import java.util.*;
+import java.text.SimpleDateFormat;
 
 /**
  * Water intake collector - tracks daily hydration
@@ -15,8 +14,8 @@ import java.util.*;
 public class WaterCollector implements DataCollector {
     private static final String TAG = "WaterCollector";
     private static final String PREFS_KEY = "water_intake_ml";
-    private static final String PREFS_NAME = "personal_data_collectors"; // Generic name
-    private static final String DATA_PREFS = "water_data"; // Generic name
+    private static final String PREFS_NAME = "personal_data_collectors";
+    private static final String DATA_PREFS = "water_data";
 
     @Override
     public String getDataType() { return "water"; }
@@ -40,48 +39,18 @@ public class WaterCollector implements DataCollector {
 
     @Override
     public void startCollection(Context context, DataCollectionCallback callback) {
-        Log.d(TAG, "💧 Starting water intake collection");
-
-        // Get current daily total
-        int dailyTotal = context.getSharedPreferences(DATA_PREFS, Context.MODE_PRIVATE)
-                .getInt(getTodayKey(), 0);
-
-        // Simulate logging 250ml of water
-        int newIntake = 250; // Standard glass
-        int newTotal = dailyTotal + newIntake;
-
-        // Create water data
-        Map<String, Object> waterData = new HashMap<>();
-        waterData.put("volume_ml", newIntake);
-        waterData.put("daily_total_ml", newTotal);
-        waterData.put("method", "manual"); // manual, reminder, automatic
-        waterData.put("display_name", "Water Logged");
-        waterData.put("summary", newIntake + "ml water (daily: " + newTotal + "ml)");
-
-        // Save daily total
-        context.getSharedPreferences(DATA_PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putInt(getTodayKey(), newTotal)
-                .apply();
-
-        // Create universal data object
-        UniversalPersonalData data = new UniversalPersonalData("water", waterData);
-
-        // Report success
-        callback.onDataCollected(data);
-
-        Log.d(TAG, "💧 Water logged: " + newIntake + "ml (daily total: " + newTotal + "ml)");
+        // This is for continuous collection - not used for quick logging
+        Log.d(TAG, "💧 Water collector in continuous mode (not implemented)");
     }
 
     @Override
     public void stopCollection(Context context) {
         Log.d(TAG, "💧 Stopping water collection");
-        // Nothing to stop for manual logging
     }
 
     @Override
     public List<String> getRequiredPermissions() {
-        return new ArrayList<>(); // No permissions needed for manual water logging
+        return new ArrayList<>(); // No permissions needed
     }
 
     @Override
@@ -94,36 +63,69 @@ public class WaterCollector implements DataCollector {
     /**
      * Get today's key for SharedPreferences (resets daily)
      */
-    private String getTodayKey() {
-        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+    private static String getTodayKey() {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         return PREFS_KEY + "_" + sdf.format(new Date());
     }
 
     /**
-     * Public method to manually log water (for UI integration)
-     * Brand-agnostic: works with any app name
+     * Get today's total water intake
+     */
+    public static int getTodayTotal(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(DATA_PREFS, Context.MODE_PRIVATE);
+        return prefs.getInt(getTodayKey(), 0);
+    }
+
+    /**
+     * FIXED: Public method to manually log water
+     * This is the main method for quick logging
      */
     public static void logWater(Context context, int volumeMl) {
-        WaterCollector collector = new WaterCollector();
+        Log.d(TAG, "💧 logWater called with " + volumeMl + "ml");
+        
+        if (volumeMl <= 0) {
+            Log.w(TAG, "Invalid water amount: " + volumeMl);
+            return;
+        }
 
-        if (collector.isEnabled(context)) {
-            collector.startCollection(context, new DataCollectionCallback() {
-                @Override
-                public void onDataCollected(PersonalData data) {
-                    Log.d(TAG, "💧 Water logged via manual entry: " + data.getDisplaySummary());
-                }
+        // Get current daily total
+        SharedPreferences prefs = context.getSharedPreferences(DATA_PREFS, Context.MODE_PRIVATE);
+        int dailyTotal = prefs.getInt(getTodayKey(), 0);
+        int newTotal = dailyTotal + volumeMl;
 
-                @Override
-                public void onCollectionError(String error) {
-                    Log.e(TAG, "💧 Water logging error: " + error);
-                }
-            });
+        // Save new total
+        prefs.edit().putInt(getTodayKey(), newTotal).apply();
+        Log.d(TAG, "💧 Daily total updated: " + dailyTotal + " → " + newTotal);
+
+        // Create water data for storage
+        Map<String, Object> waterData = new HashMap<>();
+        waterData.put("display_name", "💧 " + volumeMl + "ml");
+        waterData.put("summary", volumeMl + "ml water consumed");
+        waterData.put("amount_ml", String.valueOf(volumeMl));
+        waterData.put("daily_total_ml", String.valueOf(newTotal));
+        waterData.put("time", new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
+
+        // Create universal data object
+        UniversalPersonalData data = new UniversalPersonalData("water", waterData);
+
+        try {
+            // Save via Universal Data Service
+            UniversalDataService dataService = new UniversalDataService(context);
+            PersonalDataAdapter adapter = new PersonalDataAdapter(data);
+            String dataId = dataService.capture(adapter);
+            
+            if (dataId != null) {
+                Log.d(TAG, "✅ Water data saved with ID: " + dataId);
+            } else {
+                Log.e(TAG, "❌ Failed to save water data - capture returned null");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Exception saving water data", e);
         }
     }
 
     /**
      * Enable/disable water collection
-     * Brand-agnostic helper method
      */
     public static void setEnabled(Context context, boolean enabled) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -135,13 +137,13 @@ public class WaterCollector implements DataCollector {
     }
 
     /**
-     * Get today's water total
+     * Clear today's water data (for testing)
      */
-    public static int getTodayTotal(Context context) {
-        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        String todayKey = PREFS_KEY + "_" + sdf.format(new Date());
-
-        return context.getSharedPreferences(DATA_PREFS, Context.MODE_PRIVATE)
-                .getInt(todayKey, 0);
+    public static void clearTodayData(Context context) {
+        context.getSharedPreferences(DATA_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .remove(getTodayKey())
+                .apply();
+        Log.d(TAG, "💧 Cleared today's water data");
     }
 }

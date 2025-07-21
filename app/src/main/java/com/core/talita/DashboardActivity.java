@@ -7,8 +7,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ScrollView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
@@ -32,6 +34,7 @@ import java.util.Locale;
  * - Recent activity feed
  * - Daily summary stats
  * - Background tracking status
+ * - TEST MODE for debugging
  */
 public class DashboardActivity extends AppCompatActivity {
 
@@ -51,6 +54,10 @@ public class DashboardActivity extends AppCompatActivity {
     private QuickAddAdapter quickAddAdapter;
     private RecentActivityAdapter recentActivityAdapter;
 
+    // Test mode components
+    private boolean testMode = false;
+    private TextView testOutputText;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -60,10 +67,19 @@ public class DashboardActivity extends AppCompatActivity {
         collectorManager = new DataCollectorManager(this);
         trackingManager = new TrackingManager(this);
 
+        // Enable water collector by default for testing
+        WaterCollector.setEnabled(this, true);
+
         initializeViews();
         setupQuickAddGrid();
         setupRecentActivityFeed();
         updateDashboard();
+
+        // Add testing features
+        addTestingFeatures();
+        
+        // Run minimal test in background
+        runMinimalTest();
 
         // Check for focus collector from intent
         String focusCollector = getIntent().getStringExtra("focus_collector");
@@ -121,6 +137,130 @@ public class DashboardActivity extends AppCompatActivity {
         recentActivityAdapter = new RecentActivityAdapter(new ArrayList<>());
         recentActivityRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         recentActivityRecyclerView.setAdapter(recentActivityAdapter);
+    }
+
+    private void addTestingFeatures() {
+        // Create a test button at the bottom
+        Button testButton = new Button(this);
+        testButton.setText("🧪 Test Quick Add");
+        testButton.setBackgroundColor(0xFF4CAF50);
+        testButton.setTextColor(0xFFFFFFFF);
+        testButton.setOnClickListener(v -> runQuickAddTest());
+        
+        // Create test output view
+        testOutputText = new TextView(this);
+        testOutputText.setTextColor(0xFF00FF00);
+        testOutputText.setBackgroundColor(0xFF1A1A1A);
+        testOutputText.setPadding(20, 20, 20, 20);
+        testOutputText.setVisibility(View.GONE);
+        
+ViewGroup rootView = findViewById(android.R.id.content);
+if (rootView.getChildAt(0) instanceof ScrollView) {
+    ScrollView scrollView = (ScrollView) rootView.getChildAt(0);
+    // ScrollView can only have one child, so get its child (LinearLayout)
+    if (scrollView.getChildCount() > 0 && scrollView.getChildAt(0) instanceof ViewGroup) {
+        ViewGroup mainLayout = (ViewGroup) scrollView.getChildAt(0);
+        
+        // Create container for test elements
+        LinearLayout testContainer = new LinearLayout(this);
+        testContainer.setOrientation(LinearLayout.VERTICAL);
+        testContainer.addView(testButton);
+        testContainer.addView(testOutputText);
+        
+        mainLayout.addView(testContainer);
+    }
+}
+    }
+
+    private void runQuickAddTest() {
+        Log.d(TAG, "=== QUICK ADD TEST START ===");
+        
+        StringBuilder results = new StringBuilder();
+        results.append("Quick Add Test Results:\n\n");
+        
+        try {
+            // Test 1: Check services
+            results.append("1. Services initialized: ");
+            results.append(collectorManager != null ? "✅\n" : "❌\n");
+            
+            // Test 2: Check water collector
+            results.append("2. Water collector enabled: ");
+	    WaterCollector waterCollector = new WaterCollector();
+	    boolean waterEnabled = waterCollector.isEnabled(this);
+            results.append(waterEnabled ? "✅\n" : "❌ (enabling now...)\n");
+            
+            if (!waterEnabled) {
+                WaterCollector.setEnabled(this, true);
+            }
+            
+            // Test 3: Get initial water total
+            int initialTotal = WaterCollector.getTodayTotal(this);
+            results.append("3. Initial water total: ").append(initialTotal).append("ml\n");
+            
+            // Test 4: Log water
+            results.append("4. Adding 100ml water... ");
+            collectorManager.quickLogWater(100);
+            
+            // Test 5: Check new total
+            int newTotal = WaterCollector.getTodayTotal(this);
+            boolean success = newTotal == initialTotal + 100;
+            results.append(success ? "✅\n" : "❌\n");
+            results.append("   New total: ").append(newTotal).append("ml\n");
+            
+            // Test 6: Check data persistence
+            try {
+                UniversalDataService dataService = new UniversalDataService(this);
+                List<UniversalDataService.DecryptedDataItem> waterData = 
+                    dataService.getDecryptedDataByType("water");
+                results.append("5. Data entries saved: ").append(waterData.size()).append(" ✅\n");
+            } catch (Exception e) {
+                results.append("5. Data persistence: ❌ ").append(e.getMessage()).append("\n");
+            }
+            
+        } catch (Exception e) {
+            results.append("\n❌ Error: ").append(e.getMessage());
+            Log.e(TAG, "Test error", e);
+        }
+        
+        // Show results
+        new AlertDialog.Builder(this)
+            .setTitle("Quick Add Test Results")
+            .setMessage(results.toString())
+            .setPositiveButton("OK", null)
+            .setNeutralButton("Clear Water Data", (d, w) -> {
+                WaterCollector.clearTodayData(this);
+                updateDashboard();
+                Toast.makeText(this, "Water data cleared", Toast.LENGTH_SHORT).show();
+            })
+            .show();
+        
+        // Update the dashboard to reflect changes
+        updateDashboard();
+        
+        Log.d(TAG, "=== QUICK ADD TEST END ===");
+        Log.d(TAG, results.toString());
+    }
+
+    private void runMinimalTest() {
+        Log.d("QuickTest", "=== MINIMAL TEST ===");
+        try {
+            // Enable water collector
+            WaterCollector.setEnabled(this, true);
+            
+            // Test direct water logging
+            int before = WaterCollector.getTodayTotal(this);
+            Log.d("QuickTest", "Water total before: " + before + "ml");
+            
+            // Log 1ml to test without affecting user's real data much
+            WaterCollector.logWater(this, 1);
+            
+            int after = WaterCollector.getTodayTotal(this);
+            Log.d("QuickTest", "Water total after: " + after + "ml");
+            Log.d("QuickTest", "Test result: " + (after == before + 1 ? "✅ WORKING" : "❌ NOT WORKING"));
+            
+        } catch (Exception e) {
+            Log.e("QuickTest", "Test failed", e);
+        }
     }
 
     private void focusOnCollector(String collectorType) {
@@ -203,17 +343,26 @@ public class DashboardActivity extends AppCompatActivity {
         // Parse amount from description
         int amount = item.description.equals("250ml") ? 250 : 500;
 
-        // Use existing water collector
-        collectorManager.quickLogWater(amount);
+        try {
+            // Log for debugging
+            Log.d(TAG, "handleWaterAdd: Adding " + amount + "ml");
+            
+            // Use existing water collector
+            collectorManager.quickLogWater(amount);
 
-        // Show confirmation with today's total
-        int todayTotal = WaterCollector.getTodayTotal(this);
-        String message = String.format("💧 +%dml water logged (Total: %dml today)", amount, todayTotal);
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+            // Show confirmation with today's total
+            int todayTotal = WaterCollector.getTodayTotal(this);
+            String message = String.format("💧 +%dml water logged (Total: %dml today)", amount, todayTotal);
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
 
-        updateDashboard();
+            updateDashboard();
 
-        Log.d(TAG, "💧 Quick added water: " + amount + "ml");
+            Log.d(TAG, "💧 Quick added water: " + amount + "ml - Success!");
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error adding water", e);
+            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void handleExerciseAdd(QuickAddItem item) {
@@ -241,12 +390,12 @@ public class DashboardActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
                 .setTitle("How are you feeling?")
                 .setItems(moods, (dialog, which) -> {
-                    String mood = moods[which];
                     int rating = which + 1; // 1-5 scale
+                    String moodText = moods[which].substring(2); // Remove emoji
 
-                    collectorManager.quickLogMood(rating, mood.substring(2));
+                    collectorManager.quickLogMood(rating, moodText);
 
-                    Toast.makeText(this, mood + " mood logged", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Mood logged: " + moods[which], Toast.LENGTH_SHORT).show();
                     updateDashboard();
                 })
                 .setNegativeButton("Cancel", null)
@@ -255,76 +404,68 @@ public class DashboardActivity extends AppCompatActivity {
 
     private void handleSleepAdd(QuickAddItem item) {
         // Show sleep duration options
-        String[] sleepOptions = {"😴 4 hours", "😪 6 hours", "😊 8 hours", "🛌 10 hours"};
+        String[] durations = {"😴 4h", "😔 5h", "🙂 6h", "😊 7h", "😃 8h", "🤩 9h+"};
 
         new AlertDialog.Builder(this)
-                .setTitle("How much sleep did you get?")
-                .setItems(sleepOptions, (dialog, which) -> {
-                    String sleepText = sleepOptions[which].substring(2); // Remove emoji
-                    double hours = Double.parseDouble(sleepText.split(" ")[0]);
+                .setTitle("How many hours did you sleep?")
+                .setItems(durations, (dialog, which) -> {
+                    double hours = 4 + which; // 4-9+ hours
+                    String quality = which < 2 ? "poor" : which < 4 ? "fair" : "good";
 
-                    collectorManager.quickLogSleep(hours, "good");
+                    collectorManager.quickLogSleep(hours, quality);
 
-                    Toast.makeText(this, "💤 " + sleepText + " sleep logged", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Sleep logged: " + durations[which], Toast.LENGTH_SHORT).show();
                     updateDashboard();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
-    }
-
-    private void handleFoodAdd(QuickAddItem item) {
-        // Show meal type options
-        String[] mealOptions = {"🌅 Breakfast", "☀️ Lunch", "🌙 Dinner", "🍿 Snack"};
-
-        new AlertDialog.Builder(this)
-                .setTitle("What type of " + item.name.toLowerCase() + "?")
-                .setItems(mealOptions, (dialog, which) -> {
-                    String mealType = mealOptions[which].substring(2); // Remove emoji
-
-                    collectorManager.quickLogMeal(mealType.toLowerCase(), item.name);
-
-                    Toast.makeText(this, item.icon + " " + mealType + " logged", Toast.LENGTH_SHORT).show();
-                    updateDashboard();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void handleSubstanceAdd(QuickAddItem item) {
-        // Show confirmation dialog for substances
-        new AlertDialog.Builder(this)
-                .setTitle("Log " + item.name + "?")
-                .setMessage("This will be recorded with timestamp for your personal tracking.")
-                .setPositiveButton("Yes, Log It", (dialog, which) -> {
-                    collectorManager.quickLogSubstance(item.name.toLowerCase(), item.description);
-
-                    Toast.makeText(this, item.icon + " " + item.description + " logged", Toast.LENGTH_SHORT).show();
-                    updateDashboard();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void handleAlcoholAdd(QuickAddItem item) {
-        collectorManager.quickLogSubstance("alcohol", item.description);
-        Toast.makeText(this, item.icon + " " + item.description + " logged", Toast.LENGTH_SHORT).show();
-        updateDashboard();
     }
 
     private void handleBeverageAdd(QuickAddItem item) {
-        collectorManager.quickLogSubstance("beverage", item.description);
-        Toast.makeText(this, item.icon + " " + item.description + " logged", Toast.LENGTH_SHORT).show();
+        // For now, just log as water with note
+        collectorManager.quickLogWater(250); // Standard cup
+        Toast.makeText(this, item.icon + " " + item.name + " logged", Toast.LENGTH_SHORT).show();
         updateDashboard();
     }
 
+    private void handleSubstanceAdd(QuickAddItem item) {
+        collectorManager.quickLogSubstance(item.name.toLowerCase(), item.description);
+        Toast.makeText(this, item.icon + " " + item.name + " logged", Toast.LENGTH_SHORT).show();
+        updateDashboard();
+    }
+
+    private void handleAlcoholAdd(QuickAddItem item) {
+        collectorManager.quickLogSubstance(item.name.toLowerCase(), item.description);
+        Toast.makeText(this, item.icon + " " + item.name + " logged", Toast.LENGTH_SHORT).show();
+        updateDashboard();
+    }
+
+    private void handleFoodAdd(QuickAddItem item) {
+        // Show meal options
+        String[] mealTypes = {"🌅 Breakfast", "☀️ Lunch", "🌆 Dinner", "🍿 Snack"};
+
+        new AlertDialog.Builder(this)
+                .setTitle("What type of meal?")
+                .setItems(mealTypes, (dialog, which) -> {
+                    String mealType = mealTypes[which].substring(2); // Remove emoji
+                    collectorManager.quickLogMeal(mealType.toLowerCase(), item.description);
+                    Toast.makeText(this, mealTypes[which] + " logged", Toast.LENGTH_SHORT).show();
+                    updateDashboard();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void handleMedicationAdd(QuickAddItem item) {
+        // For now, generic medication logging
         collectorManager.quickLogSubstance("medication", item.description);
-        Toast.makeText(this, "💊 Medication dose logged", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, item.icon + " Medication logged", Toast.LENGTH_SHORT).show();
         updateDashboard();
     }
 
     private void handleBiometricAdd(QuickAddItem item) {
-        Toast.makeText(this, item.icon + " " + item.name + " - Coming soon!", Toast.LENGTH_SHORT).show();
+        // Placeholder for weight/other biometrics
+        Toast.makeText(this, "🚧 " + item.name + " logging coming soon!", Toast.LENGTH_SHORT).show();
     }
 
     private void showGenericQuickAdd(QuickAddItem item) {

@@ -16,7 +16,7 @@ import java.util.Arrays;
  * Encryption Service - Encrypts ALL data types in Talita
  *
  * Features:
- * - Transparent encryption for all TalitaDataType objects
+ * - Transparent encryption for all UniversalDataType objects
  * - File encryption for audio/media files
  * - JSON metadata encryption
  * - Secure file handling (no plaintext temp files)
@@ -44,10 +44,10 @@ public class EncryptionService {
     }
 
     /**
-     * Encrypt TalitaDataType object (metadata)
+     * Encrypt UniversalDataType object (metadata)
      * Returns encrypted JSON with original structure preserved
      */
-    public String encryptDataType(TalitaDataType data) {
+    public String encryptDataType(UniversalDataType data) {
         try {
             // Get the original JSON
             String originalJson = data.toJson();
@@ -75,7 +75,7 @@ public class EncryptionService {
     }
 
     /**
-     * Decrypt TalitaDataType JSON back to original format
+     * Decrypt UniversalDataType JSON back to original format
      */
     public String decryptDataTypeJson(String encryptedJson) {
         try {
@@ -98,6 +98,20 @@ public class EncryptionService {
         } catch (JSONException e) {
             Log.e(TAG, "❌ Failed to decrypt data type: " + e.getMessage());
             throw new RuntimeException("Data decryption failed", e);
+        }
+    }
+
+    /**
+     * Encrypt a JSON string (simplified version for now)
+     */
+    public String encryptDataTypeJson(String json) {
+        try {
+            // For now, just return the JSON as-is
+            // TODO: Implement actual encryption when ready
+            return json;
+        } catch (Exception e) {
+            Log.e(TAG, "Error encrypting JSON: " + e.getMessage());
+            return json;
         }
     }
 

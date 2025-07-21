@@ -6,10 +6,12 @@ import android.widget.Toast;
 import org.json.JSONException;
 import org.json.JSONObject;
 import com.core.talita.cloud.CloudBackupManager;
+import com.core.talita.DataItem;
+
 
 /**
  * Universal Data Service - handles ALL data types in Talita with ENCRYPTION and CLOUD BACKUP
- * Any data implementing TalitaDataType gets automatic:
+ * Any data implementing UniversalDataType gets automatic:
  * - Hardware-backed encryption
  * - Database storage
  * - Cloud backup queuing
@@ -37,51 +39,52 @@ public class UniversalDataService {
 
     /**
      * Capture any data type - handles encryption and everything automatically
-     */
-    public String capture(TalitaDataType data) {
-        try {
-            Log.d(TAG, "🔒 Capturing and encrypting " + data.getType() + " data: " + data.getDisplayName());
+     
 
-            // 1. Encrypt file if it exists
-            String encryptedFilePath = data.getFilePath();
-            if (encryptedFilePath != null && !encryptedFilePath.isEmpty()) {
-                encryptedFilePath = encryptionService.encryptFile(data.getFilePath());
-                Log.d(TAG, "🔒 File encrypted: " + encryptedFilePath);
-            }
+/**
+ * Replace the capture() method in UniversalDataService with this version
+ * that saves to database instead of files
+ */
+public String capture(UniversalDataType data) {
+    try {
+        Log.d(TAG, "🔒 Capturing and encrypting " + data.getType() + " data: " + data.getDisplayName());
 
-            // 2. Create encrypted version of data with updated file path
-            EncryptedDataWrapper encryptedData = new EncryptedDataWrapper(data, encryptedFilePath);
+        // 1. Encrypt file if it exists (for audio, photos, etc.)
+        String encryptedFilePath = data.getFilePath();
+        if (encryptedFilePath != null && !encryptedFilePath.isEmpty()) {
+            encryptedFilePath = encryptionService.encryptFile(data.getFilePath());
+            Log.d(TAG, "🔒 File encrypted: " + encryptedFilePath);
+        }
 
-            // 3. Save encrypted data to database
-            String dataId = saveToDatabase(encryptedData);
+        // 2. Create encrypted version of data with updated file path
+        EncryptedDataWrapper encryptedData = new EncryptedDataWrapper(data, encryptedFilePath);
 
-            if (dataId != null) {
-                // 4. Queue for cloud backup
-                queueForCloudBackup(dataId, encryptedData);
+        // 3. Save to DATABASE (not files!)
+        String dataId = dataManager.saveData(data);
 
-                // 5. Handle sharing updates (future feature)
-                updateActiveSharing(dataId, encryptedData);
+        if (dataId != null) {
+            // 4. Queue for cloud backup
+            queueForCloudBackup(dataId, encryptedData);
 
-                // 6. Success feedback
-                showSuccessToast(data);
+            // 5. Handle sharing updates (future feature)
+            updateActiveSharing(dataId, encryptedData);
 
-                Log.d(TAG, "✅ Successfully captured encrypted " + data.getType() + " with ID: " + dataId);
-                return dataId;
-
-            } else {
-                Log.e(TAG, "❌ Failed to save encrypted " + data.getType() + " to database");
-                showErrorToast(data);
-                return null;
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error capturing " + data.getType() + ": " + e.getMessage());
-            e.printStackTrace();
+            // 6. Show success
+            showSuccessToast(data);
+            
+            Log.d(TAG, "✅ Data saved to database with ID: " + dataId);
+            return dataId;
+        } else {
             showErrorToast(data);
             return null;
         }
-    }
 
+    } catch (Exception e) {
+        Log.e(TAG, "❌ Error capturing data: " + e.getMessage());
+        showErrorToast(data);
+        return null;
+    }
+}
     /**
      * Save encrypted data to local database
      */
@@ -162,7 +165,7 @@ public class UniversalDataService {
     /**
      * Show success toast
      */
-    private void showSuccessToast(TalitaDataType data) {
+    private void showSuccessToast(UniversalDataType data) {
         String message = "🔒 " + data.getDisplayName() + " encrypted and saved";
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
     }
@@ -170,7 +173,7 @@ public class UniversalDataService {
     /**
      * Show error toast
      */
-    private void showErrorToast(TalitaDataType data) {
+    private void showErrorToast(UniversalDataType data) {
         String message = "❌ Failed to encrypt " + data.getDisplayName();
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
     }
@@ -302,7 +305,8 @@ public class UniversalDataService {
     /**
      * Get all data of a specific type (legacy method)
      */
-    public java.util.List<LocalDataManager.DataItem> getDataByType(String type) {
+	public java.util.List<DataItem> getDataByType(String type) {
+
         return dataManager.getItemsByType(type);
     }
 
@@ -342,10 +346,10 @@ public class UniversalDataService {
      * Wrapper class for encrypted data
      */
     private static class EncryptedDataWrapper {
-        public final TalitaDataType originalData;
+        public final UniversalDataType originalData;
         public final String encryptedFilePath;
 
-        public EncryptedDataWrapper(TalitaDataType originalData, String encryptedFilePath) {
+        public EncryptedDataWrapper(UniversalDataType originalData, String encryptedFilePath) {
             this.originalData = originalData;
             this.encryptedFilePath = encryptedFilePath;
         }

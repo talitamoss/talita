@@ -33,6 +33,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import com.core.talita.DataItem;
+
+
 public class LocationActivity extends AppCompatActivity {
     private static final int REQUEST_LOCATION_PERMISSION = 1;
 
@@ -106,18 +109,19 @@ public class LocationActivity extends AppCompatActivity {
         try {
             // Use our new database instead of file
             LocalDataManager dataManager = new LocalDataManager(this);
-            List<LocalDataManager.DataItem> databaseItems = dataManager.getItemsByType("location");
+	List<DataItem> databaseItems = dataManager.getItemsByType("location");
 
             locationHistory.clear();
             routePoints.clear();
 
-            for (LocalDataManager.DataItem item : databaseItems) {
+		for (DataItem item : databaseItems) {
+
                 try {
-                    JSONObject locationData = new JSONObject(item.dataJson);
+                    JSONObject locationData = new JSONObject(item.getValue());
                     double latitude = locationData.getDouble("latitude");
                     double longitude = locationData.getDouble("longitude");
 
-                    LocationRecord record = new LocationRecord(latitude, longitude, item.createdAt);
+                    LocationRecord record = new LocationRecord(latitude, longitude, item.getTimestamp());
                     locationHistory.add(record);
 
                     // Add to route points for map display

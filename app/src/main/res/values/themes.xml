@@ -13,4 +13,7 @@
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
         <!-- Customize your theme here. -->
     </style>
+<style name="SwitchTheme" parent="Widget.AppCompat.CompoundButton.Switch">
+    <item name="colorControlActivated">@color/primary_purple</item>
+</style>
 </resources>
