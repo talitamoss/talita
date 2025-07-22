@@ -9,7 +9,9 @@ import com.core.talita.CollectorSettings;                // ← ADD THIS
 import com.core.talita.UniversalPersonalData;            // ← ADD THIS
 import com.core.talita.UniversalDataService;             // ← ADD THIS
 import com.core.talita.PersonalDataAdapter;              // ← ADD THIS
-
+import com.core.talita.UniversalPersonalData;
+import com.core.talita.UniversalDataService;
+import com.core.talita.PersonalDataAdapter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;

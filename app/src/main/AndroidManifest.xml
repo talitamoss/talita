@@ -40,6 +40,10 @@
         <activity android:name=".DataCollectionActivity" />
         <activity android:name=".DashboardActivity" />
 	<activity android:name=".TrackingOptionsActivity" />
+	<activity 
+    android:name=".CreateCollectorActivity"
+    android:label="Create Collector"
+    android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
 
         <!-- SPECIFIC DATA ACTIVITIES -->
         <activity android:name=".AudioActivity" />

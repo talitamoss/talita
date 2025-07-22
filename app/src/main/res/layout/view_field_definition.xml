@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"
+    app:cardBackgroundColor="#2A2A2A"
+    app:cardCornerRadius="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <!-- Field Name and Remove Button -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <EditText
+                android:id="@+id/field_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Field Name"
+                android:textColor="@android:color/white"
+                android:textColorHint="#999999"
+                android:background="@android:color/transparent"
+                android:padding="8dp"/>
+
+            <ImageButton
+                android:id="@+id/remove_field"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_delete"
+                android:tint="#FF5252"/>
+
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#3A3A3A"
+            android:layout_marginVertical="8dp"/>
+
+        <!-- Field Type and Required -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Type:"
+                android:textColor="#999999"
+                android:layout_marginEnd="8dp"/>
+
+            <Spinner
+                android:id="@+id/field_type"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"/>
+
+            <CheckBox
+                android:id="@+id/field_required"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Required"
+                android:textColor="@android:color/white"
+                android:layout_marginStart="12dp"/>
+
+        </LinearLayout>
+
+        <!-- Optional Unit Field -->
+        <EditText
+            android:id="@+id/field_unit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Unit (e.g., ml, kg, minutes)"
+            android:textColor="@android:color/white"
+            android:textColorHint="#999999"
+            android:background="@android:color/transparent"
+            android:padding="8dp"
+            android:layout_marginTop="8dp"/>
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

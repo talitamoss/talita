@@ -4,6 +4,7 @@ import android.content.Context;
 import android.util.Log;
 import com.core.talita.collectors.*;
 import java.util.*;
+import com.core.talita.dynamic.*;
 
 /**
  * Data Collector Manager - manages all data collectors
@@ -41,6 +42,8 @@ public class DataCollectorManager {
         addCollector(new SubstanceCollector());
 
         Log.d(TAG, "📋 Registered " + collectors.size() + " data collectors");
+	registerDynamicCollectors();
+
     }
 
     /**
@@ -67,6 +70,14 @@ public class DataCollectorManager {
         Log.d(TAG, "🚀 Started " + startedCount + " enabled collectors");
     }
 
+
+public void registerDynamicCollectors() {
+    CollectorSchemaManager schemaManager = new CollectorSchemaManager(context);
+    for (CollectorSchema schema : schemaManager.getAllSchemas()) {
+        addCollector(new DynamicCollector(schema));
+        Log.d(TAG, "➕ Registered dynamic collector: " + schema.getName());
+    }
+}
     /**
      * Start a specific collector
      */

@@ -18,12 +18,12 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.core.talita.collectors.WaterCollector;
-
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import android.content.Intent;
 
 /**
  * Dashboard Activity - Main activity for easy data entry
@@ -298,6 +298,8 @@ if (rootView.getChildAt(0) instanceof ScrollView) {
         items.add(new QuickAddItem("😊", "Mood", "mood", "rating"));
         items.add(new QuickAddItem("💤", "Sleep", "sleep", "hours"));
         items.add(new QuickAddItem("📏", "Weight", "biometric", "measurement"));
+	items.add(new QuickAddItem("➕", "Create Collector", "custom", "new"));
+
 
         return items;
     }
@@ -336,6 +338,15 @@ if (rootView.getChildAt(0) instanceof ScrollView) {
                 break;
             default:
                 showGenericQuickAdd(item);
+case "custom":
+    Log.d("DashboardActivity", "Create Collector clicked");
+    try {
+        startActivity(new Intent(this, CreateCollectorActivity.class));
+    } catch (Exception e) {
+        Log.e("DashboardActivity", "Failed to start CreateCollectorActivity", e);
+        Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+    }
+    break;
         }
     }
 
