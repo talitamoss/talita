@@ -98,5 +98,14 @@
 	</style>
 	<style name="SwitchTheme" parent="Widget.MaterialComponents.CompoundButton.Switch">
     <item name="colorControlActivated">@color/primary</item>
+    </style>
+
+    <!-- Translucent theme for overlays -->
+    <style name="Theme.Talita.Translucent" parent="Theme.Talita">
+    <item name="android:windowIsTranslucent">true</item>
+    <item name="android:windowBackground">@android:color/transparent</item>
+    <item name="android:windowContentOverlay">@null</item>
+    <item name="android:windowNoTitle">true</item>
+    <item name="android:backgroundDimEnabled">false</item>
 </style>
 </resources>

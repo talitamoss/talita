@@ -24,10 +24,10 @@ public class MoreOptionsBottomSheet extends BottomSheetDialogFragment {
     }
     
     private void setupOptions(View view) {
-        // Quick Add
-        LinearLayout quickAddOption = view.findViewById(R.id.option_quick_add);
-        quickAddOption.setOnClickListener(v -> {
-            startActivity(new Intent(getContext(), QuickAddActivity.class));
+        // Log Data
+        LinearLayout logOption = view.findViewById(R.id.option_log);
+        logOption.setOnClickListener(v -> {
+            startActivity(new Intent(getContext(), LogActivity.class));
             dismiss();
         });
         

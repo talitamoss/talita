@@ -56,6 +56,9 @@
             android:name=".CreateCollectorActivity"
             android:label="Create Collector"
             android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
+	<activity 
+   	 android:name=".LogActivity"
+	 android:theme="@style/Theme.Talita.Translucent" />
 
         <!-- SPECIFIC DATA ACTIVITIES -->
         <activity android:name=".AudioActivity" />

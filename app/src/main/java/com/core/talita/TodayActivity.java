@@ -82,7 +82,7 @@ public class TodayActivity extends AppCompatActivity {
                 // Already on Today screen
                 return true;
             } else if (itemId == R.id.nav_capture) {
-                startActivity(new Intent(this, QuickAddActivity.class));
+                startActivity(new Intent(this, LogActivity.class));
                 overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
                 return true;
             } else if (itemId == R.id.nav_my_data) {

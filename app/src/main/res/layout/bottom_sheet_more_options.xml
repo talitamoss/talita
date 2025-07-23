@@ -17,9 +17,9 @@
         android:padding="8dp"
         android:layout_marginBottom="8dp"/>
 
-    <!-- Quick Add Option -->
+    <!-- Log Data Option -->
     <LinearLayout
-        android:id="@+id/option_quick_add"
+        android:id="@+id/option_log"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -44,7 +44,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Quick Add"
+                android:text="Log Data"
                 android:textColor="#FFFFFF"
                 android:textSize="16sp"/>
 
