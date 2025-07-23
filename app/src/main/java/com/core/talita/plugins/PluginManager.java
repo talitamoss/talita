@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
 
 /**
  * Central manager for all data collector plugins
- * Handles plugin discovery, enabling/disabling, and lifecycle
+ * Organized by I • We • All categories
  */
 public class PluginManager {
     private static final String TAG = "PluginManager";
@@ -26,10 +26,7 @@ public class PluginManager {
         this.plugins = new HashMap<>();
         this.listeners = new ArrayList<>();
         
-        // Load built-in plugins
         loadBuiltInPlugins();
-        
-        // TODO: Load external plugins from APKs or JARs
     }
     
     public static synchronized PluginManager getInstance(Context context) {
@@ -40,16 +37,21 @@ public class PluginManager {
     }
     
     /**
-     * Load all built-in plugins
+     * Load all built-in plugins organized by I • We • All
      */
     private void loadBuiltInPlugins() {
-        // Register core plugins
-        registerPlugin(new com.core.talita.plugins.health.WaterCollectorPlugin());
-        registerPlugin(new com.core.talita.plugins.health.MoodCollectorPlugin());
-        registerPlugin(new com.core.talita.plugins.fitness.ExerciseCollectorPlugin());
-        registerPlugin(new com.core.talita.plugins.health.SleepCollectorPlugin());
-        registerPlugin(new com.core.talita.plugins.location.LocationCollectorPlugin());
-        registerPlugin(new com.core.talita.plugins.productivity.FocusCollectorPlugin());
+        // "I" category - Personal/self plugins
+        registerPlugin(new com.core.talita.plugins.i.WaterPlugin());
+        registerPlugin(new com.core.talita.plugins.i.MoodPlugin());
+        registerPlugin(new com.core.talita.plugins.i.ExercisePlugin());
+        registerPlugin(new com.core.talita.plugins.i.SleepPlugin());
+        
+        // "We" category - Relationship/connection plugins
+        registerPlugin(new com.core.talita.plugins.we.FocusPlugin());
+        registerPlugin(new com.core.talita.plugins.we.RelationshipsPlugin());
+        
+        // "All" category - World/environment plugins
+        registerPlugin(new com.core.talita.plugins.all.LocationPlugin());
         
         Log.d(TAG, "Loaded " + plugins.size() + " built-in plugins");
     }
@@ -61,17 +63,15 @@ public class PluginManager {
         String id = plugin.getPluginId();
         plugins.put(id, plugin);
         
-        // Check if plugin is enabled
         if (isPluginEnabled(id)) {
             plugin.onPluginEnabled(context);
         }
         
-        // Notify listeners
         for (PluginListener listener : listeners) {
             listener.onPluginRegistered(plugin);
         }
         
-        Log.d(TAG, "Registered plugin: " + id);
+        Log.d(TAG, "Registered plugin: " + id + " [" + plugin.getCategory() + "]");
     }
     
     /**
@@ -82,7 +82,7 @@ public class PluginManager {
     }
     
     /**
-     * Get plugins by category
+     * Get plugins by category (I, We, or All)
      */
     public List<DataCollectorPlugin> getPluginsByCategory(String category) {
         return plugins.values().stream()
@@ -100,6 +100,20 @@ public class PluginManager {
             .filter(DataCollectorPlugin::supportsQuickAdd)
             .sorted((a, b) -> b.getPriority() - a.getPriority())
             .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get plugins organized by I • We • All categories
+     */
+    public Map<String, List<DataCollectorPlugin>> getPluginsByCategoryMap() {
+        Map<String, List<DataCollectorPlugin>> categoryMap = new LinkedHashMap<>();
+        
+        // Ensure order: I, We, All
+        for (String category : PluginCategories.getAllCategories()) {
+            categoryMap.put(category, getPluginsByCategory(category));
+        }
+        
+        return categoryMap;
     }
     
     /**
@@ -128,7 +142,6 @@ public class PluginManager {
         boolean wasEnabled = isPluginEnabled(pluginId);
         prefs.edit().putBoolean(pluginId + "_enabled", enabled).apply();
         
-        // Handle lifecycle callbacks
         if (enabled && !wasEnabled) {
             plugin.onPluginEnabled(context);
             for (PluginListener listener : listeners) {
@@ -143,21 +156,28 @@ public class PluginManager {
     }
     
     /**
-     * Check if this is a core plugin (can't be disabled)
+     * Check if this is a core plugin (enabled by default)
      */
     private boolean isCorePlugin(String pluginId) {
-        return pluginId.equals("health.water") || 
-               pluginId.equals("fitness.exercise") ||
-               pluginId.equals("health.mood");
+        return pluginId.equals("i.water") || 
+               pluginId.equals("i.exercise") ||
+               pluginId.equals("i.mood");
     }
     
     /**
-     * Get all categories
+     * Get plugin statistics by category
      */
-    public Set<String> getAllCategories() {
-        return plugins.values().stream()
-            .map(DataCollectorPlugin::getCategory)
-            .collect(Collectors.toSet());
+    public Map<String, Integer> getPluginStats() {
+        Map<String, Integer> stats = new LinkedHashMap<>();
+        
+        for (String category : PluginCategories.getAllCategories()) {
+            int count = (int) plugins.values().stream()
+                .filter(p -> p.getCategory().equals(category))
+                .count();
+            stats.put(category, count);
+        }
+        
+        return stats;
     }
     
     /**

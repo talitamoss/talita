@@ -1,27 +1,26 @@
-package com.core.talita.plugins.health;
+package com.core.talita.plugins.i;
 
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Color;
-import com.core.talita.R;
 import com.core.talita.collectors.DataCollector;
-import com.core.talita.collectors.WaterCollector;
+import com.core.talita.collectors.ExerciseCollector;
 import com.core.talita.plugins.DataCollectorPlugin;
+import com.core.talita.plugins.PluginCategories;
 
 /**
- * Water Intake Tracking Plugin
- * Tracks daily water consumption with quick add support
+ * Exercise Plugin - "I" category
+ * Tracks personal physical activity
  */
-public class WaterCollectorPlugin extends DataCollectorPlugin {
+public class ExercisePlugin extends DataCollectorPlugin {
     
     @Override
     public String getPluginId() {
-        return "health.water";
+        return "i.exercise";
     }
     
     @Override
     public String getPluginName() {
-        return "Water Intake";
+        return "Exercise";
     }
     
     @Override
@@ -36,32 +35,32 @@ public class WaterCollectorPlugin extends DataCollectorPlugin {
     
     @Override
     public String getCategory() {
-        return "Health & Wellness";
+        return PluginCategories.I;
     }
     
     @Override
     public int getPriority() {
-        return 100; // High priority - shown first
+        return 95;
     }
     
     @Override
     public String getEmoji() {
-        return "💧";
+        return "💪";
     }
     
     @Override
     public int getAccentColor() {
-        return Color.parseColor("#4FC3F7"); // Light blue
+        return Color.parseColor("#FF5722");
     }
     
     @Override
     public int getIconResource() {
-        return 0; // Use emoji instead
+        return 0;
     }
     
     @Override
     public String[] getRequiredPermissions() {
-        return new String[0]; // No special permissions needed
+        return new String[0];
     }
     
     @Override
@@ -76,39 +75,31 @@ public class WaterCollectorPlugin extends DataCollectorPlugin {
     
     @Override
     public boolean supportsScheduling() {
-        return true; // Can set reminders to drink water
-    }
-    
-    @Override
-    public DataCollector createCollector(Context context) {
-        return new WaterCollector(context);
-    }
-    
-    @Override
-    public boolean hasSettings() {
         return true;
     }
     
     @Override
+    public DataCollector createCollector(Context context) {
+        return new ExerciseCollector();
+    }
+    
+    @Override
+    public boolean hasSettings() {
+        return false;
+    }
+    
+    @Override
     public void openSettings(Context context) {
-        // TODO: Open water settings activity
-        Intent intent = new Intent(context, WaterSettingsActivity.class);
-        context.startActivity(intent);
+        // TODO: Settings screen
     }
     
     @Override
     public QuickAddConfig getQuickAddConfig() {
         return new QuickAddConfig(
-            "Water",
-            "Track hydration",
-            QuickAddStyle.SIMPLE_TAP,
-            true // Show in main grid
+            "Exercise",
+            "Log workout",
+            QuickAddStyle.DURATION_TIMER,
+            true
         );
-    }
-    
-    @Override
-    public void onPluginEnabled(Context context) {
-        // Set default daily goal if not set
-        WaterCollector.setDailyGoal(context, 2000); // 2L default
     }
 }
