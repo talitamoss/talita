@@ -1,6 +1,3 @@
-// Updated SettingsActivity.java - Navigation-focused version
-// Remove or comment out the old inline control references
-
 package com.core.talita;
 
 import android.content.Intent;
@@ -12,14 +9,23 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.core.talita.cloud.CloudBackupManager;
+import com.core.talita.plugins.loader.PluginLoader;
+import com.core.talita.plugins.repository.PluginRepository;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Settings Activity - Main settings navigation hub
- * Navigation-focused version for Option 3
+ * Now includes Plugin Store integration
  */
 public class SettingsActivity extends AppCompatActivity {
 
     private static final String TAG = "SettingsActivity";
+    
+    // Plugin components
+    private PluginRepository pluginRepository;
+    private PluginLoader pluginLoader;
+    private TextView pluginUpdateBadge;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,8 +37,13 @@ public class SettingsActivity extends AppCompatActivity {
             setContentView(R.layout.activity_settings);
             Log.d(TAG, "📱 Layout set successfully");
             
+            // Initialize plugin components
+            pluginRepository = new PluginRepository(this);
+            pluginLoader = new PluginLoader(this);
+            
             setupBackButton();
             setupNavigationCards();
+            checkForPluginUpdates();
             
             Log.d(TAG, "🎉 Settings Activity initialized successfully");
             
@@ -86,6 +97,20 @@ public class SettingsActivity extends AppCompatActivity {
             Log.w(TAG, "⚠️ data_collectors_card not found");
         }
         
+        // Plugin Store - NEW!
+        View pluginStoreCard = findViewById(R.id.plugin_store_card);
+        if (pluginStoreCard != null) {
+            pluginStoreCard.setOnClickListener(v -> {
+                Intent intent = new Intent(this, PluginManagementActivity.class);
+                startActivity(intent);
+            });
+            
+            // Setup update badge
+            pluginUpdateBadge = findViewById(R.id.plugin_update_badge);
+        } else {
+            Log.w(TAG, "⚠️ plugin_store_card not found");
+        }
+        
         // Data Export Settings
         View dataExportCard = findViewById(R.id.data_export_card);
         if (dataExportCard != null) {
@@ -125,11 +150,48 @@ public class SettingsActivity extends AppCompatActivity {
         Log.d(TAG, "✅ Navigation cards setup complete");
     }
     
+    private void checkForPluginUpdates() {
+        // Get installed plugins
+        List<PluginRepository.InstalledPlugin> installed = new ArrayList<>();
+        for (PluginLoader.PluginInfo info : pluginLoader.getLoadedPlugins()) {
+            installed.add(new PluginRepository.InstalledPlugin(info.id, info.version));
+        }
+        
+        // Check for updates
+        pluginRepository.checkForUpdates(installed, new PluginRepository.UpdatesCallback() {
+            @Override
+            public void onSuccess(List<PluginRepository.PluginUpdate> updates) {
+                runOnUiThread(() -> {
+                    if (pluginUpdateBadge != null) {
+                        if (updates.size() > 0) {
+                            pluginUpdateBadge.setVisibility(View.VISIBLE);
+                            pluginUpdateBadge.setText(String.valueOf(updates.size()));
+                        } else {
+                            pluginUpdateBadge.setVisibility(View.GONE);
+                        }
+                    }
+                });
+            }
+            
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "Failed to check for plugin updates: " + error);
+                runOnUiThread(() -> {
+                    if (pluginUpdateBadge != null) {
+                        pluginUpdateBadge.setVisibility(View.GONE);
+                    }
+                });
+            }
+        });
+    }
+    
     @Override
     protected void onResume() {
         super.onResume();
         // Update any status indicators if needed
         updateStatusIndicators();
+        // Recheck for plugin updates
+        checkForPluginUpdates();
     }
     
     private void updateStatusIndicators() {
@@ -138,6 +200,13 @@ public class SettingsActivity extends AppCompatActivity {
         if (collectorsStatus != null) {
             // This would get the actual count from DataCollectorManager
             collectorsStatus.setText("12 active");
+        }
+        
+        // Update plugin count
+        TextView pluginCountText = findViewById(R.id.plugin_count_text);
+        if (pluginCountText != null) {
+            int pluginCount = PluginManager.getInstance(this).getAllPlugins().size();
+            pluginCountText.setText(pluginCount + " plugins installed");
         }
         
         // Update other status indicators as needed

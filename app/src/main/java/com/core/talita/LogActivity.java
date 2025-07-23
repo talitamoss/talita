@@ -1,6 +1,7 @@
 package com.core.talita;
 
 import android.animation.ObjectAnimator;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -56,10 +57,11 @@ public class LogActivity extends AppCompatActivity {
         pluginGrid = findViewById(R.id.plugin_grid);
         pluginGrid.setLayoutManager(new GridLayoutManager(this, 2));
         
-        // Settings button
+        // Settings button - Updated to open Plugin Store
         Button managePluginsButton = findViewById(R.id.manage_plugins_button);
         managePluginsButton.setOnClickListener(v -> {
-            // TODO: Open plugin management screen
+            Intent intent = new Intent(this, PluginManagementActivity.class);
+            startActivity(intent);
         });
     }
     
@@ -115,22 +117,27 @@ public class LogActivity extends AppCompatActivity {
     
     private void showNumericInput(DataCollectorPlugin plugin) {
         // TODO: Show numeric input dialog
+        Toast.makeText(this, "Numeric input for " + plugin.getPluginName(), Toast.LENGTH_SHORT).show();
     }
     
     private void showChoicePicker(DataCollectorPlugin plugin) {
         // TODO: Show choice picker dialog
+        Toast.makeText(this, "Choice picker for " + plugin.getPluginName(), Toast.LENGTH_SHORT).show();
     }
     
     private void showDurationTimer(DataCollectorPlugin plugin) {
         // TODO: Show duration timer
+        Toast.makeText(this, "Duration timer for " + plugin.getPluginName(), Toast.LENGTH_SHORT).show();
     }
     
     private void showTextInput(DataCollectorPlugin plugin) {
         // TODO: Show text input dialog
+        Toast.makeText(this, "Text input for " + plugin.getPluginName(), Toast.LENGTH_SHORT).show();
     }
     
     private void startVoiceRecording(DataCollectorPlugin plugin) {
         // TODO: Start voice recording
+        Toast.makeText(this, "Voice recording for " + plugin.getPluginName(), Toast.LENGTH_SHORT).show();
     }
     
     private void showSuccessFeedback(String message) {
@@ -158,6 +165,13 @@ public class LogActivity extends AppCompatActivity {
             .setDuration(400)
             .setStartDelay(100)
             .start();
+    }
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Reload plugins in case new ones were installed
+        loadPlugins();
     }
     
     @Override

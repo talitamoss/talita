@@ -109,5 +109,42 @@
                 android:resource="@xml/file_provider_paths" />
         </provider>
 
+	  <!-- Plugin Management Activity -->
+        <activity 
+            android:name=".PluginManagementActivity"
+            android:label="Plugin Store"
+            android:theme="@style/Theme.Talita" />
+            
+        <!-- Plugin Details Activity (for installed plugins) -->
+        <activity 
+            android:name=".PluginDetailsActivity"
+            android:label="Plugin Details"
+            android:theme="@style/Theme.Talita" />
+            
+        <!-- Plugin Store Details Activity (for marketplace plugins) -->
+        <activity 
+            android:name=".PluginStoreDetailsActivity"
+            android:label="Plugin Info"
+            android:theme="@style/Theme.Talita" />
+
+        <!-- Add file provider for plugin installation -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+
+        <!-- Add these permissions at the top of the manifest, outside the <application> tag -->
+        <!-- For plugin installation from external storage -->
+        <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+        
+        <!-- For plugin network communication -->
+        <uses-permission android:name="android.permission.INTERNET" />
+        <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     </application>
 </manifest>
