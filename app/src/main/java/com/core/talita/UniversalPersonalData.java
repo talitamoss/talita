@@ -7,7 +7,6 @@ import java.util.UUID;
 
 /**
  * Universal personal data class that can represent ANY data type
- * Brand-agnostic: works with any app name
  */
 public class UniversalPersonalData implements UniversalDataType, PersonalData {
     private final String id;
@@ -23,26 +22,20 @@ public class UniversalPersonalData implements UniversalDataType, PersonalData {
         this.timestamp = System.currentTimeMillis();
         this.data = data != null ? data : new HashMap<>();
         this.metadata = new HashMap<>();
-        
-        // Ensure timestamp is in data
-        if (!this.data.containsKey("timestamp")) {
-            this.data.put("timestamp", timestamp);
-        }
+        this.filePath = null;
     }
-    
+
     // UniversalDataType methods
     @Override
-    public String getId() { return id; }
-    
+    public String getType() {
+        return type;
+    }
+
     @Override
-    public String getType() { return type; }
-    
-    @Override
-    public long getTimestamp() { return timestamp; }
-    
-    @Override
-    public String getFilePath() { return filePath; }
-    
+    public String getId() {
+        return id;
+    }
+
     @Override
     public String toJson() {
         try {
@@ -57,55 +50,78 @@ public class UniversalPersonalData implements UniversalDataType, PersonalData {
             return "{}";
         }
     }
-    
+
     @Override
-    public String getDisplayName() {
-        return data.getOrDefault("display_name", type).toString();
+    public String getFilePath() {
+        return filePath;
     }
-    
+
     @Override
-    public Map<String, Object> getMetadata() { return metadata; }
-    
+    public long getTimestamp() {
+        return timestamp;
+    }
+
     @Override
     public double getLatitude() {
-        Object lat = data.get("latitude");
-        if (lat instanceof Number) {
-            return ((Number) lat).doubleValue();
+        if (data.containsKey("latitude")) {
+            Object lat = data.get("latitude");
+            if (lat instanceof Number) {
+                return ((Number) lat).doubleValue();
+            }
         }
         return 0.0;
     }
-    
+
     @Override
     public double getLongitude() {
-        Object lon = data.get("longitude");
-        if (lon instanceof Number) {
-            return ((Number) lon).doubleValue();
+        if (data.containsKey("longitude")) {
+            Object lon = data.get("longitude");
+            if (lon instanceof Number) {
+                return ((Number) lon).doubleValue();
+            }
         }
         return 0.0;
     }
-    
-    // PersonalData methods
+
     @Override
-    public String getDataType() { return type; }
-    
+    public Map<String, Object> getMetadata() {
+        return metadata;
+    }
+
+    @Override
+    public String getDisplayName() {
+        if (data.containsKey("display_name")) {
+            return String.valueOf(data.get("display_name"));
+        }
+        return type + " data";
+    }
+
     @Override
     public String getDisplaySummary() {
-        return data.getOrDefault("summary", "Data collected").toString();
+        return getDisplayName();
     }
-    
+
+    // PersonalData methods
+    @Override
+    public String getDataType() {
+        return type;
+    }
+
     @Override
     public Object getValue() {
         return data.get("value");
     }
     
     // Additional helper methods
-    public Map<String, Object> getAllData() { return data; }
+    public Map<String, Object> getAllData() {
+        Map<String, Object> allData = new HashMap<>(data);
+        allData.put("id", id);
+        allData.put("type", type);
+        allData.put("timestamp", timestamp);
+        return allData;
+    }
     
-    public Object getValue(String key) { return data.get(key); }
-    
-    public void setValue(String key, Object value) { data.put(key, value); }
-    
-    public void setFilePath(String filePath) { this.filePath = filePath; }
-    
-    public void setMetadata(String key, Object value) { metadata.put(key, value); }
+    public void setFilePath(String filePath) {
+        this.filePath = filePath;
+    }
 }

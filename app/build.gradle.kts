@@ -64,7 +64,7 @@ dependencies {
     implementation("androidx.viewpager2:viewpager2:1.1.0")
     
     // RecyclerView
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.recyclerview:recyclerview:1.4.0")
     
     // CardView
     implementation("androidx.cardview:cardview:1.0.0")
@@ -73,7 +73,7 @@ dependencies {
     implementation(libs.kotlin)
     
     // Location & Activity Recognition
-    implementation("com.google.android.gms:play-services-location:21.2.0")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
     
     // Maps
     implementation(libs.osmdroidAndroid)
@@ -89,7 +89,7 @@ dependencies {
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     
     // Core library desugaring
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     
     // Testing
     testImplementation(libs.junit)

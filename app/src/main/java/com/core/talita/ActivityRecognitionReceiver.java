@@ -7,70 +7,62 @@ import android.util.Log;
 import com.google.android.gms.location.ActivityRecognitionResult;
 import com.google.android.gms.location.DetectedActivity;
 
-/**
- * Receives activity recognition updates from Google Play Services
- * Translates detected activities into readable strings and forwards to background service
- */
 public class ActivityRecognitionReceiver extends BroadcastReceiver {
-
-    private static final String TAG = "ActivityRecognition";
+    private static final String TAG = "ActivityRecognitionReceiver";
 
     @Override
     public void onReceive(Context context, Intent intent) {
         if (ActivityRecognitionResult.hasResult(intent)) {
             ActivityRecognitionResult result = ActivityRecognitionResult.extractResult(intent);
-            DetectedActivity mostProbableActivity = result.getMostProbableActivity();
+            handleDetectedActivities(context, result);
+        }
+    }
 
+    private void handleDetectedActivities(Context context, ActivityRecognitionResult result) {
+        UniversalDataService dataService = new UniversalDataService(context);
+        
+        // Get the most probable activity
+        DetectedActivity mostProbableActivity = result.getMostProbableActivity();
+        int confidence = mostProbableActivity.getConfidence();
+        
+        if (confidence > 75) { // Only log high confidence activities
             String activityName = getActivityName(mostProbableActivity.getType());
-            int confidence = mostProbableActivity.getConfidence();
-
-            Log.d(TAG, "🏃 Activity detected: " + activityName + " (" + confidence + "% confidence)");
-
-            // Only process high-confidence activities
-            if (confidence > 50) {
-                // Save activity data
-                UniversalDataService dataService = new UniversalDataService(context);
-                ActivityData activityData = new ActivityData(activityName, confidence, null);
-                dataService.capture(activityData);
-
-                // Update background service if running
-                updateBackgroundService(context, activityName);
+            
+            try {
+                // Create ActivityData with correct constructor (2 parameters)
+                ActivityData activityData = new ActivityData(activityName, confidence);
+                
+                // Save using UniversalDataService
+                String id = dataService.capture(activityData);
+                
+                if (id != null) {
+                    Log.d(TAG, "Activity saved: " + activityName + " (" + confidence + "%)");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to save activity", e);
             }
         }
     }
 
-    /**
-     * Convert Google's activity types to readable strings
-     */
     private String getActivityName(int activityType) {
         switch (activityType) {
-            case DetectedActivity.STILL:
-                return "stationary";
-            case DetectedActivity.WALKING:
-                return "walking";
-            case DetectedActivity.RUNNING:
-                return "running";
-            case DetectedActivity.ON_BICYCLE:
-                return "cycling";
             case DetectedActivity.IN_VEHICLE:
-                return "driving";
+                return "In Vehicle";
+            case DetectedActivity.ON_BICYCLE:
+                return "On Bicycle";
             case DetectedActivity.ON_FOOT:
-                return "on_foot";
+                return "On Foot";
+            case DetectedActivity.RUNNING:
+                return "Running";
+            case DetectedActivity.STILL:
+                return "Still";
             case DetectedActivity.TILTING:
-                return "tilting";
+                return "Tilting";
+            case DetectedActivity.WALKING:
+                return "Walking";
+            case DetectedActivity.UNKNOWN:
             default:
-                return "unknown";
+                return "Unknown";
         }
-    }
-
-    /**
-     * Update the background service with new activity
-     */
-    private void updateBackgroundService(Context context, String activity) {
-        // Use a static method or singleton to communicate with the service
-        // For now, we'll use a simple broadcast
-        Intent updateIntent = new Intent("com.core.talita.ACTIVITY_UPDATE");
-        updateIntent.putExtra("activity", activity);
-        context.sendBroadcast(updateIntent);
     }
 }

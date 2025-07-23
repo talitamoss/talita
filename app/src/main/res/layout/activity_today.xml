@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout 
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0A0A0A">
+    android:background="#000000">
 
     <!-- Main Content -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingBottom="56dp"> <!-- Space for bottom nav -->
+        android:paddingBottom="80dp">
 
         <!-- Status Bar -->
         <LinearLayout
@@ -26,16 +25,15 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="◉ Tracking Active"
-                android:textSize="14sp"
-                android:textColor="#6366F1"/>
+                android:text="📍 Tracking Active"
+                android:textColor="#6366F1"
+                android:textSize="14sp"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Tap to toggle"
-                android:textSize="12sp"
-                android:textColor="#666666"/>
+                android:text="🔒"
+                android:textSize="16sp"/>
 
         </LinearLayout>
 
@@ -44,8 +42,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:gravity="center"
-            android:padding="24dp">
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="8dp">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -73,7 +72,7 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <com.core.talita.TodayActivity.DataVisualizationView
+            <com.core.talita.DataVisualizationView
                 android:id="@+id/data_visualization"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
@@ -105,11 +104,11 @@
             android:layout_gravity="bottom|end"
             android:layout_marginEnd="88dp"
             android:layout_marginBottom="88dp"
-            android:src="@drawable/ic_more_horizontal"
-            app:backgroundTint="#2A2A2A"
-            app:tint="#FAFAFA"
-            app:fabSize="mini"
-            android:visibility="gone"/>
+            android:src="@drawable/ic_more"
+            app:backgroundTint="#6366F1"
+            android:visibility="gone"
+            android:scaleX="0"
+            android:scaleY="0"/>
 
         <!-- Now View FAB -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -117,13 +116,13 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
-            android:layout_marginEnd="88dp"
-            android:layout_marginBottom="88dp"
-            android:src="@drawable/ic_activity"
-            app:backgroundTint="#2A2A2A"
-            app:tint="#FAFAFA"
-            app:fabSize="mini"
-            android:visibility="gone"/>
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="160dp"
+            android:src="@drawable/ic_location"
+            app:backgroundTint="#6366F1"
+            android:visibility="gone"
+            android:scaleX="0"
+            android:scaleY="0"/>
 
         <!-- Main Quick Add FAB -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -131,12 +130,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
-            android:layout_marginEnd="24dp"
+            android:layout_marginEnd="16dp"
             android:layout_marginBottom="88dp"
             android:src="@drawable/ic_add"
-            app:backgroundTint="#6366F1"
-            app:tint="#FAFAFA"
-            app:fabSize="normal"/>
+            app:backgroundTint="#6366F1"/>
 
     </FrameLayout>
 
@@ -144,12 +141,11 @@
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="#111111"
-        app:menu="@menu/bottom_navigation"
+        android:background="#1A1A1A"
         app:itemIconTint="@color/bottom_nav_selector"
         app:itemTextColor="@color/bottom_nav_selector"
-        app:labelVisibilityMode="labeled"/>
+        app:menu="@menu/bottom_navigation_menu"/>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</FrameLayout>

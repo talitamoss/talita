@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 public class LocalDatabase extends SQLiteOpenHelper {
 
-    private static final String DATABASE_NAME = "talita.db";
+    public static final String DATABASE_NAME = "talita.db";
     private static final int DATABASE_VERSION = 1;
 
     // We'll add the table creation SQL here

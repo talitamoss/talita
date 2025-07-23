@@ -1,230 +1,301 @@
 package com.core.talita;
 
+import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.net.Uri;
 import android.util.Log;
+import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.*;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /**
- * Export Manager - Handles exporting user data in various formats
+ * ExportManager - Handles exporting data in various formats
+ * Fixed to match VaultActivity's usage
  */
 public class ExportManager {
     private static final String TAG = "ExportManager";
     
     /**
-     * Export data to JSON format
+     * Export data to JSON format - Enhanced version for VaultActivity
      */
     public static void exportToJson(Context context, File outputFile, String dateRange,
-                                   boolean includeLocation, boolean includeAudio,
-                                   ProgressDialog progressDialog) throws Exception {
-        
-        UniversalDataService dataService = new UniversalDataService(context);
-        List<PersonalData> data = getDataForDateRange(dataService, dateRange);
-        
-        JSONObject root = new JSONObject();
-        root.put("export_version", "1.0");
-        root.put("export_date", System.currentTimeMillis());
-	try {
-    root.put("app_version", context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName);
-} catch (Exception e) {
-    root.put("app_version", "1.0");
-}        
-        JSONArray dataArray = new JSONArray();
-        int total = data.size();
-        int processed = 0;
-        
-        for (PersonalData item : data) {
-            // Skip location data if not included
-            if (!includeLocation && item.getDataType().equals("location")) {
-                continue;
+                                   boolean includeAudio, boolean encrypted, ProgressDialog progressDialog) {
+        new Thread(() -> {
+            try {
+                if (progressDialog != null) {
+                    ((Activity) context).runOnUiThread(() -> progressDialog.show());
+                }
+                
+                // Get data based on date range
+                List<PersonalData> data = getDataForExport(context, dateRange);
+                
+                // Create JSON
+                String jsonContent = createJsonExport(data);
+                
+                // Write to file
+                FileWriter writer = new FileWriter(outputFile);
+                writer.write(jsonContent);
+                writer.close();
+                
+                // Convert File to Uri for the simple version
+                Uri fileUri = Uri.fromFile(outputFile);
+                
+                ((Activity) context).runOnUiThread(() -> {
+                    if (progressDialog != null) progressDialog.dismiss();
+                    Toast.makeText(context, "Export completed: " + data.size() + " items", 
+                        Toast.LENGTH_LONG).show();
+                });
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Export failed", e);
+                ((Activity) context).runOnUiThread(() -> {
+                    if (progressDialog != null) progressDialog.dismiss();
+                    Toast.makeText(context, "Export failed: " + e.getMessage(), 
+                        Toast.LENGTH_LONG).show();
+                });
             }
-            
-            // Skip audio data if not included
-            if (!includeAudio && item.getDataType().equals("audio")) {
-                continue;
-            }
-            
-            JSONObject dataObject = new JSONObject();
-            dataObject.put("type", item.getDataType());
-            dataObject.put("timestamp", item.getTimestamp());
-            dataObject.put("value", item.getValue());
-            dataObject.put("summary", item.getDisplaySummary());
-            
-            // Add any metadata
-            if (item instanceof UniversalPersonalData) {
-                UniversalPersonalData universalData = (UniversalPersonalData) item;
-                JSONObject metadata = new JSONObject(universalData.getAllData());
-                dataObject.put("metadata", metadata);
-            }
-            
-            dataArray.put(dataObject);
-            
-            processed++;
-            final int progress = (processed * 100) / total;
-            progressDialog.post(() -> progressDialog.setProgress(progress));
-        }
-        
-        root.put("data", dataArray);
-        root.put("total_entries", dataArray.length());
-        
-        // Write to file
-        FileWriter writer = new FileWriter(outputFile);
-        writer.write(root.toString(2)); // Pretty print with 2 space indent
-        writer.close();
-        
-        Log.d(TAG, "Exported " + dataArray.length() + " entries to JSON");
+        }).start();
     }
     
     /**
-     * Export data to CSV format
+     * Export data to JSON format - Simple version
+     */
+    public static void exportToJson(Context context, Uri uri) {
+        exportToJson(context, new File(uri.getPath()), "all", false, false, null);
+    }
+    
+    /**
+     * Export data to CSV format - Enhanced version for VaultActivity
      */
     public static void exportToCsv(Context context, File outputFile, String dateRange,
-                                  boolean includeLocation, boolean includeAudio,
-                                  ProgressDialog progressDialog) throws Exception {
-        
-        UniversalDataService dataService = new UniversalDataService(context);
-        List<PersonalData> data = getDataForDateRange(dataService, dateRange);
-        
-        FileWriter writer = new FileWriter(outputFile);
-        
-        // Write header
-        writer.write("Timestamp,Date,Time,Type,Value,Summary\n");
-        
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
-        
-        int total = data.size();
-        int processed = 0;
-        
-        for (PersonalData item : data) {
-            // Skip if needed
-            if (!includeLocation && item.getDataType().equals("location")) {
-                continue;
+                                  boolean includeAudio, boolean encrypted, ProgressDialog progressDialog) {
+        new Thread(() -> {
+            try {
+                if (progressDialog != null) {
+                    ((Activity) context).runOnUiThread(() -> progressDialog.show());
+                }
+                
+                // Get data based on date range
+                List<PersonalData> data = getDataForExport(context, dateRange);
+                
+                // Create CSV
+                PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
+                
+                // Write header
+                writer.println("ID,Date,Timestamp,Type,Value,Summary");
+                
+                // Write data
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", 
+                    Locale.getDefault());
+                
+                for (PersonalData item : data) {
+                    String id = item.hashCode() + "";
+                    String date = dateFormat.format(new Date(item.getTimestamp()));
+                    String type = escapeCSV(item.getDataType());
+                    String value = escapeCSV(String.valueOf(item.getValue()));
+                    String summary = escapeCSV(item.getDisplaySummary());
+                    
+                    writer.println(String.format("%s,%s,%d,%s,%s,%s",
+                        id, date, item.getTimestamp(), type, value, summary));
+                }
+                
+                writer.close();
+                
+                ((Activity) context).runOnUiThread(() -> {
+                    if (progressDialog != null) progressDialog.dismiss();
+                    Toast.makeText(context, "CSV export completed: " + data.size() + " items", 
+                        Toast.LENGTH_LONG).show();
+                });
+                
+            } catch (Exception e) {
+                Log.e(TAG, "CSV export failed", e);
+                ((Activity) context).runOnUiThread(() -> {
+                    if (progressDialog != null) progressDialog.dismiss();
+                    Toast.makeText(context, "Export failed: " + e.getMessage(), 
+                        Toast.LENGTH_LONG).show();
+                });
             }
-            if (!includeAudio && item.getDataType().equals("audio")) {
-                continue;
-            }
-            
-            Date date = new Date(item.getTimestamp());
-            
-            // Escape CSV values
-            String type = escapeCsv(item.getDataType());
-            String value = escapeCsv(String.valueOf(item.getValue()));
-            String summary = escapeCsv(item.getDisplaySummary());
-            
-            writer.write(String.format("%d,%s,%s,%s,%s,%s\n",
-                item.getTimestamp(),
-                dateFormat.format(date),
-                timeFormat.format(date),
-                type,
-                value,
-                summary
-            ));
-            
-            processed++;
-            final int progress = (processed * 100) / total;
-	((Activity) context).runOnUiThread(() -> progressDialog.setProgress(progress));
-        }
-        
-        writer.close();
-        Log.d(TAG, "Exported " + processed + " entries to CSV");
+        }).start();
     }
     
     /**
-     * Export data to ZIP archive
+     * Export data to CSV format - Simple version
+     */
+    public static void exportToCsv(Context context, Uri uri) {
+        exportToCsv(context, new File(uri.getPath()), "all", false, false, null);
+    }
+    
+    /**
+     * Export as archive (ZIP) - For VaultActivity
      */
     public static void exportToArchive(Context context, File outputFile, String dateRange,
-                                      boolean includeLocation, boolean includeAudio,
-                                      ProgressDialog progressDialog) throws Exception {
-        
-        ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(outputFile));
-        
-        // Export metadata
-        ZipEntry metaEntry = new ZipEntry("metadata.json");
-        zipOut.putNextEntry(metaEntry);
-        
-        JSONObject metadata = new JSONObject();
-        metadata.put("export_date", System.currentTimeMillis());
-        metadata.put("export_version", "1.0");
-        metadata.put("date_range", dateRange);
-        metadata.put("include_location", includeLocation);
-        metadata.put("include_audio", includeAudio);
-        
-        zipOut.write(metadata.toString(2).getBytes());
-        zipOut.closeEntry();
-        
-        // Export data as JSON
-        File tempJson = new File(context.getCacheDir(), "data.json");
-        exportToJson(context, tempJson, dateRange, includeLocation, includeAudio, progressDialog);
-        
-        ZipEntry dataEntry = new ZipEntry("data.json");
-        zipOut.putNextEntry(dataEntry);
-        
-        FileInputStream fis = new FileInputStream(tempJson);
-        byte[] buffer = new byte[1024];
-        int len;
-        while ((len = fis.read(buffer)) > 0) {
-            zipOut.write(buffer, 0, len);
-        }
-        
-        fis.close();
-        zipOut.closeEntry();
-        
-        // If including audio, add audio files
-        if (includeAudio) {
-            File audioDir = new File(context.getFilesDir(), "audio");
-            if (audioDir.exists()) {
-                addFolderToZip(audioDir, "audio", zipOut);
+                                      boolean includeAudio, boolean encrypted, ProgressDialog progressDialog) {
+        new Thread(() -> {
+            try {
+                if (progressDialog != null) {
+                    ((Activity) context).runOnUiThread(() -> {
+                        progressDialog.setMessage("Creating archive...");
+                        progressDialog.show();
+                    });
+                }
+                
+                FileOutputStream fos = new FileOutputStream(outputFile);
+                ZipOutputStream zipOut = new ZipOutputStream(fos);
+                
+                // Add data.json
+                List<PersonalData> data = getDataForExport(context, dateRange);
+                String jsonData = createJsonExport(data);
+                
+                ZipEntry jsonEntry = new ZipEntry("data.json");
+                zipOut.putNextEntry(jsonEntry);
+                zipOut.write(jsonData.getBytes());
+                zipOut.closeEntry();
+                
+                // Add audio files if requested
+                if (includeAudio) {
+                    File audioDir = new File(context.getFilesDir(), "audio");
+                    if (audioDir.exists()) {
+                        File[] audioFiles = audioDir.listFiles();
+                        if (audioFiles != null) {
+                            int fileCount = 0;
+                            for (File file : audioFiles) {
+                                if (file.getName().endsWith(".enc") || file.getName().endsWith(".3gp")) {
+                                    ZipEntry audioEntry = new ZipEntry("audio/" + file.getName());
+                                    zipOut.putNextEntry(audioEntry);
+                                    
+                                    FileInputStream fis = new FileInputStream(file);
+                                    byte[] buffer = new byte[1024];
+                                    int length;
+                                    while ((length = fis.read(buffer)) > 0) {
+                                        zipOut.write(buffer, 0, length);
+                                    }
+                                    fis.close();
+                                    zipOut.closeEntry();
+                                    fileCount++;
+                                    
+                                    final int progress = fileCount;
+                                    if (progressDialog != null) {
+                                        ((Activity) context).runOnUiThread(() -> 
+                                            progressDialog.setMessage("Adding audio files... " + progress));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                zipOut.close();
+                fos.close();
+                
+                ((Activity) context).runOnUiThread(() -> {
+                    if (progressDialog != null) progressDialog.dismiss();
+                    Toast.makeText(context, "Archive created successfully", 
+                        Toast.LENGTH_LONG).show();
+                });
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Archive export failed", e);
+                ((Activity) context).runOnUiThread(() -> {
+                    if (progressDialog != null) progressDialog.dismiss();
+                    Toast.makeText(context, "Export failed: " + e.getMessage(), 
+                        Toast.LENGTH_LONG).show();
+                });
             }
-        }
-        
-        zipOut.close();
-        tempJson.delete();
-        
-        Log.d(TAG, "Created archive: " + outputFile.getAbsolutePath());
+        }).start();
     }
     
     /**
-     * Get data based on date range selection
+     * Export as archive - Simple version
      */
-    private static List<PersonalData> getDataForDateRange(UniversalDataService dataService, 
-                                                         String dateRange) {
+    public static void exportAsArchive(Context context, Uri uri) {
+        exportToArchive(context, new File(uri.getPath()), "all", true, false, null);
+    }
+    
+    /**
+     * Get data for export based on date range
+     */
+    private static List<PersonalData> getDataForExport(Context context, String dateRange) {
+        UniversalDataService dataService = new UniversalDataService(context);
+        
         long endTime = System.currentTimeMillis();
         long startTime;
         
-        switch (dateRange) {
-            case "Last 30 days":
-                startTime = endTime - (30L * 24 * 60 * 60 * 1000);
+        switch (dateRange.toLowerCase()) {
+            case "today":
+                startTime = getStartOfDay();
                 break;
-            case "Last 7 days":
+            case "week":
                 startTime = endTime - (7L * 24 * 60 * 60 * 1000);
                 break;
-            case "Today":
-                Calendar cal = Calendar.getInstance();
-                cal.set(Calendar.HOUR_OF_DAY, 0);
-                cal.set(Calendar.MINUTE, 0);
-                cal.set(Calendar.SECOND, 0);
-                cal.set(Calendar.MILLISECOND, 0);
-                startTime = cal.getTimeInMillis();
+            case "month":
+                startTime = endTime - (30L * 24 * 60 * 60 * 1000);
                 break;
-            default: // All time
-                startTime = 0;
+            case "year":
+                startTime = endTime - (365L * 24 * 60 * 60 * 1000);
                 break;
+            default:
+                startTime = 0; // All data
         }
         
         return dataService.getDataInRange(startTime, endTime);
     }
     
     /**
-     * Escape special characters for CSV
+     * Get start of current day in milliseconds
      */
-    private static String escapeCsv(String value) {
+    private static long getStartOfDay() {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
+    }
+    
+    /**
+     * Create JSON export string
+     */
+    private static String createJsonExport(List<PersonalData> data) throws Exception {
+        JSONObject root = new JSONObject();
+        root.put("export_version", "1.0");
+        root.put("export_date", System.currentTimeMillis());
+        root.put("app_name", "Talita");
+        
+        JSONArray dataArray = new JSONArray();
+        for (PersonalData item : data) {
+            JSONObject obj = new JSONObject();
+            obj.put("type", item.getDataType());
+            obj.put("timestamp", item.getTimestamp());
+            obj.put("summary", item.getDisplaySummary());
+            obj.put("value", String.valueOf(item.getValue()));
+            
+            // Add metadata if it's UniversalPersonalData
+            if (item instanceof UniversalPersonalData) {
+                UniversalPersonalData universalData = (UniversalPersonalData) item;
+                obj.put("metadata", new JSONObject(universalData.getAllData()));
+            }
+            
+            dataArray.put(obj);
+        }
+        
+        root.put("data", dataArray);
+        root.put("total_items", data.size());
+        
+        return root.toString(2);
+    }
+    
+    /**
+     * Escape CSV values
+     */
+    private static String escapeCSV(String value) {
         if (value == null) return "";
         
         if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
@@ -233,33 +304,5 @@ public class ExportManager {
         }
         
         return value;
-    }
-    
-    /**
-     * Add folder contents to zip
-     */
-    private static void addFolderToZip(File folder, String parentPath, 
-                                      ZipOutputStream zipOut) throws IOException {
-        File[] files = folder.listFiles();
-        if (files == null) return;
-        
-        for (File file : files) {
-            if (file.isDirectory()) {
-                addFolderToZip(file, parentPath + "/" + file.getName(), zipOut);
-            } else {
-                ZipEntry entry = new ZipEntry(parentPath + "/" + file.getName());
-                zipOut.putNextEntry(entry);
-                
-                FileInputStream fis = new FileInputStream(file);
-                byte[] buffer = new byte[1024];
-                int len;
-                while ((len = fis.read(buffer)) > 0) {
-                    zipOut.write(buffer, 0, len);
-                }
-                
-                fis.close();
-                zipOut.closeEntry();
-            }
-        }
     }
 }

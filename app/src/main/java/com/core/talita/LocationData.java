@@ -1,4 +1,6 @@
 package com.core.talita;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -9,6 +11,16 @@ import java.util.UUID;
  * Gets automatic database storage, cloud backup, and sharing
  */
 public class LocationData implements UniversalDataType {
+
+    @Override
+    public Map<String, Object> getMetadata() {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("provider", provider);
+        metadata.put("accuracy", accuracy);
+        metadata.put("speed", speed);
+        metadata.put("bearing", bearing);
+        return metadata;
+    }
 
     private final String id;
     private final double latitude;

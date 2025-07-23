@@ -1,219 +1,232 @@
 package com.core.talita;
 
 import android.content.Context;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import android.util.Log;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.util.UUID;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 
 /**
- * Encryption Service - Encrypts ALL data types in Talita
- *
- * Features:
- * - Transparent encryption for all UniversalDataType objects
- * - File encryption for audio/media files
- * - JSON metadata encryption
- * - Secure file handling (no plaintext temp files)
+ * EncryptionService - Handles all encryption/decryption operations
+ * Uses Android Hardware Security Module for unextractable keys
  */
 public class EncryptionService {
-
     private static final String TAG = "EncryptionService";
-    private static final String ENCRYPTED_FILE_EXTENSION = ".enc";
-    private static final String METADATA_ENCRYPTION_KEY = "encrypted_data";
-
+    private static final String KEYSTORE_ALIAS = "TalitaMainKey";
+    private static final String ANDROID_KEYSTORE = "AndroidKeyStore";
+    private static final String TRANSFORMATION = "AES/GCM/NoPadding";
+    private static final int GCM_TAG_LENGTH = 128;
+    
     private final Context context;
-    private final SecureKeyManager keyManager;
-
+    private SecretKey secretKey;
+    
     public EncryptionService(Context context) {
         this.context = context;
-        this.keyManager = new SecureKeyManager(context);
-
-        // Verify encryption is working
-        if (!keyManager.isEncryptionAvailable()) {
-            throw new RuntimeException("Hardware encryption not available");
-        }
-
-        Log.d(TAG, "✅ Encryption service initialized");
-        Log.d(TAG, keyManager.getEncryptionInfo());
+        initializeEncryption();
     }
-
+    
     /**
-     * Encrypt UniversalDataType object (metadata)
-     * Returns encrypted JSON with original structure preserved
+     * Initialize encryption with hardware-backed key
      */
-    public String encryptDataType(UniversalDataType data) {
+    private void initializeEncryption() {
         try {
-            // Get the original JSON
-            String originalJson = data.toJson();
-
-            // Encrypt the JSON content
-            byte[] encryptedBytes = keyManager.encryptString(originalJson);
-            String encryptedBase64 = Base64.encodeToString(encryptedBytes, Base64.DEFAULT);
-
-            // Create wrapper JSON with metadata
-            JSONObject wrapper = new JSONObject();
-            wrapper.put("type", data.getType());
-            wrapper.put("id", data.getId());
-            wrapper.put("timestamp", data.getTimestamp());
-            wrapper.put("encrypted", true);
-            wrapper.put(METADATA_ENCRYPTION_KEY, encryptedBase64);
-            wrapper.put("display_name", data.getDisplayName()); // Keep for UI
-
-            Log.d(TAG, "🔒 Encrypted " + data.getType() + " metadata (" + encryptedBytes.length + " bytes)");
-            return wrapper.toString();
-
-        } catch (JSONException e) {
-            Log.e(TAG, "❌ Failed to encrypt data type: " + e.getMessage());
+            secretKey = getOrCreateKey();
+            Log.d(TAG, "✅ Encryption initialized with hardware-backed key");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to initialize encryption", e);
+        }
+    }
+    
+    /**
+     * Get or create hardware-backed encryption key
+     */
+    private SecretKey getOrCreateKey() throws Exception {
+        KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+        keyStore.load(null);
+        
+        // Check if key exists
+        if (keyStore.containsAlias(KEYSTORE_ALIAS)) {
+            KeyStore.SecretKeyEntry secretKeyEntry = 
+                (KeyStore.SecretKeyEntry) keyStore.getEntry(KEYSTORE_ALIAS, null);
+            return secretKeyEntry.getSecretKey();
+        }
+        
+        // Generate new key
+        KeyGenerator keyGenerator = KeyGenerator.getInstance(
+            KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE);
+            
+        KeyGenParameterSpec keySpec = new KeyGenParameterSpec.Builder(
+            KEYSTORE_ALIAS,
+            KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setKeySize(256)
+            .setUserAuthenticationRequired(false)
+            .build();
+            
+        keyGenerator.init(keySpec);
+        return keyGenerator.generateKey();
+    }
+    
+    /**
+     * Encrypt a file and return encrypted file path
+     */
+    public String encryptFile(String inputFilePath) {
+        if (inputFilePath == null || inputFilePath.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            File inputFile = new File(inputFilePath);
+            if (!inputFile.exists()) {
+                Log.e(TAG, "Input file does not exist: " + inputFilePath);
+                return null;
+            }
+            
+            // Create encrypted file path
+            String encryptedFileName = UUID.randomUUID().toString() + ".enc";
+            File encryptedDir = new File(context.getFilesDir(), "encrypted");
+            encryptedDir.mkdirs();
+            File encryptedFile = new File(encryptedDir, encryptedFileName);
+            
+            // Initialize cipher
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+            byte[] iv = cipher.getIV();
+            
+            // Read and encrypt file
+            FileInputStream fis = new FileInputStream(inputFile);
+            FileOutputStream fos = new FileOutputStream(encryptedFile);
+            
+            // Write IV first
+            fos.write(iv.length);
+            fos.write(iv);
+            
+            // Encrypt file content
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                byte[] encrypted = cipher.update(buffer, 0, bytesRead);
+                if (encrypted != null) {
+                    fos.write(encrypted);
+                }
+            }
+            
+            byte[] finalBlock = cipher.doFinal();
+            if (finalBlock != null) {
+                fos.write(finalBlock);
+            }
+            
+            fis.close();
+            fos.close();
+            
+            Log.d(TAG, "✅ File encrypted: " + encryptedFile.getAbsolutePath());
+            return encryptedFile.getAbsolutePath();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "❌ File encryption failed", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Decrypt file to temporary location for playback
+     */
+    public String decryptFileToTemp(String encryptedFilePath) {
+        if (encryptedFilePath == null || encryptedFilePath.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            File encryptedFile = new File(encryptedFilePath);
+            if (!encryptedFile.exists()) {
+                Log.e(TAG, "Encrypted file does not exist: " + encryptedFilePath);
+                return null;
+            }
+            
+            // Create temp file
+            File tempDir = new File(context.getCacheDir(), "temp_decrypt");
+            tempDir.mkdirs();
+            File tempFile = new File(tempDir, UUID.randomUUID().toString() + ".temp");
+            
+            // Read encrypted file
+            FileInputStream fis = new FileInputStream(encryptedFile);
+            
+            // Read IV
+            int ivLength = fis.read();
+            byte[] iv = new byte[ivLength];
+            fis.read(iv);
+            
+            // Initialize cipher
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, spec);
+            
+            // Decrypt to temp file
+            FileOutputStream fos = new FileOutputStream(tempFile);
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                byte[] decrypted = cipher.update(buffer, 0, bytesRead);
+                if (decrypted != null) {
+                    fos.write(decrypted);
+                }
+            }
+            
+            byte[] finalBlock = cipher.doFinal();
+            if (finalBlock != null) {
+                fos.write(finalBlock);
+            }
+            
+            fis.close();
+            fos.close();
+            
+            Log.d(TAG, "✅ File decrypted to temp: " + tempFile.getAbsolutePath());
+            return tempFile.getAbsolutePath();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "❌ File decryption failed", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Encrypt string data
+     */
+    public String encryptData(String plainText) {
+        try {
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+            
+            byte[] iv = cipher.getIV();
+            byte[] encrypted = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
+            
+            // Combine IV and encrypted data
+            String ivBase64 = Base64.encodeToString(iv, Base64.DEFAULT);
+            String encryptedBase64 = Base64.encodeToString(encrypted, Base64.DEFAULT);
+            
+            return ivBase64 + ":" + encryptedBase64;
+            
+        } catch (Exception e) {
             throw new RuntimeException("Data encryption failed", e);
         }
     }
-
+    
     /**
-     * Decrypt UniversalDataType JSON back to original format
-     */
-    public String decryptDataTypeJson(String encryptedJson) {
-        try {
-            JSONObject wrapper = new JSONObject(encryptedJson);
-
-            // Check if this is encrypted data
-            if (!wrapper.optBoolean("encrypted", false)) {
-                Log.d(TAG, "📄 Data is not encrypted, returning as-is");
-                return encryptedJson; // Not encrypted, return original
-            }
-
-            // Decrypt the content
-            String encryptedBase64 = wrapper.getString(METADATA_ENCRYPTION_KEY);
-            byte[] encryptedBytes = Base64.decode(encryptedBase64, Base64.DEFAULT);
-            String decryptedJson = keyManager.decryptToString(encryptedBytes);
-
-            Log.d(TAG, "🔓 Decrypted " + wrapper.optString("type") + " metadata");
-            return decryptedJson;
-
-        } catch (JSONException e) {
-            Log.e(TAG, "❌ Failed to decrypt data type: " + e.getMessage());
-            throw new RuntimeException("Data decryption failed", e);
-        }
-    }
-
-    /**
-     * Encrypt a JSON string (simplified version for now)
-     */
-    public String encryptDataTypeJson(String json) {
-        try {
-            // For now, just return the JSON as-is
-            // TODO: Implement actual encryption when ready
-            return json;
-        } catch (Exception e) {
-            Log.e(TAG, "Error encrypting JSON: " + e.getMessage());
-            return json;
-        }
-    }
-
-    /**
-     * Encrypt file in place (for audio files, photos, etc.)
-     * Original file is securely deleted
-     */
-    public String encryptFile(String originalFilePath) {
-        if (originalFilePath == null || originalFilePath.isEmpty()) {
-            return originalFilePath;
-        }
-
-        File originalFile = new File(originalFilePath);
-        if (!originalFile.exists()) {
-            Log.w(TAG, "⚠️ File not found for encryption: " + originalFilePath);
-            return originalFilePath;
-        }
-
-        String encryptedFilePath = originalFilePath + ENCRYPTED_FILE_EXTENSION;
-        File encryptedFile = new File(encryptedFilePath);
-
-        try {
-            Log.d(TAG, "🔒 Encrypting file: " + originalFile.getName() + " (" + originalFile.length() + " bytes)");
-
-            // Read original file
-            byte[] fileData = readFileSecurely(originalFile);
-
-            // Encrypt the data
-            byte[] encryptedData = keyManager.encrypt(fileData);
-
-            // Write encrypted file
-            writeFileSecurely(encryptedFile, encryptedData);
-
-            // Securely delete original file
-            secureDeleteFile(originalFile);
-
-            Log.d(TAG, "✅ File encrypted: " + encryptedFile.getName() + " (" + encryptedFile.length() + " bytes)");
-            return encryptedFilePath;
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ File encryption failed: " + e.getMessage());
-
-            // Clean up on failure
-            if (encryptedFile.exists()) {
-                encryptedFile.delete();
-            }
-
-            throw new RuntimeException("File encryption failed", e);
-        }
-    }
-
-    /**
-     * Decrypt file (for reading/playback)
-     * Returns path to temporary decrypted file
-     */
-    public String decryptFileToTemp(String encryptedFilePath) {
-        if (encryptedFilePath == null || !encryptedFilePath.endsWith(ENCRYPTED_FILE_EXTENSION)) {
-            Log.d(TAG, "📄 File is not encrypted: " + encryptedFilePath);
-            return encryptedFilePath; // Not encrypted
-        }
-
-        File encryptedFile = new File(encryptedFilePath);
-        if (!encryptedFile.exists()) {
-            Log.w(TAG, "⚠️ Encrypted file not found: " + encryptedFilePath);
-            return encryptedFilePath;
-        }
-
-        // Create temp file for decrypted content
-        String tempFilePath = encryptedFilePath.replace(ENCRYPTED_FILE_EXTENSION, ".temp");
-        File tempFile = new File(tempFilePath);
-
-        try {
-            Log.d(TAG, "🔓 Decrypting file: " + encryptedFile.getName());
-
-            // Read encrypted file
-            byte[] encryptedData = readFileSecurely(encryptedFile);
-
-            // Decrypt the data
-            byte[] decryptedData = keyManager.decrypt(encryptedData);
-
-            // Write temp file
-            writeFileSecurely(tempFile, decryptedData);
-
-            // Clear sensitive data
-            Arrays.fill(decryptedData, (byte) 0);
-
-            Log.d(TAG, "✅ File decrypted to temp: " + tempFile.getName());
-            return tempFilePath;
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ File decryption failed: " + e.getMessage());
-
-            // Clean up on failure
-            if (tempFile.exists()) {
-                tempFile.delete();
-            }
-
-            throw new RuntimeException("File decryption failed", e);
-        }
-    }
-
- * Decrypt encrypted data string
+     * Decrypt encrypted data string
      */
     public String decryptData(String encryptedData) {
         try {
@@ -255,76 +268,41 @@ public class EncryptionService {
         if (tempFilePath != null && tempFilePath.endsWith(".temp")) {
             File tempFile = new File(tempFilePath);
             if (tempFile.exists()) {
-                secureDeleteFile(tempFile);
-                Log.d(TAG, "🧹 Cleaned up temp file: " + tempFile.getName());
+                tempFile.delete();
+                Log.d(TAG, "🧹 Cleaned up temp file: " + tempFilePath);
             }
         }
     }
-
-    /**
-     * Read file securely into memory
-     */
-    private byte[] readFileSecurely(File file) throws IOException {
-        try (FileInputStream fis = new FileInputStream(file)) {
-            byte[] data = new byte[(int) file.length()];
-            int bytesRead = fis.read(data);
-
-            if (bytesRead != data.length) {
-                throw new IOException("Failed to read complete file");
-            }
-
-            return data;
-        }
-    }
-
-    /**
-     * Write file securely
-     */
-    private void writeFileSecurely(File file, byte[] data) throws IOException {
-        try (FileOutputStream fos = new FileOutputStream(file)) {
-            fos.write(data);
-            fos.flush();
-            fos.getFD().sync(); // Force write to disk
-        }
-    }
-
-    /**
-     * Securely delete file (overwrite then delete)
-     */
-    private void secureDeleteFile(File file) {
-        try {
-            if (file.exists()) {
-                // Overwrite with random data
-                try (FileOutputStream fos = new FileOutputStream(file)) {
-                    byte[] randomData = new byte[(int) file.length()];
-                    new java.security.SecureRandom().nextBytes(randomData);
-                    fos.write(randomData);
-                    fos.flush();
-                    fos.getFD().sync();
-                }
-
-                // Delete the file
-                boolean deleted = file.delete();
-                Log.d(TAG, deleted ? "🗑️ Securely deleted: " + file.getName() : "⚠️ Failed to delete: " + file.getName());
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "⚠️ Secure delete failed: " + e.getMessage());
-            // Still try normal delete
-            file.delete();
-        }
-    }
-
+    
     /**
      * Check if a file is encrypted
      */
     public boolean isFileEncrypted(String filePath) {
-        return filePath != null && filePath.endsWith(ENCRYPTED_FILE_EXTENSION);
+        return filePath != null && filePath.endsWith(".enc");
     }
-
+    
     /**
-     * Get encryption status info
+     * Get encryption status
      */
     public String getEncryptionStatus() {
-        return keyManager.getEncryptionInfo();
+        try {
+            KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+            keyStore.load(null);
+            
+            if (keyStore.containsAlias(KEYSTORE_ALIAS)) {
+                return "🔐 Hardware-backed encryption active";
+            } else {
+                return "⚠️ Encryption key not found";
+            }
+        } catch (Exception e) {
+            return "❌ Encryption error: " + e.getMessage();
+        }
+    }
+    
+    /**
+     * Encrypt JSON data from UniversalDataType
+     */
+    public String encryptDataTypeJson(String jsonData) {
+        return encryptData(jsonData);
     }
 }

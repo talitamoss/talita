@@ -39,6 +39,20 @@ public interface CloudProvider {
 
     /**
      * File operations (for encrypted audio files, photos, etc.)
+     * Simplified to work with CloudItem objects
+     */
+    void uploadFile(CloudItem item) throws Exception;
+    void uploadMetadata(CloudItem item) throws Exception;
+    
+    /**
+     * Download operations returning data directly (simplified)
+     */
+    List<CloudFile> listFiles(String path) throws Exception;
+    String downloadMetadata(String key) throws Exception;
+    String downloadFile(String remotePath, String localDir) throws Exception;
+    
+    /**
+     * Legacy method signatures for compatibility
      */
     void uploadFile(
             String localFilePath,
@@ -214,56 +228,42 @@ public interface CloudProvider {
         }
     }
 
+    class CloudError {
+        public final String code;
+        public final String message;
+        public final Exception cause;
+        public final boolean isRetryable;
+
+        public CloudError(String code, String message, Exception cause, boolean isRetryable) {
+            this.code = code;
+            this.message = message;
+            this.cause = cause;
+            this.isRetryable = isRetryable;
+        }
+
+        public CloudError(String code, String message) {
+            this(code, message, null, false);
+        }
+    }
+
     class CloudStorageInfo {
         public final long totalSpace;
         public final long usedSpace;
-        public final long availableSpace;
+        public final long freeSpace;
         public final int fileCount;
-        public final String planName;
+        public final Map<String, Long> spaceByType; // "audio" -> bytes, "metadata" -> bytes
 
-        public CloudStorageInfo(long totalSpace, long usedSpace, long availableSpace,
-                                int fileCount, String planName) {
+        public CloudStorageInfo(long totalSpace, long usedSpace, long freeSpace,
+                                int fileCount, Map<String, Long> spaceByType) {
             this.totalSpace = totalSpace;
             this.usedSpace = usedSpace;
-            this.availableSpace = availableSpace;
+            this.freeSpace = freeSpace;
             this.fileCount = fileCount;
-            this.planName = planName;
+            this.spaceByType = spaceByType;
         }
 
         public double getUsagePercentage() {
-            if (totalSpace <= 0) return 0.0;
-            return (double) usedSpace / totalSpace * 100.0;
+            return totalSpace > 0 ? (double) usedSpace / totalSpace * 100 : 0;
         }
-    }
-
-    class CloudError {
-        public final CloudErrorType type;
-        public final String message;
-        public final String details;
-        public final Throwable cause;
-
-        public CloudError(CloudErrorType type, String message, String details, Throwable cause) {
-            this.type = type;
-            this.message = message;
-            this.details = details;
-            this.cause = cause;
-        }
-
-        public CloudError(CloudErrorType type, String message) {
-            this(type, message, null, null);
-        }
-    }
-
-    enum CloudErrorType {
-        AUTHENTICATION_FAILED,
-        NETWORK_ERROR,
-        STORAGE_FULL,
-        FILE_NOT_FOUND,
-        PERMISSION_DENIED,
-        QUOTA_EXCEEDED,
-        INVALID_CREDENTIALS,
-        SERVER_ERROR,
-        TIMEOUT,
-        UNKNOWN
     }
 }

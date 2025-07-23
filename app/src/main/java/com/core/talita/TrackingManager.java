@@ -1,6 +1,7 @@
 package com.core.talita;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -100,7 +101,8 @@ public boolean startTracking() {
     /**
      * Auto-start tracking if it was previously enabled
      */
-	public void autoStartIfEnabled() {
+	@SuppressLint("SuspiciousIndentation")
+    public void autoStartIfEnabled() {
 	    if (isTrackingEnabled()) {
        	 // ADD PERMISSION CHECK HERE - prevents crash on Settings open
     		 if (!hasLocationPermissions()) {

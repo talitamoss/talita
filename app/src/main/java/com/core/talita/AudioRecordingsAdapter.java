@@ -6,75 +6,73 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class AudioRecordingsAdapter extends RecyclerView.Adapter<AudioRecordingsAdapter.AudioViewHolder> {
-
-    private final List<AudioActivity.AudioRecord> recordings;
+public class AudioRecordingsAdapter extends RecyclerView.Adapter<AudioRecordingsAdapter.ViewHolder> {
+    
+    private final List<PersonalData> recordings;
     private final OnRecordingClickListener clickListener;
-
+    
     public interface OnRecordingClickListener {
-        void onRecordingClick(AudioActivity.AudioRecord record);
+        void onRecordingClick(PersonalData recording);
     }
-
-    public AudioRecordingsAdapter(List<AudioActivity.AudioRecord> recordings, OnRecordingClickListener clickListener) {
+    
+    public AudioRecordingsAdapter(List<PersonalData> recordings, OnRecordingClickListener clickListener) {
         this.recordings = recordings;
         this.clickListener = clickListener;
     }
-
+    
+    public void updateRecordings(List<PersonalData> newRecordings) {
+        this.recordings.clear();
+        this.recordings.addAll(newRecordings);
+        notifyDataSetChanged();
+    }
+    
     @NonNull
     @Override
-    public AudioViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-                .inflate(android.R.layout.simple_list_item_2, parent, false);
-        return new AudioViewHolder(view);
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        // Create a simple text view for now
+        TextView textView = new TextView(parent.getContext());
+        textView.setLayoutParams(new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        textView.setPadding(16, 16, 16, 16);
+        textView.setTextSize(16);
+        return new ViewHolder(textView);
     }
-
+    
     @Override
-    public void onBindViewHolder(@NonNull AudioViewHolder holder, int position) {
-        AudioActivity.AudioRecord record = recordings.get(position);
-
-        holder.primaryText.setText(record.displayName);
-
-        // Get file size for additional info
-        File audioFile = new File(record.filepath);
-        long fileSizeKB = audioFile.length() / 1024;
-        String secondaryInfo = record.formattedTime + " • " + fileSizeKB + " KB";
-
-        holder.secondaryText.setText(secondaryInfo);
-
-        // Style the text for dark theme
-        holder.primaryText.setTextColor(0xFFFFFFFF); // White
-        holder.secondaryText.setTextColor(0xFFCCCCCC); // Light gray
-
-        // Set click listener
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        PersonalData recording = recordings.get(position);
+        
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault());
+        String dateStr = sdf.format(new Date(recording.getTimestamp()));
+        
+        String text = dateStr + " - " + recording.getDisplaySummary();
+        holder.textView.setText(text);
+        
         holder.itemView.setOnClickListener(v -> {
             if (clickListener != null) {
-                clickListener.onRecordingClick(record);
+                clickListener.onRecordingClick(recording);
             }
         });
-
-        // Add visual feedback for clickable item
-        holder.itemView.setBackgroundColor(0xFF2A2A2A);
-        holder.itemView.setClickable(true);
-        holder.itemView.setFocusable(true);
     }
-
+    
     @Override
     public int getItemCount() {
         return recordings.size();
     }
-
-    public static class AudioViewHolder extends RecyclerView.ViewHolder {
-        TextView primaryText;
-        TextView secondaryText;
-
-        public AudioViewHolder(@NonNull View itemView) {
+    
+    static class ViewHolder extends RecyclerView.ViewHolder {
+        final TextView textView;
+        
+        ViewHolder(View itemView) {
             super(itemView);
-            primaryText = itemView.findViewById(android.R.id.text1);
-            secondaryText = itemView.findViewById(android.R.id.text2);
+            this.textView = (TextView) itemView;
         }
     }
 }

@@ -1,25 +1,29 @@
 package com.core.talita;
 
 import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Adapter to bridge between PersonalData and UniversalDataType
- * Allows UniversalDataType objects to be used as PersonalData
  */
 public class PersonalDataAdapter implements PersonalData, UniversalDataType {
+    private final UniversalDataType universalData;
     private final PersonalData personalData;
     
-    public PersonalDataAdapter(PersonalData data) {
-        this.personalData = data;
-    }
-    
-    // Constructor for UniversalDataType
-    public PersonalDataAdapter(UniversalDataType data) {
-        if (data instanceof PersonalData) {
+    // Single constructor that handles both types
+    public PersonalDataAdapter(Object data) {
+        if (data instanceof UniversalDataType) {
+            this.universalData = (UniversalDataType) data;
+            if (data instanceof PersonalData) {
+                this.personalData = (PersonalData) data;
+            } else {
+                this.personalData = new PersonalDataWrapper((UniversalDataType) data);
+            }
+        } else if (data instanceof PersonalData) {
             this.personalData = (PersonalData) data;
+            this.universalData = new UniversalDataWrapper((PersonalData) data);
         } else {
-            // Create a wrapper that implements PersonalData
-            this.personalData = new PersonalDataWrapper(data);
+            throw new IllegalArgumentException("Data must be UniversalDataType or PersonalData");
         }
     }
     
@@ -44,71 +48,48 @@ public class PersonalDataAdapter implements PersonalData, UniversalDataType {
         return personalData.getValue();
     }
     
-    // UniversalDataType methods (delegate to PersonalData if it implements it)
+    // UniversalDataType methods
     @Override
     public String getId() {
-        if (personalData instanceof UniversalDataType) {
-            return ((UniversalDataType) personalData).getId();
-        }
-        return String.valueOf(personalData.hashCode());
+        return universalData.getId();
     }
     
     @Override
     public String getType() {
-        return personalData.getDataType();
+        return universalData.getType();
     }
     
     @Override
     public String getFilePath() {
-        if (personalData instanceof UniversalDataType) {
-            return ((UniversalDataType) personalData).getFilePath();
-        }
-        return null;
+        return universalData.getFilePath();
     }
     
     @Override
     public String toJson() {
-        if (personalData instanceof UniversalDataType) {
-            return ((UniversalDataType) personalData).toJson();
-        }
-        return "{}";
+        return universalData.toJson();
     }
     
     @Override
     public String getDisplayName() {
-        if (personalData instanceof UniversalDataType) {
-            return ((UniversalDataType) personalData).getDisplayName();
-        }
-        return personalData.getDisplaySummary();
+        return universalData.getDisplayName();
     }
     
     @Override
     public Map<String, Object> getMetadata() {
-        if (personalData instanceof UniversalDataType) {
-            return ((UniversalDataType) personalData).getMetadata();
-        }
-        return new java.util.HashMap<>();
+        return universalData.getMetadata();
     }
     
     @Override
     public double getLatitude() {
-        if (personalData instanceof UniversalDataType) {
-            return ((UniversalDataType) personalData).getLatitude();
-        }
-        return 0.0;
+        return universalData.getLatitude();
     }
     
     @Override
     public double getLongitude() {
-        if (personalData instanceof UniversalDataType) {
-            return ((UniversalDataType) personalData).getLongitude();
-        }
-        return 0.0;
+        return universalData.getLongitude();
     }
     
-    /**
-     * Inner class to wrap UniversalDataType as PersonalData
-     */
+    // Inner wrapper classes
     private static class PersonalDataWrapper implements PersonalData {
         private final UniversalDataType data;
         
@@ -138,6 +119,64 @@ public class PersonalDataAdapter implements PersonalData, UniversalDataType {
                 return metadata.get("value");
             }
             return data.getDisplayName();
+        }
+    }
+    
+    private static class UniversalDataWrapper implements UniversalDataType {
+        private final PersonalData data;
+        
+        UniversalDataWrapper(PersonalData data) {
+            this.data = data;
+        }
+        
+        @Override
+        public String getType() {
+            return data.getDataType();
+        }
+        
+        @Override
+        public String getId() {
+            return String.valueOf(data.hashCode());
+        }
+        
+        @Override
+        public String toJson() {
+            return "{}";
+        }
+        
+        @Override
+        public String getFilePath() {
+            return null;
+        }
+        
+        @Override
+        public long getTimestamp() {
+            return data.getTimestamp();
+        }
+        
+        @Override
+        public double getLatitude() {
+            return 0.0;
+        }
+        
+        @Override
+        public double getLongitude() {
+            return 0.0;
+        }
+        
+        @Override
+        public Map<String, Object> getMetadata() {
+            return new HashMap<>();
+        }
+        
+        @Override
+        public String getDisplayName() {
+            return data.getDisplaySummary();
+        }
+        
+        @Override
+        public String getDisplaySummary() {
+            return data.getDisplaySummary();
         }
     }
 }

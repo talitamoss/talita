@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
@@ -63,7 +64,6 @@
 
         <!-- SETTINGS & CONFIG -->
         <activity android:name=".SettingsActivity" />
-        <activity android:name=".SettingsTestActivity" />
         <activity android:name=".ConnectActivity" />
         <activity android:name=".DataViewActivity" />
         <activity android:name=".AboutSettingsActivity" />
@@ -78,10 +78,6 @@
         <activity
             android:name=".MyDataActivity"
             android:theme="@style/Theme.Talita" />
-
-        <!-- LEGACY & P2P -->
-        <activity android:name=".QrHandshakeActivity" />
-        <activity android:name=".MainActivity" />
 
         <!-- TEST -->
         <activity android:name=".QuickAddTestActivity" />

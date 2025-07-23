@@ -1,5 +1,6 @@
 package com.core.talita;
 
+import android.annotation.SuppressLint;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -22,6 +23,7 @@ import java.util.Iterator;
  */
 public class LocalDataManager {
     private static final String TAG = "LocalDataManager";
+    private static final String DATABASE_NAME = "talita_db";
     
     private LocalDatabase dbHelper;
     private Context context;
@@ -80,30 +82,28 @@ public class LocalDataManager {
         List<UniversalDataType> results = new ArrayList<>();
         
         SQLiteDatabase db = dbHelper.getReadableDatabase();
-        String query = "SELECT * FROM data_items WHERE created_at >= ? AND created_at <= ? ORDER BY created_at DESC";
+        String query = "SELECT * FROM data_items WHERE created_at >= ? AND created_at <= ?";
         Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(startTime), String.valueOf(endTime)});
         
-        try {
-            while (cursor.moveToNext()) {
-                String encryptedData = cursor.getString(cursor.getColumnIndexOrThrow("data_json"));
-                String dataType = cursor.getString(cursor.getColumnIndexOrThrow("type"));
-                String id = cursor.getString(cursor.getColumnIndexOrThrow("id"));
-                long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("created_at"));
-                String filePath = cursor.getString(cursor.getColumnIndexOrThrow("file_path"));
+        while (cursor.moveToNext()) {
+            try {
+                @SuppressLint("Range") String encryptedJson = cursor.getString(cursor.getColumnIndex("data_json"));
+                String decryptedJson = encryptionService.decryptData(encryptedJson);
+                JSONObject jsonObject = new JSONObject(decryptedJson);
                 
-                // Decrypt and deserialize
-                String decryptedJson = encryptionService.decryptData(encryptedData);
+                Map<String, Object> dataMap = jsonToMap(jsonObject);
+                @SuppressLint("Range") String type = cursor.getString(cursor.getColumnIndex("type"));
                 
-                // Create a generic UniversalDataType implementation
-                UniversalDataType data = new UniversalPersonalData(dataType, parseJsonToMap(decryptedJson));
+                UniversalPersonalData data = new UniversalPersonalData(type, dataMap);
                 results.add(data);
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Error parsing data item", e);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error querying data by time range", e);
-        } finally {
-            cursor.close();
-            db.close();
         }
+        
+        cursor.close();
+        db.close();
         
         return results;
     }
@@ -111,40 +111,46 @@ public class LocalDataManager {
     /**
      * Get data by type
      */
+    @SuppressLint("Range")
     public List<DataItem> getDataByType(String type) {
-        List<DataItem> items = new ArrayList<>();
-        
+        List<DataItem> results = new ArrayList<>();
         SQLiteDatabase db = dbHelper.getReadableDatabase();
-        String query = "SELECT * FROM data_items WHERE type = ? ORDER BY created_at DESC";
-        Cursor cursor = db.rawQuery(query, new String[]{type});
         
-        try {
-            while (cursor.moveToNext()) {
-                DataItem item = new DataItem();
-                item.setId(cursor.getString(cursor.getColumnIndexOrThrow("id")));
-                item.setType(cursor.getString(cursor.getColumnIndexOrThrow("type")));
-                item.setCreatedAt(cursor.getLong(cursor.getColumnIndexOrThrow("created_at")));
-                item.setDataJson(cursor.getString(cursor.getColumnIndexOrThrow("data_json")));
-                item.setFilePath(cursor.getString(cursor.getColumnIndexOrThrow("file_path")));
-                items.add(item);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting data by type", e);
-        } finally {
-            cursor.close();
-            db.close();
+        Cursor cursor = db.query("data_items", null, "type = ?", 
+            new String[]{type}, null, null, "created_at DESC");
+        
+        while (cursor.moveToNext()) {
+            DataItem item = new DataItem();
+            item.setId(cursor.getString(cursor.getColumnIndex("id")));
+            item.setType(cursor.getString(cursor.getColumnIndex("type")));
+            item.setDataJson(cursor.getString(cursor.getColumnIndex("data_json")));
+            item.setFilePath(cursor.getString(cursor.getColumnIndex("file_path")));
+            item.setCreatedAt(cursor.getLong(cursor.getColumnIndex("created_at")));
+            results.add(item);
         }
         
-        return items;
+        cursor.close();
+        db.close();
+        
+        return results;
     }
     
     /**
-     * Get the size of the database file
+     * Delete all data
+     */
+    public void deleteAllData() {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.delete("data_items", null, null);
+        db.close();
+        Log.d(TAG, "🗑️ All data deleted");
+    }
+    
+    /**
+     * Get total database size
      */
     public long getDatabaseSize() {
         try {
-            // Get the database file
-            File dbFile = context.getDatabasePath(LocalDatabase.DATABASE_NAME);
+            File dbFile = context.getDatabasePath(DATABASE_NAME);
             if (dbFile.exists()) {
                 return dbFile.length();
             }
@@ -155,16 +161,16 @@ public class LocalDataManager {
     }
     
     /**
-     * Clear all data from the database
+     * Clear all data including files
      */
     public void clearAllData() {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         try {
-            // Delete all records from the data table
+            // Delete all database records
             db.delete("data_items", null, null);
             db.delete("location_points", null, null);
             
-            // Also clear any audio files
+            // Delete audio files
             File audioDir = new File(context.getFilesDir(), "audio");
             if (audioDir.exists()) {
                 File[] files = audioDir.listFiles();
@@ -175,7 +181,7 @@ public class LocalDataManager {
                 }
             }
             
-            Log.d(TAG, "All data cleared");
+            Log.d(TAG, "✅ All data cleared");
         } catch (Exception e) {
             Log.e(TAG, "Error clearing data", e);
         } finally {
@@ -184,13 +190,12 @@ public class LocalDataManager {
     }
     
     /**
-     * Save location point (legacy method for compatibility)
+     * Save location point
      */
     public String saveLocationPoint(double latitude, double longitude, double accuracy, String context) {
         String id = UUID.randomUUID().toString();
         
         try {
-            // Create location data
             Map<String, Object> locationData = new HashMap<>();
             locationData.put("latitude", latitude);
             locationData.put("longitude", longitude);
@@ -198,7 +203,7 @@ public class LocalDataManager {
             locationData.put("context", context);
             locationData.put("timestamp", System.currentTimeMillis());
             
-            // Create UniversalDataType
+            // Create UniversalPersonalData for location
             UniversalPersonalData data = new UniversalPersonalData("location", locationData);
             
             // Save using the universal method
@@ -211,13 +216,12 @@ public class LocalDataManager {
     }
     
     /**
-     * Save audio recording (legacy method for compatibility)
+     * Save audio recording
      */
     public String saveAudioRecording(String filePath, long durationMs, double latitude, double longitude) {
         String id = UUID.randomUUID().toString();
-
+        
         try {
-            // Create audio data
             Map<String, Object> audioData = new HashMap<>();
             audioData.put("duration_ms", durationMs);
             audioData.put("latitude", latitude);
@@ -225,7 +229,7 @@ public class LocalDataManager {
             audioData.put("file_path", filePath);
             audioData.put("timestamp", System.currentTimeMillis());
             
-            // Create UniversalDataType
+            // Create UniversalPersonalData for audio
             UniversalPersonalData data = new UniversalPersonalData("audio", audioData);
             data.setFilePath(filePath);
             
@@ -239,30 +243,20 @@ public class LocalDataManager {
     }
     
     /**
-     * Helper method to parse JSON to Map
+     * Helper method to convert JSONObject to Map
      */
-    private Map<String, Object> parseJsonToMap(String json) {
+    private Map<String, Object> jsonToMap(JSONObject jsonObject) throws JSONException {
         Map<String, Object> map = new HashMap<>();
-        try {
-            JSONObject jsonObject = new JSONObject(json);
-            Iterator<String> keys = jsonObject.keys();
-            while (keys.hasNext()) {
-                String key = keys.next();
-                map.put(key, jsonObject.get(key));
-            }
-        } catch (JSONException e) {
-            Log.e(TAG, "Error parsing JSON", e);
+        Iterator<String> keys = jsonObject.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            map.put(key, jsonObject.get(key));
         }
         return map;
     }
-
-   /**
-     * Get database name constant
-     */
-    private static final String DATABASE_NAME = "talita_db";
     
     /**
-     * Get items by type
+     * Get items by type (for backwards compatibility)
      */
     public List<DataItem> getItemsByType(String type) {
         return getDataByType(type);
@@ -299,5 +293,4 @@ public class LocalDataManager {
         db.close();
         return count;
     }
-
 }

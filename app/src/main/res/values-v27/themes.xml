@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Talita" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color -->
+        <item name="colorPrimary">#6366F1</item>
+        <item name="colorPrimaryVariant">#4C4EDB</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+
+        <!-- Secondary brand color -->
+        <item name="colorSecondary">#EC4899</item>
+        <item name="colorSecondaryVariant">#DB2777</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+
+        <!-- Background colors -->
+        <item name="android:colorBackground">#0A0A0A</item>
+        <item name="colorSurface">#1A1A1A</item>
+        <item name="colorError">#EF4444</item>
+
+        <!-- Status bar -->
+        <item name="android:statusBarColor">#0A0A0A</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Navigation bar -->
+        <item name="android:navigationBarColor">#111111</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- Text colors -->
+        <item name="android:textColorPrimary">#FAFAFA</item>
+        <item name="android:textColorSecondary">#888888</item>
+
+        <!-- Window background -->
+        <item name="android:windowBackground">#0A0A0A</item>
+
+        <!-- Enable edge-to-edge -->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:fitsSystemWindows">false</item>
+
+        <!-- Material Design 3 components -->
+        <item name="materialCardViewStyle">@style/Widget.App.CardView</item>
+        <item name="chipStyle">@style/Widget.App.Chip</item>
+        <item name="floatingActionButtonStyle">@style/Widget.App.FloatingActionButton</item>
+    </style><![CDATA[
+
+
+]]></resources>

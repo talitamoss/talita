@@ -22,7 +22,7 @@
             android:id="@+id/fab_icon"
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:tint="@color/white" />
+            app:tint="@color/white" />
 
         <TextView
             android:id="@+id/fab_label"

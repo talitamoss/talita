@@ -1,37 +1,44 @@
 package com.core.talita;
 
+import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.net.Uri;
 import android.util.Log;
 import android.widget.Toast;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.io.*;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
- * Import Manager - Handles importing user data from various formats
+ * ImportManager - Handles importing data from various formats
+ * Supports JSON, CSV, and ZIP archive imports
  */
 public class ImportManager {
     private static final String TAG = "ImportManager";
     
     /**
-     * Import data from a file
+     * Import data from URI
      */
-    public static void importData(Context context, Uri fileUri, boolean replaceAll) {
-        ProgressDialog progressDialog = new ProgressDialog(context);
-        progressDialog.setMessage("Importing data...");
-        progressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        progressDialog.setCancelable(false);
-        progressDialog.show();
-        
+    public static void importData(Context context, Uri uri, boolean replaceAll) {
         new Thread(() -> {
+            ProgressDialog progressDialog = new ProgressDialog(context);
+            progressDialog.setMessage("Importing data...");
+            progressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+            progressDialog.setCancelable(false);
+            
+            ((Activity) context).runOnUiThread(() -> progressDialog.show());
+            
             try {
-                String fileName = getFileName(context, fileUri);
-                InputStream inputStream = context.getContentResolver().openInputStream(fileUri);
+                ContentResolver resolver = context.getContentResolver();
+                InputStream inputStream = resolver.openInputStream(uri);
+                String fileName = getFileName(context, uri);
                 
                 if (fileName.endsWith(".json")) {
                     importFromJson(context, inputStream, replaceAll, progressDialog);
@@ -39,21 +46,20 @@ public class ImportManager {
                     importFromCsv(context, inputStream, replaceAll, progressDialog);
                 } else if (fileName.endsWith(".zip")) {
                     importFromArchive(context, inputStream, replaceAll, progressDialog);
-                } else {
-                    throw new Exception("Unsupported file format");
                 }
                 
                 inputStream.close();
                 
-                // Success
-		((Activity) context).runOnUiThread(() -> progressDialog.setProgress(progress));
+                // Success notification
+                ((Activity) context).runOnUiThread(() -> {
                     progressDialog.dismiss();
-                    Toast.makeText(context, "Import successful!", Toast.LENGTH_LONG).show();
+                    Toast.makeText(context, "Import completed successfully", 
+                        Toast.LENGTH_LONG).show();
                 });
                 
             } catch (Exception e) {
                 Log.e(TAG, "Import failed", e);
-                progressDialog.post(() -> {
+                ((Activity) context).runOnUiThread(() -> {
                     progressDialog.dismiss();
                     Toast.makeText(context, "Import failed: " + e.getMessage(), 
                         Toast.LENGTH_LONG).show();
@@ -85,15 +91,15 @@ public class ImportManager {
             throw new Exception("Incompatible export version: " + exportVersion);
         }
         
-        UniversalDataService dataService = new UniversalDataService(context);
+        // Initialize services
         LocalDataManager localDataManager = new LocalDataManager(context);
+        UniversalDataService dataService = new UniversalDataService(context);
         
-        // Clear existing data if replacing
         if (replaceAll) {
-            localDataManager.clearAllData();
+            localDataManager.deleteAllData();
         }
         
-        // Import data
+        // Import data array
         JSONArray dataArray = root.getJSONArray("data");
         int total = dataArray.length();
         
@@ -108,7 +114,7 @@ public class ImportManager {
             dataMap.put("timestamp", timestamp);
             dataMap.put("display_name", dataObject.optString("summary", type));
             
-            // Add metadata if present
+            // Add metadata if exists
             if (dataObject.has("metadata")) {
                 JSONObject metadata = dataObject.getJSONObject("metadata");
                 Iterator<String> keys = metadata.keys();
@@ -116,9 +122,6 @@ public class ImportManager {
                     String key = keys.next();
                     dataMap.put(key, metadata.get(key));
                 }
-            } else {
-                // Use value field for simple data
-                dataMap.put("value", dataObject.get("value"));
             }
             
             // Create and save data
@@ -127,28 +130,29 @@ public class ImportManager {
             
             // Update progress
             final int progress = ((i + 1) * 100) / total;
-            progressDialog.post(() -> progressDialog.setProgress(progress));
+            ((Activity) context).runOnUiThread(() -> progressDialog.setProgress(progress));
         }
         
-        Log.d(TAG, "Imported " + total + " entries from JSON");
+        Log.d(TAG, "Imported " + total + " items from JSON");
     }
     
     /**
      * Import from CSV format
      */
     private static void importFromCsv(Context context, InputStream inputStream,
-                                     boolean replaceAll, ProgressDialog progressDialog) 
+                                     boolean replaceAll, ProgressDialog progressDialog)
                                      throws Exception {
         
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
         UniversalDataService dataService = new UniversalDataService(context);
         LocalDataManager localDataManager = new LocalDataManager(context);
         
         if (replaceAll) {
-            localDataManager.clearAllData();
+            localDataManager.deleteAllData();
         }
         
-        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-        String line = reader.readLine(); // Skip header
+        // Skip header
+        String line = reader.readLine();
         
         List<String> lines = new ArrayList<>();
         while ((line = reader.readLine()) != null) {
@@ -160,9 +164,9 @@ public class ImportManager {
         int processed = 0;
         
         for (String csvLine : lines) {
-            String[] parts = parseCsvLine(csvLine);
+            String[] parts = parseCSVLine(csvLine);
             if (parts.length >= 6) {
-                long timestamp = Long.parseLong(parts[0]);
+                long timestamp = Long.parseLong(parts[2]);
                 String type = parts[3];
                 String value = parts[4];
                 String summary = parts[5];
@@ -180,23 +184,24 @@ public class ImportManager {
             
             processed++;
             final int progress = (processed * 100) / total;
-            progressDialog.post(() -> progressDialog.setProgress(progress));
+            ((Activity) context).runOnUiThread(() -> progressDialog.setProgress(progress));
         }
         
-        Log.d(TAG, "Imported " + processed + " entries from CSV");
+        Log.d(TAG, "Imported " + processed + " items from CSV");
     }
     
     /**
      * Import from ZIP archive
      */
     private static void importFromArchive(Context context, InputStream inputStream,
-                                         boolean replaceAll, ProgressDialog progressDialog) 
+                                         boolean replaceAll, ProgressDialog progressDialog)
                                          throws Exception {
         
+        // Create temp directory
         File tempDir = new File(context.getCacheDir(), "import_" + System.currentTimeMillis());
         tempDir.mkdirs();
         
-        // Extract ZIP
+        // Extract archive
         ZipInputStream zipIn = new ZipInputStream(inputStream);
         ZipEntry entry;
         
@@ -207,7 +212,6 @@ public class ImportManager {
                 file.mkdirs();
             } else {
                 file.getParentFile().mkdirs();
-                
                 FileOutputStream fos = new FileOutputStream(file);
                 byte[] buffer = new byte[1024];
                 int len;
@@ -221,7 +225,7 @@ public class ImportManager {
         }
         zipIn.close();
         
-        // Import data.json
+        // Import data.json if exists
         File dataFile = new File(tempDir, "data.json");
         if (dataFile.exists()) {
             FileInputStream fis = new FileInputStream(dataFile);
@@ -229,13 +233,13 @@ public class ImportManager {
             fis.close();
         }
         
-        // Import audio files if present
+        // Import audio files if exist
         File audioDir = new File(tempDir, "audio");
         if (audioDir.exists()) {
             importAudioFiles(context, audioDir);
         }
         
-        // Clean up temp files
+        // Clean up temp directory
         deleteRecursive(tempDir);
         
         Log.d(TAG, "Imported archive successfully");
@@ -244,7 +248,7 @@ public class ImportManager {
     /**
      * Import audio files from directory
      */
-    private static void importAudioFiles(Context context, File sourceDir) throws IOException {
+    private static void importAudioFiles(Context context, File sourceDir) {
         File destDir = new File(context.getFilesDir(), "audio");
         if (!destDir.exists()) {
             destDir.mkdirs();
@@ -254,10 +258,14 @@ public class ImportManager {
         if (files == null) return;
         
         for (File file : files) {
-            if (file.isFile() && file.getName().endsWith(".3gp")) {
+            if (file.isFile() && file.getName().endsWith(".enc")) {
                 File destFile = new File(destDir, file.getName());
-                copyFile(file, destFile);
-                Log.d(TAG, "Imported audio file: " + file.getName());
+                try {
+                    copyFile(file, destFile);
+                    Log.d(TAG, "Imported audio file: " + file.getName());
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to import audio: " + file.getName(), e);
+                }
             }
         }
     }
@@ -265,7 +273,7 @@ public class ImportManager {
     /**
      * Parse CSV line handling quoted values
      */
-    private static String[] parseCsvLine(String line) {
+    private static String[] parseCSVLine(String line) {
         List<String> parts = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inQuotes = false;

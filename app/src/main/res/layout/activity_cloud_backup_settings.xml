@@ -1,309 +1,168 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF121212">
+    android:orientation="vertical">
 
+    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:padding="16dp">
 
-        <!-- Header -->
+        <Button
+            android:id="@+id/back_button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:text="←"
+            android:textSize="24sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Cloud Backup Settings"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_gravity="center_vertical" />
+
+        <View
+            android:layout_width="48dp"
+            android:layout_height="48dp" />
+
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="24dp">
+            android:orientation="vertical"
+            android:padding="16dp">
 
-            <Button
-                android:id="@+id/back_button"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:text="←"
-                android:textSize="20sp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:textColor="#FFFFFFFF" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Cloud Backup"
-                android:textSize="24sp"
-                android:textColor="#FFFFFFFF"
-                android:textStyle="bold"
-                android:layout_marginStart="16dp" />
-
-        </LinearLayout>
-
-        <!-- Backup Status -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="#FF2A2A2A"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="12dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="☁️ Cloud Backup"
-                        android:textSize="18sp"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold" />
-
-                    <Switch
-                        android:id="@+id/switch_backup_enabled"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/backup_status_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="🔒 All backups are encrypted"
-                    android:textSize="14sp"
-                    android:textColor="#4CAF50"
-                    android:layout_marginBottom="8dp" />
-
-                <TextView
-                    android:id="@+id/last_backup_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Last backup: Never"
-                    android:textSize="14sp"
-                    android:textColor="#CCCCCC"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:id="@+id/pending_backups_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="0 items pending backup"
-                    android:textSize="14sp"
-                    android:textColor="#888888" />
-
-            </LinearLayout>
-
-        </androidx.cardview.widget.CardView>
-
-        <!-- Backup Options -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Backup Options"
-            android:textSize="18sp"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:layout_marginBottom="12dp" />
-
-        <!-- Auto Backup -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            app:cardBackgroundColor="#FF2A2A2A"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
-
+            <!-- Main Backup Switch -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🔄"
-                    android:textSize="20sp"
-                    android:layout_marginEnd="12dp" />
+                android:padding="8dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Automatic Backup"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF" />
+                    android:text="Enable Cloud Backup"
+                    android:textSize="16sp" />
 
                 <Switch
-                    android:id="@+id/switch_auto_backup"
+                    android:id="@+id/backup_switch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
 
             </LinearLayout>
 
-        </androidx.cardview.widget.CardView>
+            <!-- Status Text -->
+            <TextView
+                android:id="@+id/backup_status_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="Cloud backup is disabled"
+                android:gravity="center" />
 
-        <!-- WiFi Only -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            app:cardBackgroundColor="#FF2A2A2A"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
+            <!-- Last Backup -->
+            <TextView
+                android:id="@+id/last_backup_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="Last backup: Never"
+                android:gravity="center" />
 
+            <!-- Queue Size -->
+            <TextView
+                android:id="@+id/queue_size_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="Items in queue: 0"
+                android:gravity="center" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_margin="16dp"
+                android:background="#E0E0E0" />
+
+            <!-- WiFi Only -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="📶"
-                    android:textSize="20sp"
-                    android:layout_marginEnd="12dp" />
+                android:padding="8dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="WiFi Only"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF" />
+                    android:textSize="16sp" />
 
                 <Switch
-                    android:id="@+id/switch_wifi_only"
+                    android:id="@+id/wifi_only_switch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
 
             </LinearLayout>
 
-        </androidx.cardview.widget.CardView>
-
-        <!-- Charging Only -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            app:cardBackgroundColor="#FF2A2A2A"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
-
+            <!-- Include Media -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🔌"
-                    android:textSize="20sp"
-                    android:layout_marginEnd="12dp" />
+                android:padding="8dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Only When Charging"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF" />
+                    android:text="Include Media Files"
+                    android:textSize="16sp" />
 
                 <Switch
-                    android:id="@+id/switch_charging_only"
+                    android:id="@+id/include_media_switch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
 
             </LinearLayout>
 
-        </androidx.cardview.widget.CardView>
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_margin="16dp"
+                android:background="#E0E0E0" />
 
-        <!-- Cloud Providers -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Cloud Providers"
-            android:textSize="18sp"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:layout_marginBottom="12dp" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/providers_recycler"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp" />
-
-        <!-- Actions -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Actions"
-            android:textSize="18sp"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:layout_marginBottom="12dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            <!-- Buttons -->
+            <Button
+                android:id="@+id/backup_now_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="8dp"
+                android:text="Backup Now" />
 
             <Button
-                android:id="@+id/manual_backup_button"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="🚀 Backup Now"
-                android:textSize="14sp"
-                android:background="#FF7B1FA2"
-                android:textColor="#FFFFFF" />
-
-            <Button
-                android:id="@+id/test_connection_button"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:text="🔗 Test"
-                android:textSize="14sp"
-                android:background="@android:color/transparent"
-                android:textColor="#4285F4" />
-
-            <Button
-                android:id="@+id/backup_history_button"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:text="📜 History"
-                android:textSize="14sp"
-                android:background="@android:color/transparent"
-                android:textColor="#888888" />
+                android:id="@+id/select_provider_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="8dp"
+                android:text="Select Cloud Provider" />
 
         </LinearLayout>
 
-    </LinearLayout>
+    </ScrollView>
 
-</ScrollView>
+</LinearLayout>

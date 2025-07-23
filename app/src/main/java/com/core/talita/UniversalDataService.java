@@ -66,7 +66,6 @@ public class UniversalDataService {
                 // 6. Show success
                 showSuccessToast(data);
                 
-                Log.d(TAG, "✅ Data saved to database with ID: " + dataId);
                 return dataId;
             } else {
                 showErrorToast(data);
@@ -74,39 +73,21 @@ public class UniversalDataService {
             }
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error capturing data: " + e.getMessage());
+            Log.e(TAG, "❌ Failed to capture data", e);
             showErrorToast(data);
             return null;
         }
     }
 
     /**
-     * Get all data from today
+     * Query data across time range (for activity views, reports, etc.)
      */
-    public List<PersonalData> getTodaysData() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        
-        long startOfDay = cal.getTimeInMillis();
-        long endOfDay = System.currentTimeMillis();
-        
-        return getDataInRange(startOfDay, endOfDay);
-    }
-    
-    /**
-     * Get data within a time range
-     */
-    public List<PersonalData> getDataInRange(long startTime, long endTime) {
+    public List<PersonalData> queryDataInRange(long startTime, long endTime) {
         List<PersonalData> result = new ArrayList<>();
         
         try {
-            // Query your database for data between startTime and endTime
             List<UniversalDataType> dataList = dataManager.queryDataByTimeRange(startTime, endTime);
             
-            // Convert to PersonalData objects
             for (UniversalDataType data : dataList) {
                 result.add(new PersonalDataAdapter(data));
             }
@@ -115,6 +96,30 @@ public class UniversalDataService {
         }
         
         return result;
+    }
+
+    /**
+     * Get data in range (alias for queryDataInRange)
+     */
+    public List<PersonalData> getDataInRange(long startTime, long endTime) {
+        return queryDataInRange(startTime, endTime);
+    }
+
+    /**
+     * Get today's data
+     */
+    public List<PersonalData> getTodaysData() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        long startOfDay = cal.getTimeInMillis();
+        
+        cal.add(Calendar.DAY_OF_MONTH, 1);
+        long endOfDay = cal.getTimeInMillis();
+        
+        return getDataInRange(startOfDay, endOfDay);
     }
 
     /**
@@ -190,14 +195,41 @@ public class UniversalDataService {
 
     public void setAutoBackupEnabled(boolean enabled) {
         cloudBackupManager.setAutoBackupEnabled(enabled);
-        Log.d(TAG, enabled ? "🔄 Auto cloud backup enabled" : "⏸️ Auto cloud backup disabled");
+        Log.d(TAG, enabled ? 
+            "🔄 Auto cloud backup enabled" : "⏸️ Auto cloud backup disabled");
     }
 
     /**
-     * Check cloud backup status for a data item
+     * Get cloud backup manager
      */
-    public CloudBackupManager.BackupStatus getBackupStatus(String dataId) {
-        return cloudBackupManager.getBackupStatus(dataId);
+    public CloudBackupManager getCloudBackupManager() {
+        return cloudBackupManager;
+    }
+
+    /**
+     * Get data by type (for backwards compatibility)
+     */
+    public List<PersonalData> getDataByType(String type) {
+        List<PersonalData> results = new ArrayList<>();
+        List<DecryptedDataItem> items = getDecryptedDataByType(type);
+        
+        for (DecryptedDataItem item : items) {
+            try {
+                Map<String, Object> dataMap = new HashMap<>();
+                Iterator<String> keys = item.decryptedData.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    dataMap.put(key, item.decryptedData.get(key));
+                }
+                
+                UniversalPersonalData data = new UniversalPersonalData(type, dataMap);
+                results.add(data);
+            } catch (Exception e) {
+                Log.e(TAG, "Error converting data", e);
+            }
+        }
+        
+        return results;
     }
 
     /**

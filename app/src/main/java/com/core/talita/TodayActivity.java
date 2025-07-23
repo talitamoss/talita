@@ -3,17 +3,11 @@ package com.core.talita;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.Intent;
-import android.content.Context;
-import android.graphics.*;
 import android.os.Bundle;
 import android.os.Handler;
-import android.view.MotionEvent;
 import android.view.View;
-import android.view.animation.DecelerateInterpolator;
 import android.widget.TextView;
-import android.util.AttributeSet;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.cardview.widget.CardView;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.text.SimpleDateFormat;
@@ -85,19 +79,24 @@ public class TodayActivity extends AppCompatActivity {
             int itemId = item.getItemId();
             
             if (itemId == R.id.nav_today) {
-                // Already here
+                // Already on Today screen
                 return true;
-            } else if (itemId == R.id.nav_patterns) {
-                startActivity(new Intent(this, PatternsActivity.class));
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+            } else if (itemId == R.id.nav_capture) {
+                startActivity(new Intent(this, QuickAddActivity.class));
+                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
                 return true;
-            } else if (itemId == R.id.nav_vault) {
-                startActivity(new Intent(this, VaultActivity.class));
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+            } else if (itemId == R.id.nav_my_data) {
+                startActivity(new Intent(this, MyDataActivity.class));
+                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
                 return true;
             } else if (itemId == R.id.nav_connect) {
-                showComingSoon("Connect");
-                return false;
+                startActivity(new Intent(this, ConnectActivity.class));
+                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                return true;
+            } else if (itemId == R.id.nav_settings) {
+                startActivity(new Intent(this, SettingsActivity.class));
+                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                return true;
             }
             
             return false;
@@ -108,109 +107,62 @@ public class TodayActivity extends AppCompatActivity {
     }
     
     private void setupFloatingActions() {
-        // Main FAB (Quick Add)
         quickAddFab.setOnClickListener(v -> {
-            Intent intent = new Intent(this, QuickAddActivity.class);
-            intent.putExtra("context_aware", true);
-            startActivity(intent);
-            overridePendingTransition(R.anim.slide_up, R.anim.stay);
+            toggleFabMenu();
         });
         
-        // Now View FAB (Real-time data)
         nowViewFab.setOnClickListener(v -> {
-            Intent intent = new Intent(this, NowViewActivity.class);
-            startActivity(intent);
-            overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+            // Show current location/activity
+            showComingSoon("now view");
         });
         
-        // More Options FAB
         moreOptionsFab.setOnClickListener(v -> {
             showMoreOptions();
         });
         
-        // Initially hide secondary FABs
-        nowViewFab.setVisibility(View.GONE);
-        moreOptionsFab.setVisibility(View.GONE);
-        
-        // Long press on main FAB reveals all options
-        quickAddFab.setOnLongClickListener(v -> {
-            toggleFabMenu();
-            return true;
+        fabOverlay.setOnClickListener(v -> {
+            if (fabOverlay.getVisibility() == View.VISIBLE) {
+                toggleFabMenu();
+            }
         });
     }
     
     private void toggleFabMenu() {
-        if (nowViewFab.getVisibility() == View.VISIBLE) {
-            // Hide menu
-            hideFabMenu();
-        } else {
+        if (nowViewFab.getVisibility() == View.GONE) {
             // Show menu
-            showFabMenu();
+            fabOverlay.setVisibility(View.VISIBLE);
+            fabOverlay.animate().alpha(1f).setDuration(200);
+            
+            nowViewFab.setVisibility(View.VISIBLE);
+            nowViewFab.animate().scaleX(1f).scaleY(1f).setDuration(200);
+            
+            moreOptionsFab.setVisibility(View.VISIBLE);
+            moreOptionsFab.animate().scaleX(1f).scaleY(1f).setDuration(200).setStartDelay(50);
+            
+            // Rotate main FAB
+            quickAddFab.animate().rotation(45f).setDuration(200);
+        } else {
+            // Hide menu
+            fabOverlay.animate().alpha(0f).setDuration(200).withEndAction(() -> 
+                fabOverlay.setVisibility(View.GONE));
+            
+            nowViewFab.animate().scaleX(0f).scaleY(0f).setDuration(200).withEndAction(() ->
+                nowViewFab.setVisibility(View.GONE));
+            
+            moreOptionsFab.animate().scaleX(0f).scaleY(0f).setDuration(200).withEndAction(() ->
+                moreOptionsFab.setVisibility(View.GONE));
+            
+            // Reset rotation
+            quickAddFab.animate().rotation(0f).setDuration(200);
         }
-    }
-    
-    private void showFabMenu() {
-        // Show overlay
-        fabOverlay.setVisibility(View.VISIBLE);
-        fabOverlay.animate().alpha(1f).setDuration(200);
-        
-        // Animate secondary FABs
-        nowViewFab.setVisibility(View.VISIBLE);
-        moreOptionsFab.setVisibility(View.VISIBLE);
-        
-        nowViewFab.setTranslationY(100f);
-        moreOptionsFab.setTranslationY(100f);
-        
-        nowViewFab.animate()
-            .translationY(0f)
-            .translationX(-120f)
-            .setDuration(200)
-            .setInterpolator(new DecelerateInterpolator());
-            
-        moreOptionsFab.animate()
-            .translationY(0f)
-            .translationX(-240f)
-            .setDuration(200)
-            .setInterpolator(new DecelerateInterpolator());
-        
-        // Close on overlay tap
-        fabOverlay.setOnClickListener(v -> hideFabMenu());
-    }
-    
-    private void hideFabMenu() {
-        fabOverlay.animate().alpha(0f).setDuration(200)
-            .withEndAction(() -> fabOverlay.setVisibility(View.GONE));
-        
-        nowViewFab.animate()
-            .translationY(100f)
-            .translationX(0f)
-            .setDuration(200)
-            .withEndAction(() -> nowViewFab.setVisibility(View.GONE));
-            
-        moreOptionsFab.animate()
-            .translationY(100f)
-            .translationX(0f)
-            .setDuration(200)
-            .withEndAction(() -> moreOptionsFab.setVisibility(View.GONE));
     }
     
     private void updateTrackingStatus() {
-        boolean isTracking = trackingManager.isTrackingEnabled();
-        
-        if (isTracking) {
-            trackingStatusText.setText("◉ Tracking Active");
-            trackingStatusText.setTextColor(getColor(R.color.accent_flow));
+        if (trackingManager != null && trackingManager.isTrackingEnabled()) {
+            trackingStatusText.setText("📍 Tracking Active");
         } else {
-            trackingStatusText.setText("◐ Tracking Paused");
-            trackingStatusText.setTextColor(getColor(R.color.text_secondary));
+            trackingStatusText.setText("📍 Tracking Paused");
         }
-        
-        // Tap to toggle
-        trackingStatusText.setOnClickListener(v -> {
-            trackingManager.setTrackingEnabled(!isTracking);
-            updateTrackingStatus();
-            updateVisualization();
-        });
     }
     
     private void updateVisualization() {
@@ -265,139 +217,5 @@ public class TodayActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         isBreathing = false;
-    }
-    
-    /**
-     * Custom view for data visualization
-     * Creates generative art based on user's data
-     */
-    public static class DataVisualizationView extends View {
-        private Paint paint;
-        private List<PersonalData> data;
-        private float breathingScale = 1.0f;
-        private int breathingSpeed = 2000;
-        private ValueAnimator breathAnimator;
-        
-        // Particle system for data points
-        private List<DataParticle> particles;
-        private Random random = new Random();
-        
-        public DataVisualizationView(Context context, AttributeSet attrs) {
-            super(context, attrs);
-            init();
-        }
-        
-        private void init() {
-            paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            particles = new ArrayList<>();
-            data = new ArrayList<>();
-        }
-        
-        public void setData(List<PersonalData> newData) {
-            this.data = newData;
-            updateParticles();
-            invalidate();
-        }
-        
-        public void setBreathingSpeed(int speed) {
-            this.breathingSpeed = speed;
-        }
-        
-        public void breathe() {
-            if (breathAnimator != null) {
-                breathAnimator.cancel();
-            }
-            
-            breathAnimator = ValueAnimator.ofFloat(1.0f, 1.1f, 1.0f);
-            breathAnimator.setDuration(breathingSpeed);
-            breathAnimator.setInterpolator(new DecelerateInterpolator());
-            breathAnimator.addUpdateListener(animation -> {
-                breathingScale = (float) animation.getAnimatedValue();
-                invalidate();
-            });
-            breathAnimator.start();
-        }
-        
-        private void updateParticles() {
-            particles.clear();
-            
-            // Create particles based on data
-            for (PersonalData item : data) {
-                DataParticle particle = new DataParticle();
-                particle.x = random.nextFloat() * getWidth();
-                particle.y = random.nextFloat() * getHeight();
-                particle.size = 5 + random.nextFloat() * 20;
-                particle.color = getColorForDataType(item.getDataType());
-                particle.alpha = 0.3f + random.nextFloat() * 0.7f;
-                particles.add(particle);
-            }
-        }
-        
-        private int getColorForDataType(String type) {
-            // Map data types to colors
-            switch (type) {
-                case "water": return Color.parseColor("#3B82F6");
-                case "exercise": return Color.parseColor("#10B981");
-                case "mood": return Color.parseColor("#8B5CF6");
-                case "sleep": return Color.parseColor("#6366F1");
-                case "location": return Color.parseColor("#EC4899");
-                default: return Color.parseColor("#FAFAFA");
-            }
-        }
-        
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            
-            int centerX = getWidth() / 2;
-            int centerY = getHeight() / 2;
-            
-            // Draw breathing circle
-            paint.setColor(Color.parseColor("#6366F1"));
-            paint.setAlpha(20);
-            float radius = Math.min(centerX, centerY) * 0.8f * breathingScale;
-            canvas.drawCircle(centerX, centerY, radius, paint);
-            
-            // Draw data particles
-            for (DataParticle particle : particles) {
-                paint.setColor(particle.color);
-                paint.setAlpha((int) (particle.alpha * 255));
-                
-                // Apply breathing scale to particle positions
-                float px = centerX + (particle.x - centerX) * breathingScale;
-                float py = centerY + (particle.y - centerY) * breathingScale;
-                
-                canvas.drawCircle(px, py, particle.size * breathingScale, paint);
-            }
-            
-            // Draw connection lines between nearby particles
-            paint.setStrokeWidth(1f);
-            paint.setAlpha(30);
-            
-            for (int i = 0; i < particles.size(); i++) {
-                DataParticle p1 = particles.get(i);
-                for (int j = i + 1; j < particles.size(); j++) {
-                    DataParticle p2 = particles.get(j);
-                    
-                    float distance = (float) Math.sqrt(
-                        Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)
-                    );
-                    
-                    if (distance < 150) {
-                        float p1x = centerX + (p1.x - centerX) * breathingScale;
-                        float p1y = centerY + (p1.y - centerY) * breathingScale;
-                        float p2x = centerX + (p2.x - centerX) * breathingScale;
-                        float p2y = centerY + (p2.y - centerY) * breathingScale;
-                        
-                        canvas.drawLine(p1x, p1y, p2x, p2y, paint);
-                    }
-                }
-            }
-        }
-        
-        private static class DataParticle {
-            float x, y, size, alpha;
-            int color;
-        }
     }
 }

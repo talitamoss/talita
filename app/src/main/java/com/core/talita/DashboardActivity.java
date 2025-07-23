@@ -1,5 +1,6 @@
 package com.core.talita;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
@@ -271,6 +272,7 @@ if (rootView.getChildAt(0) instanceof ScrollView) {
         // For now, just show a toast
     }
 
+    @SuppressLint("SuspiciousIndentation")
     private List<QuickAddItem> createQuickAddItems() {
         List<QuickAddItem> items = new ArrayList<>();
 
@@ -296,9 +298,9 @@ if (rootView.getChildAt(0) instanceof ScrollView) {
 
         // Health & Mood
         items.add(new QuickAddItem("😊", "Mood", "mood", "rating"));
-        items.add(new QuickAddItem("💤", "Sleep", "sleep", "hours"));
+        boolean add = items.add(new QuickAddItem("💤", "Sleep", "sleep", "hours"));
         items.add(new QuickAddItem("📏", "Weight", "biometric", "measurement"));
-	items.add(new QuickAddItem("➕", "Create Collector", "custom", "new"));
+	    items.add(new QuickAddItem("➕", "Create Collector", "custom", "new"));
 
 
         return items;

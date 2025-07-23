@@ -260,7 +260,7 @@ public class BackgroundTrackingService extends Service implements LocationListen
 
             // Save step data every 100 steps
             if (dailyStepCount % 100 == 0 && dailyStepCount > 0) {
-                StepData stepData = new StepData(dailyStepCount, lastKnownLocation);
+                StepData stepData = new StepData(dailyStepCount);
                 dataService.capture(stepData);
 
                 Log.d(TAG, "👣 Step milestone: " + dailyStepCount + " daily steps");

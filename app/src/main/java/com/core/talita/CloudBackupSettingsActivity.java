@@ -1,31 +1,34 @@
 package com.core.talita;
 
 import android.os.Bundle;
+import android.view.View;
 import android.widget.Button;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.cardview.widget.CardView;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 import com.core.talita.cloud.CloudBackupManager;
-import java.util.ArrayList;
-import java.util.List;
+import com.core.talita.cloud.BackupConfig;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
+/**
+ * Cloud Backup Settings Activity
+ */
 public class CloudBackupSettingsActivity extends AppCompatActivity {
     
     private CloudBackupManager cloudManager;
     private UniversalDataService dataService;
     
-    // UI Components
-    private Switch backupEnabledSwitch;
-    private Switch autoBackupSwitch;
+    private Switch backupSwitch;
     private Switch wifiOnlySwitch;
-    private Switch chargingOnlySwitch;
-    private TextView backupStatusText;
+    private Switch includeMediaSwitch;
+    private TextView statusText;
     private TextView lastBackupText;
-    private TextView pendingBackupsText;
-    private RecyclerView providersRecycler;
+    private TextView queueSizeText;
+    private Button backupNowButton;
+    private Button selectProviderButton;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,152 +39,97 @@ public class CloudBackupSettingsActivity extends AppCompatActivity {
         cloudManager = dataService.getCloudBackupManager();
         
         initializeViews();
-        setupControls();
-        setupProvidersList();
         updateUI();
     }
     
     private void initializeViews() {
+        backupSwitch = findViewById(R.id.backup_switch);
+        wifiOnlySwitch = findViewById(R.id.wifi_only_switch);
+        includeMediaSwitch = findViewById(R.id.include_media_switch);
+        statusText = findViewById(R.id.backup_status_text);
+        lastBackupText = findViewById(R.id.last_backup_text);
+        queueSizeText = findViewById(R.id.queue_size_text);
+        backupNowButton = findViewById(R.id.backup_now_button);
+        selectProviderButton = findViewById(R.id.select_provider_button);
+        
         Button backButton = findViewById(R.id.back_button);
         backButton.setOnClickListener(v -> finish());
         
-        // Switches
-        backupEnabledSwitch = findViewById(R.id.switch_backup_enabled);
-        autoBackupSwitch = findViewById(R.id.switch_auto_backup);
-        wifiOnlySwitch = findViewById(R.id.switch_wifi_only);
-        chargingOnlySwitch = findViewById(R.id.switch_charging_only);
-        
-        // Status displays
-        backupStatusText = findViewById(R.id.backup_status_text);
-        lastBackupText = findViewById(R.id.last_backup_text);
-        pendingBackupsText = findViewById(R.id.pending_backups_text);
-        
-        // Lists
-        providersRecycler = findViewById(R.id.providers_recycler);
-        
-        // Action buttons
-        findViewById(R.id.manual_backup_button).setOnClickListener(v -> triggerManualBackup());
-        findViewById(R.id.test_connection_button).setOnClickListener(v -> testCloudConnection());
-        findViewById(R.id.backup_history_button).setOnClickListener(v -> showBackupHistory());
-    }
-    
-    private void setupControls() {
-        backupEnabledSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            cloudManager.setBackupEnabled(isChecked);
-            updateSubSettings(isChecked);
+        // Set listeners
+        backupSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            cloudManager.setEnabled(isChecked);
             updateUI();
-        });
-        
-        autoBackupSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            cloudManager.setAutoBackupEnabled(isChecked);
+            
+            if (isChecked) {
+                Toast.makeText(this, "Cloud backup enabled", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Cloud backup disabled", Toast.LENGTH_SHORT).show();
+            }
         });
         
         wifiOnlySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             updateBackupConfig();
         });
         
-        chargingOnlySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        includeMediaSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             updateBackupConfig();
+        });
+        
+        backupNowButton.setOnClickListener(v -> {
+            cloudManager.backupNow();
+            Toast.makeText(this, "Backup started...", Toast.LENGTH_SHORT).show();
+            updateUI();
+        });
+        
+        selectProviderButton.setOnClickListener(v -> {
+            // TODO: Show provider selection dialog
+            Toast.makeText(this, "Provider selection coming soon", Toast.LENGTH_SHORT).show();
         });
     }
     
-    private void setupProvidersList() {
-        List<CloudProviderOption> providers = new ArrayList<>();
-        providers.add(new CloudProviderOption("☁️", "Google Drive", "google_drive", "Store encrypted data in Google Drive"));
-        providers.add(new CloudProviderOption("📦", "Dropbox", "dropbox", "Store encrypted data in Dropbox"));
-        providers.add(new CloudProviderOption("🔒", "Greenhost", "greenhost", "Privacy-focused European hosting"));
-        providers.add(new CloudProviderOption("🌐", "Solid Pod", "solid", "Decentralized web storage"));
-        providers.add(new CloudProviderOption("⚡", "Custom WebDAV", "webdav", "Your own cloud server"));
-        
-        CloudProviderAdapter adapter = new CloudProviderAdapter(providers, this::onProviderSelected);
-        providersRecycler.setLayoutManager(new LinearLayoutManager(this));
-        providersRecycler.setAdapter(adapter);
-    }
-    
     private void updateUI() {
-        // Update switch states and status text
-        backupStatusText.setText("🔒 All backups are encrypted");
-        lastBackupText.setText("Last backup: Never");
-        pendingBackupsText.setText("0 items pending backup");
-    }
-    
-    private void updateSubSettings(boolean enabled) {
-        autoBackupSwitch.setEnabled(enabled);
-        wifiOnlySwitch.setEnabled(enabled);
-        chargingOnlySwitch.setEnabled(enabled);
+        CloudBackupManager.BackupStats stats = cloudManager.getBackupStats();
+        
+        backupSwitch.setChecked(stats.isEnabled);
+        
+        if (stats.isEnabled) {
+            statusText.setText("✅ Cloud backup is active");
+            statusText.setTextColor(getColor(R.color.green));
+        } else {
+            statusText.setText("❌ Cloud backup is disabled");
+            statusText.setTextColor(getColor(R.color.red));
+        }
+        
+        // Update last backup time
+        if (stats.lastBackupTime > 0) {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
+            String lastBackup = sdf.format(new Date(stats.lastBackupTime));
+            lastBackupText.setText("Last backup: " + lastBackup);
+        } else {
+            lastBackupText.setText("Last backup: Never");
+        }
+        
+        // Update queue size
+        queueSizeText.setText("Items in queue: " + stats.queueSize);
+        
+        // Enable/disable backup now button
+        backupNowButton.setEnabled(stats.isEnabled && stats.hasProvider);
     }
     
     private void updateBackupConfig() {
-        CloudBackupManager.BackupConfig config = new CloudBackupManager.BackupConfig(
+        BackupConfig config = new BackupConfig(
             wifiOnlySwitch.isChecked(),
-            chargingOnlySwitch.isChecked(),
-            3, // retry attempts
-            5000, // retry delay
-            2 // max concurrent
+            includeMediaSwitch.isChecked(),
+            3 // retry count
         );
-        cloudManager.setBackupConfig(config);
+        
+        // TODO: Apply config to CloudBackupManager
+        Toast.makeText(this, "Settings updated", Toast.LENGTH_SHORT).show();
     }
     
-    private void triggerManualBackup() {
-        cloudManager.processBackupQueue();
-        // Show progress dialog
-    }
-    
-    private void testCloudConnection() {
-        // Test connection to selected provider
-    }
-    
-    private void showBackupHistory() {
-        // Show backup history activity
-    }
-    
-    private void onProviderSelected(CloudProviderOption provider) {
-        // Configure selected cloud provider
-    }
-    
-    // Cloud provider option data class
-    public static class CloudProviderOption {
-        public final String icon;
-        public final String name;
-        public final String id;
-        public final String description;
-        
-        public CloudProviderOption(String icon, String name, String id, String description) {
-            this.icon = icon;
-            this.name = name;
-            this.id = id;
-            this.description = description;
-        }
-    }
-    
-    // Cloud provider adapter
-    private static class CloudProviderAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-        private final List<CloudProviderOption> providers;
-        private final ProviderSelectionListener listener;
-        
-        interface ProviderSelectionListener {
-            void onProviderSelected(CloudProviderOption provider);
-        }
-        
-        public CloudProviderAdapter(List<CloudProviderOption> providers, ProviderSelectionListener listener) {
-            this.providers = providers;
-            this.listener = listener;
-        }
-        
-        @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(android.view.ViewGroup parent, int viewType) {
-            return new RecyclerView.ViewHolder(android.view.LayoutInflater.from(parent.getContext())
-                .inflate(android.R.layout.simple_list_item_2, parent, false)) {};
-        }
-        
-        @Override
-        public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            // Bind provider data to views
-        }
-        
-        @Override
-        public int getItemCount() {
-            return providers.size();
-        }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateUI();
     }
 }

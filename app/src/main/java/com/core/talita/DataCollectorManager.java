@@ -1,5 +1,6 @@
 package com.core.talita;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.util.Log;
 import com.core.talita.collectors.*;
@@ -32,6 +33,7 @@ public class DataCollectorManager {
     /**
      * Register all your existing collectors
      */
+    @SuppressLint("SuspiciousIndentation")
     private void registerAllCollectors() {
         // Register all your existing collectors
         addCollector(new WaterCollector());
@@ -42,7 +44,7 @@ public class DataCollectorManager {
         addCollector(new SubstanceCollector());
 
         Log.d(TAG, "📋 Registered " + collectors.size() + " data collectors");
-	registerDynamicCollectors();
+	    registerDynamicCollectors();
 
     }
 

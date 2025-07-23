@@ -1,8 +1,8 @@
 package com.core.talita;
 
-import org.json.JSONException;
 import org.json.JSONObject;
-import java.io.File;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.UUID;
 
 /**
@@ -10,49 +10,43 @@ import java.util.UUID;
  * Gets automatic database storage, cloud backup, and sharing
  */
 public class AudioData implements UniversalDataType {
-
+    
     private final String id;
     private final String filePath;
-    private final long durationMs;
-    private final String format;
-    private final int sampleRate;
-    private final int channels;
-    private final long fileSizeBytes;
+    private final long duration;
     private final long timestamp;
     private final double latitude;
     private final double longitude;
-    private final String recordingContext; // "voice_memo", "meeting", etc.
-
-    public AudioData(String filePath, long durationMs, double latitude, double longitude) {
+    
+    public AudioData(String filePath, long duration) {
         this.id = UUID.randomUUID().toString();
         this.filePath = filePath;
-        this.durationMs = durationMs;
-        this.format = "aac"; // Default format
-        this.sampleRate = 44100; // Default sample rate
-        this.channels = 1; // Mono by default
+        this.duration = duration;
+        this.timestamp = System.currentTimeMillis();
+        this.latitude = 0.0;
+        this.longitude = 0.0;
+    }
+    
+    public AudioData(String filePath, long duration, double latitude, double longitude) {
+        this.id = UUID.randomUUID().toString();
+        this.filePath = filePath;
+        this.duration = duration;
         this.timestamp = System.currentTimeMillis();
         this.latitude = latitude;
         this.longitude = longitude;
-        this.recordingContext = "voice_memo";
-
-        // Calculate file size
-        this.fileSizeBytes = calculateFileSize(filePath);
     }
 
-    // Enhanced constructor with audio details
-    public AudioData(String filePath, long durationMs, String format, int sampleRate, int channels,
-                     double latitude, double longitude, String recordingContext) {
-        this.id = UUID.randomUUID().toString();
-        this.filePath = filePath;
-        this.durationMs = durationMs;
-        this.format = format;
-        this.sampleRate = sampleRate;
-        this.channels = channels;
-        this.timestamp = System.currentTimeMillis();
-        this.latitude = latitude;
-        this.longitude = longitude;
-        this.recordingContext = recordingContext != null ? recordingContext : "voice_memo";
-        this.fileSizeBytes = calculateFileSize(filePath);
+    // Add getter method for duration
+    public long getDurationMs() {
+        return duration;
+    }
+
+    @Override
+    public Map<String, Object> getMetadata() {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("duration", duration);
+        metadata.put("format", "audio/3gpp");
+        return metadata;
     }
 
     @Override
@@ -69,17 +63,15 @@ public class AudioData implements UniversalDataType {
     public String toJson() {
         try {
             JSONObject json = new JSONObject();
-            json.put("duration_ms", durationMs);
-            json.put("format", format);
-            json.put("sample_rate", sampleRate);
-            json.put("channels", channels);
-            json.put("file_size_bytes", fileSizeBytes);
+            json.put("id", id);
+            json.put("type", "audio");
+            json.put("filePath", filePath);
+            json.put("duration", duration);
+            json.put("timestamp", timestamp);
             json.put("latitude", latitude);
             json.put("longitude", longitude);
-            json.put("recording_context", recordingContext);
             return json.toString();
-        } catch (JSONException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
             return "{}";
         }
     }
@@ -106,53 +98,14 @@ public class AudioData implements UniversalDataType {
 
     @Override
     public String getDisplayName() {
-        return "Audio Recording";
+        long seconds = duration / 1000;
+        long minutes = seconds / 60;
+        seconds = seconds % 60;
+        return String.format("Audio Recording (%d:%02d)", minutes, seconds);
     }
 
     @Override
     public String getDisplaySummary() {
-        return String.format("%s recording (%.1fs, %s)",
-                formatRecordingContext(),
-                durationMs / 1000.0,
-                formatFileSize());
+        return getDisplayName();
     }
-
-    // Helper methods
-    private long calculateFileSize(String filePath) {
-        try {
-            if (filePath != null) {
-                File file = new File(filePath);
-                if (file.exists()) {
-                    return file.length();
-                }
-            }
-        } catch (Exception e) {
-            // Ignore errors
-        }
-        return 0;
-    }
-
-    private String formatRecordingContext() {
-        switch (recordingContext.toLowerCase()) {
-            case "voice_memo": return "Voice memo";
-            case "meeting": return "Meeting";
-            case "interview": return "Interview";
-            case "note": return "Audio note";
-            default: return "Audio";
-        }
-    }
-
-    private String formatFileSize() {
-        if (fileSizeBytes < 1024) return fileSizeBytes + "B";
-        else if (fileSizeBytes < 1024 * 1024) return String.format("%.1fKB", fileSizeBytes / 1024.0);
-        else return String.format("%.1fMB", fileSizeBytes / (1024.0 * 1024.0));
-    }
-
-    // Getters for audio-specific data
-    public long getDurationMs() { return durationMs; }
-    public String getFormat() { return format; }
-    public int getSampleRate() { return sampleRate; }
-    public int getChannels() { return channels; }
-    public long getFileSizeBytes() { return fileSizeBytes; }
-    public String getRecordingContext() { return recordingContext; }
 }

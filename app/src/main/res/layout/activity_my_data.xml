@@ -44,8 +44,8 @@
                 android:layout_height="48dp"
                 android:src="@drawable/ic_export"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:tint="#FFFFFFFF"
-                android:contentDescription="Export data" />
+                android:contentDescription="Export data"
+                app:tint="#FFFFFFFF" />
 
             <ImageButton
                 android:id="@+id/search_button"
@@ -53,9 +53,9 @@
                 android:layout_height="48dp"
                 android:src="@drawable/ic_search"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:tint="#FFFFFFFF"
                 android:layout_marginStart="8dp"
-                android:contentDescription="Search data" />
+                android:contentDescription="Search data"
+                app:tint="#FFFFFFFF" />
 
         </LinearLayout>
 
