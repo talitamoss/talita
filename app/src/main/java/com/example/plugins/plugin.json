@@ -1,0 +1,32 @@
+{
+  "plugin": {
+    "id": "com.example.gratitude",
+    "name": "Daily Gratitude",
+    "version": "1.0.0",
+    "minAppVersion": "1.0",
+    "author": "Example Developer",
+    "category": "I",
+    "mainClass": "com.example.plugins.ExamplePlugin",
+    "description": "Track what you're grateful for each day to boost happiness and well-being",
+    "website": "https://example.com/gratitude-plugin",
+    "email": "support@example.com",
+    "permissions": [],
+    "dependencies": [],
+    "signature": "SHA256:1234567890ABCDEF...",
+    "buildTime": 1706745600000,
+    "experimental": false,
+    "targetSdkVersion": 28,
+    "features": {
+      "quickAdd": true,
+      "scheduling": true,
+      "backgroundTracking": false,
+      "dataSharing": true,
+      "eventEmitter": true
+    },
+    "screenshots": [
+      "https://example.com/screenshots/gratitude1.png",
+      "https://example.com/screenshots/gratitude2.png"
+    ],
+    "changelog": "1.0.0 - Initial release\n- Daily gratitude tracking\n- Mood integration\n- Statistics dashboard"
+  }
+}

@@ -81,6 +81,10 @@
         <activity
             android:name=".MyDataActivity"
             android:theme="@style/Theme.Talita" />
+	
+	<!-- Add PluginManagementActivity -->
+	<activity android:name=".PluginManagementActivity"
+  	  android:theme="@style/Theme.Talita" />
 
         <!-- TEST -->
         <activity android:name=".QuickAddTestActivity" />
