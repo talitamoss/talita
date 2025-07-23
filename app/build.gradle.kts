@@ -64,6 +64,8 @@ dependencies {
     implementation("com.google.dagger:dagger:2.51.1")
     implementation(libs.androidx.appcompat)
     implementation ("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.viewpager2:viewpager2:1.0.0'
     kapt("com.google.dagger:dagger-compiler:2.51.1")
 
     // Add core library desugaring

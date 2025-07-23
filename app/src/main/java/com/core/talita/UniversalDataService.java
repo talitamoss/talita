@@ -420,4 +420,11 @@ public String capture(UniversalDataType data) {
             this.data = data != null ? data : new JSONObject();
         }
     }
+public List<PersonalData> getDataInRange(long startTime, long endTime) {
+    // Query your database for data in time range
+}
+
+public List<PersonalData> getTodaysData() {
+    // Get today's data
+}
 }

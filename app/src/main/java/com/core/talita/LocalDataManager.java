@@ -293,6 +293,14 @@ public class LocalDataManager {
     public SQLiteDatabase getWritableDatabase() {
         return dbHelper.getWritableDatabase();
     }
+
+public long getDatabaseSize() {
+    // Return database file size
+}
+
+public void clearAllData() {
+    // Clear all data
+}
     
     /**
      * Implementation of DataItem for decrypted data
