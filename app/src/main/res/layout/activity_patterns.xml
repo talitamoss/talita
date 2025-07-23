@@ -27,7 +27,6 @@
                 android:textSize="32sp"
                 android:textColor="#FAFAFA"
                 android:textStyle="bold"
-                android:fontFamily="@font/sf_pro_display"
                 android:layout_marginBottom="4dp"/>
 
             <TextView

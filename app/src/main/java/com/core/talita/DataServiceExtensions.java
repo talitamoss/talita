@@ -1,19 +1,26 @@
 package com.core.talita;
 
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.util.Log;
+import java.io.File;
 import java.util.*;
 
 /**
  * Extension methods for UniversalDataService and LocalDataManager
- * Add these methods to your existing classes
+ * These are meant to be added to the respective classes
  */
 public class DataServiceExtensions {
-    
-    // Add to UniversalDataService class:
+    private static final String TAG = "DataServiceExtensions";
     
     /**
-     * Get all data from today
+     * NOTE: These methods should be copied into UniversalDataService and LocalDataManager
+     * They are kept here for reference
      */
-    public List<PersonalData> getTodaysData() {
+    
+    // For UniversalDataService:
+    public static List<PersonalData> getTodaysData(UniversalDataService dataService) {
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.HOUR_OF_DAY, 0);
         cal.set(Calendar.MINUTE, 0);
@@ -23,101 +30,8 @@ public class DataServiceExtensions {
         long startOfDay = cal.getTimeInMillis();
         long endOfDay = System.currentTimeMillis();
         
-        return getDataInRange(startOfDay, endOfDay);
+        return dataService.getDataInRange(startOfDay, endOfDay);
     }
     
-    /**
-     * Get data within a time range
-     */
-    public List<PersonalData> getDataInRange(long startTime, long endTime) {
-        List<PersonalData> result = new ArrayList<>();
-        
-        // Query your database for data between startTime and endTime
-        List<TalitaDataType> dataList = localDataManager.queryDataByTimeRange(startTime, endTime);
-        
-        // Convert to PersonalData objects
-        for (TalitaDataType data : dataList) {
-            result.add(new PersonalDataAdapter(data));
-        }
-        
-        return result;
-    }
-    
-    // Add to LocalDataManager class:
-    
-    /**
-     * Get the size of the database file
-     */
-    public long getDatabaseSize() {
-        try {
-            // Get the database file
-            File dbFile = context.getDatabasePath("talita_db");
-            if (dbFile.exists()) {
-                return dbFile.length();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting database size", e);
-        }
-        return 0;
-    }
-    
-    /**
-     * Clear all data from the database
-     */
-    public void clearAllData() {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        try {
-            // Delete all records from the data table
-            db.delete("personal_data", null, null);
-            
-            // Also clear any audio files
-            File audioDir = new File(context.getFilesDir(), "audio");
-            if (audioDir.exists()) {
-                File[] files = audioDir.listFiles();
-                if (files != null) {
-                    for (File file : files) {
-                        file.delete();
-                    }
-                }
-            }
-            
-            Log.d(TAG, "All data cleared");
-        } catch (Exception e) {
-            Log.e(TAG, "Error clearing data", e);
-        } finally {
-            db.close();
-        }
-    }
-    
-    /**
-     * Query data by time range
-     */
-    public List<TalitaDataType> queryDataByTimeRange(long startTime, long endTime) {
-        List<TalitaDataType> results = new ArrayList<>();
-        
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        String query = "SELECT * FROM personal_data WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC";
-        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(startTime), String.valueOf(endTime)});
-        
-        try {
-            while (cursor.moveToNext()) {
-                String encryptedData = cursor.getString(cursor.getColumnIndex("encrypted_data"));
-                String dataType = cursor.getString(cursor.getColumnIndex("data_type"));
-                long timestamp = cursor.getLong(cursor.getColumnIndex("timestamp"));
-                
-                // Decrypt and deserialize
-                String decryptedJson = encryptionService.decryptData(encryptedData);
-                TalitaDataType data = deserializeData(decryptedJson, dataType);
-                
-                if (data != null) {
-                    results.add(data);
-                }
-            }
-        } finally {
-            cursor.close();
-            db.close();
-        }
-        
-        return results;
-    }
+    // The actual implementation should be in the respective classes
 }

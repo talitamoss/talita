@@ -30,8 +30,11 @@ public class ExportManager {
         JSONObject root = new JSONObject();
         root.put("export_version", "1.0");
         root.put("export_date", System.currentTimeMillis());
-        root.put("app_version", BuildConfig.VERSION_NAME);
-        
+	try {
+    root.put("app_version", context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName);
+} catch (Exception e) {
+    root.put("app_version", "1.0");
+}        
         JSONArray dataArray = new JSONArray();
         int total = data.size();
         int processed = 0;
@@ -126,7 +129,7 @@ public class ExportManager {
             
             processed++;
             final int progress = (processed * 100) / total;
-            progressDialog.post(() -> progressDialog.setProgress(progress));
+	((Activity) context).runOnUiThread(() -> progressDialog.setProgress(progress));
         }
         
         writer.close();

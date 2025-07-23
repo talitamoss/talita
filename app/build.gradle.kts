@@ -15,8 +15,6 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // Enable core library desugaring
         multiDexEnabled = true
     }
 
@@ -33,7 +31,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-        // Enable core library desugaring
         isCoreLibraryDesugaringEnabled = true
     }
 
@@ -42,10 +39,11 @@ android {
     }
 
     buildFeatures {
-        dataBinding = true
+        viewBinding = true
+        // Disable data binding to avoid menu/selector issues
+        dataBinding = false
     }
 
-    // Add lint configuration to suppress errors temporarily
     lint {
         abortOnError = false
         checkReleaseBuilds = false
@@ -53,29 +51,48 @@ android {
 }
 
 dependencies {
+    // Core Android
     implementation(libs.core.ktx)
     implementation(libs.appcompat)
-    implementation(libs.material)
-    implementation(libs.constraintlayout)
-    implementation(libs.osmdroidAndroid)
-    implementation(libs.kotlin)
-    implementation(libs.zxing.android.embedded)
-    implementation(libs.androidx.databinding.runtime)
-    implementation("com.google.dagger:dagger:2.51.1")
     implementation(libs.androidx.appcompat)
-    implementation ("com.github.PhilJay:MPAndroidChart:v3.1.0")
-    implementation 'com.google.android.material:material:1.9.0'
-    implementation 'androidx.viewpager2:viewpager2:1.0.0'
+    implementation(libs.constraintlayout)
+    
+    // Material Design
+    implementation("com.google.android.material:material:1.12.0")
+    
+    // ViewPager2
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
+    
+    // RecyclerView
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    
+    // CardView
+    implementation("androidx.cardview:cardview:1.0.0")
+    
+    // Kotlin
+    implementation(libs.kotlin)
+    
+    // Location & Activity Recognition
+    implementation("com.google.android.gms:play-services-location:21.2.0")
+    
+    // Maps
+    implementation(libs.osmdroidAndroid)
+    
+    // QR Code
+    implementation(libs.zxing.android.embedded)
+    
+    // Dependency Injection
+    implementation("com.google.dagger:dagger:2.51.1")
     kapt("com.google.dagger:dagger-compiler:2.51.1")
-
-    // Add core library desugaring
+    
+    // Charts
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    
+    // Core library desugaring
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
-
-    // Add Google Play Services for activity recognition
-    implementation("com.google.android.gms:play-services-location:21.0.1")
-
+    
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-
 }

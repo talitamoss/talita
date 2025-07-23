@@ -46,7 +46,7 @@ public class ImportManager {
                 inputStream.close();
                 
                 // Success
-                progressDialog.post(() -> {
+		((Activity) context).runOnUiThread(() -> progressDialog.setProgress(progress));
                     progressDialog.dismiss();
                     Toast.makeText(context, "Import successful!", Toast.LENGTH_LONG).show();
                 });

@@ -26,35 +26,35 @@
         android:theme="@style/Theme.Talita"
         tools:targetApi="31">
 
-        <!-- HOME SCREEN (Main Launcher) -->
-        <activity android:name=".HomeActivity"
+        <!-- NEW HOME SCREEN (Main Launcher) - TodayActivity -->
+        <activity android:name=".TodayActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
-	<provider
-    android:name="androidx.core.content.FileProvider"
-    android:authorities="${applicationId}.fileprovider"
-    android:exported="false"
-    android:grantUriPermissions="true">
-    <meta-data
-        android:name="android.support.FILE_PROVIDER_PATHS"
-        android:resource="@xml/file_provider_paths" />
-</provider>
-
         </activity>
+
+        <!-- NEW NAVIGATION ACTIVITIES -->
+        <activity android:name=".PatternsActivity" />
+        <activity android:name=".VaultActivity" />
+        <activity android:name=".ComingSoonActivity" 
+            android:theme="@style/Theme.Talita" />
+        <activity android:name=".QuickAddActivity" />
+        <activity android:name=".NowViewActivity" />
+
+        <!-- LEGACY HOME (Remove launcher intent if switching to TodayActivity) -->
+        <activity android:name=".HomeActivity" />
 
         <!-- DATA COLLECTION & DASHBOARD -->
         <activity android:name=".DataSummaryActivity" />
         <activity android:name=".DataCollectionActivity" />
         <activity android:name=".DashboardActivity" />
-	<activity android:name=".TrackingOptionsActivity" />
-	<activity 
-    android:name=".CreateCollectorActivity"
-    android:label="Create Collector"
-    android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
+        <activity android:name=".TrackingOptionsActivity" />
+        <activity 
+            android:name=".CreateCollectorActivity"
+            android:label="Create Collector"
+            android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
 
         <!-- SPECIFIC DATA ACTIVITIES -->
         <activity android:name=".AudioActivity" />
@@ -63,16 +63,17 @@
 
         <!-- SETTINGS & CONFIG -->
         <activity android:name=".SettingsActivity" />
-	<activity android:name=".ConnectActivity" />
-	<activity android:name=".DataViewActivity" />
-	<activity android:name=".AboutSettingsActivity" />
-	<activity android:name=".BackgroundTrackingSettingsActivity" />
-	<activity android:name=".CloudBackupSettingsActivity" />
-	<activity android:name=".DataCollectorsSettingsActivity" />
-	<activity android:name=".DataExportSettingsActivity" />
-	<activity android:name=".SecurityPrivacySettingsActivity" />
-	<activity android:name=".DataTypeDetailActivity" />
-	<activity android:name=".TileSelectionActivity" />
+        <activity android:name=".SettingsTestActivity" />
+        <activity android:name=".ConnectActivity" />
+        <activity android:name=".DataViewActivity" />
+        <activity android:name=".AboutSettingsActivity" />
+        <activity android:name=".BackgroundTrackingSettingsActivity" />
+        <activity android:name=".CloudBackupSettingsActivity" />
+        <activity android:name=".DataCollectorsSettingsActivity" />
+        <activity android:name=".DataExportSettingsActivity" />
+        <activity android:name=".SecurityPrivacySettingsActivity" />
+        <activity android:name=".DataTypeDetailActivity" />
+        <activity android:name=".TileSelectionActivity" />
 
         <activity
             android:name=".MyDataActivity"
@@ -81,6 +82,9 @@
         <!-- LEGACY & P2P -->
         <activity android:name=".QrHandshakeActivity" />
         <activity android:name=".MainActivity" />
+
+        <!-- TEST -->
+        <activity android:name=".QuickAddTestActivity" />
 
         <!-- SERVICES -->
         <service android:name=".BackgroundTrackingService"
@@ -91,15 +95,16 @@
         <receiver android:name=".ActivityRecognitionReceiver"
             android:exported="false" />
 
-	<!-- TEST -->
-	<activity android:name=".QuickAddTestActivity" />
-
-	<activity android:name=".TodayActivity" />
-<activity android:name=".PatternsActivity" />
-<activity android:name=".VaultActivity" />
-<activity android:name=".ComingSoonActivity" 
-    android:theme="@style/Theme.Talita.ComingSoon" />
-
+        <!-- FILE PROVIDER -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
 
     </application>
 </manifest>

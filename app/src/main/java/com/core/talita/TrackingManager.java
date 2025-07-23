@@ -113,6 +113,19 @@ public boolean startTracking() {
         startTracking();
     }
 }
+
+  /**
+     * Enable or disable tracking
+     */
+    public void setTrackingEnabled(boolean enabled) {
+        prefs.edit().putBoolean(PREF_TRACKING_ENABLED, enabled).apply();
+        
+        if (enabled) {
+            startTracking();
+        } else {
+            stopTracking();
+        }
+    }
     /**
      * Get tracking statistics
      */

@@ -1,29 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Harmonized Purple Palette - Darker & Consistent -->
-    <color name="purple_200">#FFAB47BC</color>  <!-- Light purple for accents -->
-    <color name="purple_500">#FF7B1FA2</color>  <!-- Main brand purple (darker) -->
-    <color name="purple_700">#FF4A148C</color>  <!-- Dark purple for variants -->
-
-    <!-- Existing colours -->
+    <!-- Default Android Colors (Required by themes) -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-
-    <!-- Additional UI colours -->
-    <color name="dark_background">#FF121212</color>
-    <color name="card_background">#FF2A2A2A</color>
-    <color name="text_primary">#FFFFFFFF</color>
-    <color name="text_secondary">#FFCCCCCC</color>
-    <color name="text_tertiary">#FF888888</color>
-
-    <!-- My Data Page Colors -->
-    <color name="primary_purple">#FF7B1FA2</color>
-    <color name="primary_purple_light">#FF9C27B0</color>
-    <color name="success_green">#FF4CAF50</color>
-    <color name="warning_yellow">#FFFFC107</color>
-    <color name="error_red">#FFF44336</color>
-    <color name="background_dark">#FF121212</color>
-    <color name="background_darker">#FF1A1A1A</color>
+    
+    <!-- App Primary colors -->
+    <color name="primary">#6366F1</color>
+    <color name="primary_dark">#4C4EDB</color>
+    <color name="primary_variant">#4C4EDB</color>
+    
+    <!-- Accent colors -->
+    <color name="accent">#6366F1</color>
+    <color name="accent_flow">#6366F1</color>
+    
+    <!-- Background colors -->
+    <color name="background_primary">#0A0A0A</color>
+    <color name="background_secondary">#1A1A1A</color>
+    <color name="background_tertiary">#2A2A2A</color>
+    
+    <!-- Text colors -->
+    <color name="text_primary">#FAFAFA</color>
+    <color name="text_secondary">#888888</color>
+    <color name="text_tertiary">#666666</color>
+    
+    <!-- Surface colors -->
+    <color name="surface">#1A1A1A</color>
+    <color name="surface_variant">#2A2A2A</color>
+    
+    <!-- Status colors -->
+    <color name="error">#EF4444</color>
+    <color name="success">#10B981</color>
+    <color name="warning">#F59E0B</color>
+    
+    <!-- Data type colors -->
+    <color name="water_color">#3B82F6</color>
+    <color name="exercise_color">#10B981</color>
+    <color name="mood_color">#8B5CF6</color>
+    <color name="sleep_color">#6366F1</color>
+    <color name="location_color">#EC4899</color>
+    
+    <!-- Component specific -->
+    <color name="chip_background_default">#2A2A2A</color>
+    <color name="chip_background_selected">#6366F1</color>
+    <color name="chip_text_default">#888888</color>
+    <color name="chip_text_selected">#FFFFFF</color>
+    
+    <!-- Additional colors needed by existing layouts -->
+    <color name="background_darker">#050505</color>
+    <color name="card_background">#1A1A1A</color>
+    <color name="dark_background">#0A0A0A</color>
+    <color name="primary_purple">#6366F1</color>
+    
+    <!-- Status colors -->
+    <color name="success_green">#10B981</color>
+    <color name="warning_yellow">#F59E0B</color>
+    <color name="error_red">#EF4444</color>
 </resources>

@@ -1,17 +1,11 @@
 package com.core.talita;
 
-import java.util.Map;
-
 /**
- * Universal personal data interface - ALL data types implement this
- * Brand-agnostic: works with any app name
+ * Base interface for all personal data types
  */
 public interface PersonalData {
-    String getId();
-    String getType();
+    String getDataType();
     long getTimestamp();
-    String toJson();
-    String getDisplayName();
     String getDisplaySummary();
-    Map<String, Object> getMetadata();
+    Object getValue();
 }

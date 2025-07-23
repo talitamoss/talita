@@ -213,6 +213,41 @@ public class EncryptionService {
         }
     }
 
+ * Decrypt encrypted data string
+     */
+    public String decryptData(String encryptedData) {
+        try {
+            if (encryptedData == null || encryptedData.isEmpty()) {
+                return null;
+            }
+            
+            // Extract IV and encrypted content
+            String[] parts = encryptedData.split(":");
+            if (parts.length != 2) {
+                Log.e(TAG, "Invalid encrypted data format");
+                return null;
+            }
+            
+            byte[] iv = Base64.decode(parts[0], Base64.DEFAULT);
+            byte[] encryptedBytes = Base64.decode(parts[1], Base64.DEFAULT);
+            
+            // Get the key
+            SecretKey key = getOrCreateKey();
+            
+            // Decrypt
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+            cipher.init(Cipher.DECRYPT_MODE, key, spec);
+            
+            byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
+            return new String(decryptedBytes, StandardCharsets.UTF_8);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error decrypting data", e);
+            return null;
+        }
+    }
+
     /**
      * Clean up temporary decrypted files
      */

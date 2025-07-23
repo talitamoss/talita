@@ -28,8 +28,7 @@
                 android:layout_weight="1"
                 android:text="◉ Tracking Active"
                 android:textSize="14sp"
-                android:textColor="#6366F1"
-                android:fontFamily="@font/jetbrains_mono"/>
+                android:textColor="#6366F1"/>
 
             <TextView
                 android:layout_width="wrap_content"
@@ -54,7 +53,6 @@
                 android:text="TODAY"
                 android:textSize="48sp"
                 android:textColor="#FAFAFA"
-                android:fontFamily="@font/sf_pro_display"
                 android:letterSpacing="-0.02"
                 android:textStyle="bold"/>
 

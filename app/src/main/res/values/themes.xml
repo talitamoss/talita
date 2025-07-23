@@ -93,7 +93,10 @@
     </style>
 
     <!-- Coming Soon style -->
-    <style name="Theme.Talita.ComingSoon" parent="Theme.Talita">
-        <item name="android:windowBackground">@drawable/coming_soon_background</item>
-    </style>
+	<style name="Theme.Talita.ComingSoon" parent="Theme.Talita">
+    <!-- Coming soon specific styling -->
+	</style>
+	<style name="SwitchTheme" parent="Widget.MaterialComponents.CompoundButton.Switch">
+    <item name="colorControlActivated">@color/primary</item>
+</style>
 </resources>

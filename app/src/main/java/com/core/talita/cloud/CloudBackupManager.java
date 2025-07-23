@@ -410,4 +410,10 @@ public class CloudBackupManager {
     public interface BackupProgressListener {
         void onBackupProgress(BackupStatus status);
     }
+  * Check if cloud backup is enabled
+     */
+    public boolean isEnabled() {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getBoolean(PREF_BACKUP_ENABLED, false);
+    }
 }
