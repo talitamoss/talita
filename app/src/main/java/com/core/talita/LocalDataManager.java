@@ -261,6 +261,19 @@ public class LocalDataManager {
     public List<DataItem> getItemsByType(String type) {
         return getDataByType(type);
     }
+
+    public long getDataCount() {
+    SQLiteDatabase db = dbHelper.getReadableDatabase();
+    long count = 0;
+    
+    try {
+        count = DatabaseUtils.queryNumEntries(db, DatabaseHelper.TABLE_DATA);
+    } catch (Exception e) {
+        Log.e(TAG, "Error getting data count", e);
+    }
+    
+    return count;
+}
     
     /**
      * Get total data count

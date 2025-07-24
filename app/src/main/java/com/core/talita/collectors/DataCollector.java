@@ -1,10 +1,13 @@
 package com.core.talita.collectors;
 
+import android.content.Context;
+import java.util.List;
+
 /**
  * DataCollector Interface
  * 
  * Base interface for all data collection implementations.
- * This defines the contract that all collectors must follow.
+ * Used by plugins to implement their collection logic.
  */
 public interface DataCollector {
     
@@ -18,12 +21,12 @@ public interface DataCollector {
      * Start automated/background collection
      * Used for collectors that support continuous tracking
      */
-    void startCollection();
+    void startCollection(Context context);
     
     /**
      * Stop automated/background collection
      */
-    void stopCollection();
+    void stopCollection(Context context);
     
     /**
      * Check if collector is currently active
@@ -54,4 +57,14 @@ public interface DataCollector {
      * Get default configuration for this collector
      */
     CollectorSettings getDefaultSettings();
+    
+    /**
+     * Get required permissions for this collector
+     */
+    List<String> getRequiredPermissions();
+    
+    /**
+     * Get current settings
+     */
+    CollectorSettings getSettings();
 }

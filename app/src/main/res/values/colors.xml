@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Default Android Colors (Requi/red by themes) -->
+    <!-- Default Android Colors (Required by themes) -->
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
@@ -19,6 +19,7 @@
     <color name="accent_flow">#6366F1</color>
     
     <!-- Background colors -->
+    <color name="background">#0A0A0A</color>
     <color name="background_primary">#0A0A0A</color>
     <color name="background_secondary">#1A1A1A</color>
     <color name="background_tertiary">#2A2A2A</color>
@@ -31,6 +32,7 @@
     <!-- Surface colors -->
     <color name="surface">#1A1A1A</color>
     <color name="surface_variant">#2A2A2A</color>
+    <color name="divider">#333333</color>
     
     <!-- Status colors -->
     <color name="error">#EF4444</color>
@@ -64,5 +66,4 @@
     <!-- Add these if missing -->
     <color name="red">#FF0000</color>
     <color name="green">#00FF00</color>
-
 </resources>

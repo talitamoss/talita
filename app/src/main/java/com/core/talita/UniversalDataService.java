@@ -145,6 +145,15 @@ public class UniversalDataService {
         String message = "🔒 " + data.getDisplayName() + " encrypted and saved";
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
     }
+    public void saveData(PersonalData personalData) {
+    if (personalData == null) {
+        Log.e(TAG, "Cannot save null PersonalData");
+        return;
+    }
+    
+    // Convert PersonalData to UniversalDataType and process
+    processData(personalData);
+}
 
     /**
      * Show error toast

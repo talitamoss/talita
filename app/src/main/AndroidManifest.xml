@@ -69,7 +69,6 @@
         <activity android:name=".DataCollectorsSettingsActivity" />
         <activity android:name=".DataExportSettingsActivity" />
         <activity android:name=".SecurityPrivacySettingsActivity" />
-        <activity android:name=".EnhancedSettingsActivity" />
         <activity android:name=".TileSelectionActivity" />
         
         <!-- PLUGIN ACTIVITIES -->
