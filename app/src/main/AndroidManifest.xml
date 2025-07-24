@@ -1,19 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    package="com.core.talita">
 
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- PERMISSIONS -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
         android:name=".TalitaApp"
@@ -22,72 +26,58 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Talita"
-        tools:targetApi="31">
+        android:theme="@style/Theme.Talita">
 
-        <!-- NEW HOME SCREEN (Main Launcher) - TodayActivity -->
-        <activity android:name=".TodayActivity"
-            android:exported="true">
+        <!-- MAIN ACTIVITIES -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Talita">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- NEW NAVIGATION ACTIVITIES -->
-        <activity android:name=".PatternsActivity" />
-        <activity android:name=".VaultActivity" />
-        <activity android:name=".ComingSoonActivity" 
-            android:theme="@style/Theme.Talita" />
-        <activity android:name=".QuickAddActivity" />
-        <activity android:name=".NowViewActivity" />
-
-        <!-- LEGACY HOME (Remove launcher intent if switching to TodayActivity) -->
-        <activity android:name=".HomeActivity" />
-
-        <!-- DATA COLLECTION & DASHBOARD -->
-        <activity android:name=".DataSummaryActivity" />
-        <activity android:name=".DataCollectionActivity" />
-        <activity android:name=".DashboardActivity" />
-        <activity android:name=".TrackingOptionsActivity" />
-        <activity 
-            android:name=".CreateCollectorActivity"
-            android:label="Create Collector"
-            android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
-	<activity 
-   	 android:name=".LogActivity"
-	 android:theme="@style/Theme.Talita.Translucent" />
-
-        <!-- SPECIFIC DATA ACTIVITIES -->
-        <activity android:name=".AudioActivity" />
-        <activity android:name=".AudioPlaybackActivity" />
+        <!-- DATA COLLECTION ACTIVITIES -->
         <activity android:name=".LocationActivity" />
-
-        <!-- SETTINGS & CONFIG -->
-        <activity android:name=".SettingsActivity" />
-        <activity android:name=".ConnectActivity" />
+        <activity android:name=".AudioActivity" />
+        <activity android:name=".QuickAddActivity" 
+            android:theme="@style/Theme.Talita.Translucent" />
+        <activity android:name=".QuickAddTestActivity" />
+        
+        <!-- DATA MANAGEMENT ACTIVITIES -->
+        <activity android:name=".DataSummaryActivity" />
         <activity android:name=".DataViewActivity" />
+        <activity android:name=".DataTypeDetailActivity" />
+        <activity android:name=".MyDataActivity"
+            android:theme="@style/Theme.Talita" />
+        
+        <!-- PATTERN & VISUALIZATION ACTIVITIES -->
+        <activity android:name=".PatternsActivity" />
+        <activity android:name=".NowViewActivity" 
+            android:theme="@style/Theme.Talita.Fullscreen" />
+        
+        <!-- VAULT & EXPORT ACTIVITIES -->
+        <activity android:name=".VaultActivity" />
+        
+        <!-- SETTINGS ACTIVITIES -->
+        <activity android:name=".SettingsActivity" />
         <activity android:name=".AboutSettingsActivity" />
         <activity android:name=".BackgroundTrackingSettingsActivity" />
         <activity android:name=".CloudBackupSettingsActivity" />
         <activity android:name=".DataCollectorsSettingsActivity" />
         <activity android:name=".DataExportSettingsActivity" />
         <activity android:name=".SecurityPrivacySettingsActivity" />
-        <activity android:name=".DataTypeDetailActivity" />
+        <activity android:name=".EnhancedSettingsActivity" />
         <activity android:name=".TileSelectionActivity" />
-
-        <activity
-            android:name=".MyDataActivity"
+        
+        <!-- PLUGIN ACTIVITIES -->
+        <activity android:name=".PluginManagementActivity"
             android:theme="@style/Theme.Talita" />
-	
-	<!-- Add PluginManagementActivity -->
-	<activity android:name=".PluginManagementActivity"
-  	  android:theme="@style/Theme.Talita" />
-
-        <!-- TEST -->
-        <activity android:name=".QuickAddTestActivity" />
+        <activity android:name=".LogActivity"
+            android:theme="@style/Theme.Talita.Translucent" />
 
         <!-- SERVICES -->
         <service android:name=".BackgroundTrackingService"
@@ -108,43 +98,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_provider_paths" />
         </provider>
-
-	  <!-- Plugin Management Activity -->
-        <activity 
-            android:name=".PluginManagementActivity"
-            android:label="Plugin Store"
-            android:theme="@style/Theme.Talita" />
-            
-        <!-- Plugin Details Activity (for installed plugins) -->
-        <activity 
-            android:name=".PluginDetailsActivity"
-            android:label="Plugin Details"
-            android:theme="@style/Theme.Talita" />
-            
-        <!-- Plugin Store Details Activity (for marketplace plugins) -->
-        <activity 
-            android:name=".PluginStoreDetailsActivity"
-            android:label="Plugin Info"
-            android:theme="@style/Theme.Talita" />
-
-        <!-- Add file provider for plugin installation -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_provider_paths" />
-        </provider>
-
-        <!-- Add these permissions at the top of the manifest, outside the <application> tag -->
-        <!-- For plugin installation from external storage -->
-        <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-        
-        <!-- For plugin network communication -->
-        <uses-permission android:name="android.permission.INTERNET" />
-        <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
     </application>
+
 </manifest>

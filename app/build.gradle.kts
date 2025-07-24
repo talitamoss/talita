@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.core.talita"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.core.talita"
@@ -64,7 +64,7 @@ dependencies {
     implementation("androidx.viewpager2:viewpager2:1.1.0")
     
     // RecyclerView
-    implementation("androidx.recyclerview:recyclerview:1.4.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
     
     // CardView
     implementation("androidx.cardview:cardview:1.0.0")

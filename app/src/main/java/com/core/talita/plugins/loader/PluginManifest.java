@@ -49,8 +49,8 @@ public class PluginManifest {
         this.description = builder.description;
         this.website = builder.website;
         this.email = builder.email;
-        this.permissions = builder.permissions;
-        this.dependencies = builder.dependencies;
+        this.permissions = new ArrayList<>(builder.permissions);
+        this.dependencies = new ArrayList<>(builder.dependencies);
         this.signature = builder.signature;
         this.buildTime = builder.buildTime;
         this.experimental = builder.experimental;
@@ -197,6 +197,30 @@ public class PluginManifest {
     }
     
     /**
+     * Check if this plugin is compatible with the given app version
+     */
+    public boolean isCompatibleWith(String appVersion) {
+        try {
+            String[] minParts = minAppVersion.split("\\.");
+            String[] appParts = appVersion.split("\\.");
+            
+            for (int i = 0; i < Math.min(minParts.length, appParts.length); i++) {
+                int min = Integer.parseInt(minParts[i]);
+                int app = Integer.parseInt(appParts[i]);
+                
+                if (app > min) return true;
+                if (app < min) return false;
+            }
+            
+            return true; // Equal versions
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error comparing versions", e);
+            return false;
+        }
+    }
+    
+    /**
      * Builder pattern for creating manifests
      */
     public static class Builder {
@@ -268,12 +292,22 @@ public class PluginManifest {
         }
         
         public Builder setPermissions(List<String> permissions) {
-            this.permissions = permissions;
+            this.permissions = new ArrayList<>(permissions);
+            return this;
+        }
+        
+        public Builder addPermission(String permission) {
+            this.permissions.add(permission);
             return this;
         }
         
         public Builder setDependencies(List<String> dependencies) {
-            this.dependencies = dependencies;
+            this.dependencies = new ArrayList<>(dependencies);
+            return this;
+        }
+        
+        public Builder addDependency(String dependency) {
+            this.dependencies.add(dependency);
             return this;
         }
         
@@ -298,7 +332,25 @@ public class PluginManifest {
         }
         
         public PluginManifest build() {
+            // Validate required fields
+            if (id == null || name == null || version == null || 
+                minAppVersion == null || author == null || 
+                category == null || mainClass == null) {
+                throw new IllegalStateException("Missing required fields in PluginManifest");
+            }
+            
             return new PluginManifest(this);
         }
+    }
+    
+    @Override
+    public String toString() {
+        return "PluginManifest{" +
+                "id='" + id + '\'' +
+                ", name='" + name + '\'' +
+                ", version='" + version + '\'' +
+                ", category='" + category + '\'' +
+                ", author='" + author + '\'' +
+                '}';
     }
 }

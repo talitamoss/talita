@@ -1,103 +1,59 @@
 package com.core.talita.cloud;
 
-import java.io.File;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Universal Cloud Provider Interface
- *
- * Any cloud service (Greenhost, AWS, Google Drive, etc.) implements this interface
- * to provide secure backup capabilities for Talita's encrypted data.
- *
- * Key Design Principles:
- * - Provider-agnostic (works with any cloud service)
- * - Encryption-first (all data already encrypted before reaching provider)
- * - Async operations with progress callbacks
- * - Comprehensive error handling
- * - Metadata preservation
+ * Cloud Provider Interface
+ * 
+ * Base interface that all cloud storage providers must implement.
+ * This enables pluggable cloud backends (Google Drive, Dropbox, Solid Pods, etc.)
  */
 public interface CloudProvider {
-
+    
     /**
-     * Provider identification and capabilities
+     * Provider identification
      */
+    String getProviderId();
     String getProviderName();
-    String getProviderDisplayName();
-    boolean supportsFileStorage();
-    boolean supportsMetadataStorage();
-    boolean supportsProgressCallbacks();
-    long getMaxFileSize(); // in bytes, -1 for unlimited
-
+    String getProviderDescription();
+    int getProviderIcon();
+    
     /**
-     * Authentication and connection
+     * Authentication
      */
     boolean isAuthenticated();
     void authenticate(AuthenticationCallback callback);
-    void disconnect();
-    CloudConnectionStatus getConnectionStatus();
-
-    /**
-     * File operations (for encrypted audio files, photos, etc.)
-     * Simplified to work with CloudItem objects
-     */
-    void uploadFile(CloudItem item) throws Exception;
-    void uploadMetadata(CloudItem item) throws Exception;
+    void deauthenticate();
+    String getAccountEmail();
     
     /**
-     * Download operations returning data directly (simplified)
+     * File Operations
      */
-    List<CloudFile> listFiles(String path) throws Exception;
-    String downloadMetadata(String key) throws Exception;
-    String downloadFile(String remotePath, String localDir) throws Exception;
+    void uploadFile(String localPath, String remotePath, UploadCallback callback);
+    void downloadFile(String remotePath, String localPath, DownloadCallback callback);
+    void deleteFile(String remotePath, OperationCallback callback);
+    void listFiles(String remotePath, ListFilesCallback callback);
     
     /**
-     * Legacy method signatures for compatibility
+     * Metadata Operations (for smaller data like settings, records)
      */
-    void uploadFile(
-            String localFilePath,
-            String remoteFileName,
-            Map<String, String> metadata,
-            UploadCallback callback
-    );
-
-    void downloadFile(
-            String remoteFileName,
-            String localFilePath,
-            DownloadCallback callback
-    );
-
-    void deleteFile(String remoteFileName, OperationCallback callback);
-
-    void listFiles(String folder, ListFilesCallback callback);
-
-    /**
-     * Metadata operations (for encrypted JSON data)
-     */
-    void uploadMetadata(
-            String key,
-            String encryptedJsonData,
-            Map<String, String> metadata,
-            UploadCallback callback
-    );
-
+    void uploadMetadata(String key, byte[] data, UploadCallback callback);
     void downloadMetadata(String key, DownloadCallback callback);
-
     void deleteMetadata(String key, OperationCallback callback);
-
-    void listMetadata(String prefix, ListMetadataCallback callback);
-
+    void listMetadata(ListMetadataCallback callback);
+    
     /**
-     * Batch operations for efficiency
+     * Batch Operations
      */
     void uploadBatch(List<CloudItem> items, BatchUploadCallback callback);
     void downloadBatch(List<String> remoteNames, String localFolder, BatchDownloadCallback callback);
-
+    
     /**
-     * Storage info and quota
+     * Storage Info
      */
     void getStorageInfo(StorageInfoCallback callback);
-
+    
     /**
      * Provider-specific configuration
      */
@@ -157,92 +113,64 @@ public interface CloudProvider {
 
     // Data Classes
 
-    enum CloudConnectionStatus {
-        DISCONNECTED,
-        CONNECTING,
-        CONNECTED,
-        AUTHENTICATED,
-        ERROR
-    }
-
-    class CloudItem {
-        public final String localPath;
-        public final String remoteName;
-        public final CloudItemType type;
-        public final Map<String, String> metadata;
-        public final String encryptedData; // for metadata items
-
-        public CloudItem(String localPath, String remoteName, CloudItemType type,
-                         Map<String, String> metadata) {
-            this.localPath = localPath;
-            this.remoteName = remoteName;
-            this.type = type;
-            this.metadata = metadata;
-            this.encryptedData = null;
+    class CloudError {
+        public final int code;
+        public final String message;
+        public final Exception exception;
+        
+        public CloudError(int code, String message, Exception exception) {
+            this.code = code;
+            this.message = message;
+            this.exception = exception;
         }
-
-        public CloudItem(String encryptedData, String remoteName,
-                         Map<String, String> metadata) {
-            this.localPath = null;
-            this.remoteName = remoteName;
-            this.type = CloudItemType.METADATA;
-            this.metadata = metadata;
-            this.encryptedData = encryptedData;
-        }
-    }
-
-    enum CloudItemType {
-        FILE,
-        METADATA
     }
 
     class CloudFile {
         public final String name;
+        public final String path;
         public final long size;
-        public final long lastModified;
-        public final String url;
-        public final Map<String, String> metadata;
-
-        public CloudFile(String name, long size, long lastModified, String url,
-                         Map<String, String> metadata) {
+        public final long modifiedTime;
+        public final boolean isDirectory;
+        
+        public CloudFile(String name, String path, long size, long modifiedTime, boolean isDirectory) {
             this.name = name;
+            this.path = path;
             this.size = size;
-            this.lastModified = lastModified;
-            this.url = url;
-            this.metadata = metadata;
+            this.modifiedTime = modifiedTime;
+            this.isDirectory = isDirectory;
         }
     }
 
     class CloudMetadata {
         public final String key;
-        public final String encryptedData;
-        public final long lastModified;
-        public final Map<String, String> metadata;
-
-        public CloudMetadata(String key, String encryptedData, long lastModified,
-                             Map<String, String> metadata) {
+        public final long size;
+        public final long timestamp;
+        
+        public CloudMetadata(String key, long size, long timestamp) {
             this.key = key;
-            this.encryptedData = encryptedData;
-            this.lastModified = lastModified;
-            this.metadata = metadata;
+            this.size = size;
+            this.timestamp = timestamp;
         }
     }
 
-    class CloudError {
-        public final String code;
-        public final String message;
-        public final Exception cause;
-        public final boolean isRetryable;
-
-        public CloudError(String code, String message, Exception cause, boolean isRetryable) {
-            this.code = code;
-            this.message = message;
-            this.cause = cause;
-            this.isRetryable = isRetryable;
+    class CloudItem {
+        public final String localPath;
+        public final String remotePath;
+        public final boolean isMetadata;
+        public final byte[] data; // For metadata
+        
+        public CloudItem(String localPath, String remotePath) {
+            this.localPath = localPath;
+            this.remotePath = remotePath;
+            this.isMetadata = false;
+            this.data = null;
         }
-
-        public CloudError(String code, String message) {
-            this(code, message, null, false);
+        
+        public CloudItem(String key, byte[] data) {
+            this.localPath = key;
+            this.remotePath = key;
+            this.isMetadata = true;
+            this.data = data;
         }
     }
 
@@ -250,20 +178,13 @@ public interface CloudProvider {
         public final long totalSpace;
         public final long usedSpace;
         public final long freeSpace;
-        public final int fileCount;
-        public final Map<String, Long> spaceByType; // "audio" -> bytes, "metadata" -> bytes
-
-        public CloudStorageInfo(long totalSpace, long usedSpace, long freeSpace,
-                                int fileCount, Map<String, Long> spaceByType) {
+        public final String accountType;
+        
+        public CloudStorageInfo(long totalSpace, long usedSpace, long freeSpace, String accountType) {
             this.totalSpace = totalSpace;
             this.usedSpace = usedSpace;
             this.freeSpace = freeSpace;
-            this.fileCount = fileCount;
-            this.spaceByType = spaceByType;
-        }
-
-        public double getUsagePercentage() {
-            return totalSpace > 0 ? (double) usedSpace / totalSpace * 100 : 0;
+            this.accountType = accountType;
         }
     }
 }
