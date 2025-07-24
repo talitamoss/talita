@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 import com.core.talita.UniversalDataType;
+import com.core.talita.AppConstants;
 import org.json.JSONObject;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -16,7 +17,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class CloudBackupManager {
     private static final String TAG = "CloudBackupManager";
-    private static final String PREFS_NAME = "cloud_backup_prefs";
+    private static final String PREFS_NAME = AppConstants.PREFS_MAIN + "_cloud";
     private static CloudBackupManager instance;
     
     private final Context context;
@@ -56,15 +57,20 @@ public class CloudBackupManager {
     
     private void initializeProvider(String providerName) {
         switch (providerName) {
-            case "GoogleDrive":
+            case AppConstants.PROVIDER_GOOGLE_DRIVE:
                 // cloudProvider = new GoogleDriveProvider(context);
+                Log.d(TAG, "Google Drive provider selected (not implemented)");
                 break;
-            case "Dropbox":
+            case AppConstants.PROVIDER_DROPBOX:
                 // cloudProvider = new DropboxProvider(context);
+                Log.d(TAG, "Dropbox provider selected (not implemented)");
                 break;
-            case "SolidPod":
+            case AppConstants.PROVIDER_SOLID_POD:
                 // cloudProvider = new SolidPodProvider(context);
+                Log.d(TAG, "Solid Pod provider selected (not implemented)");
                 break;
+            default:
+                Log.w(TAG, "Unknown cloud provider: " + providerName);
         }
     }
     
@@ -73,294 +79,178 @@ public class CloudBackupManager {
             .putBoolean("cloud_backup_enabled", true)
             .putString("cloud_provider", providerName)
             .apply();
-        
+            
         isBackupEnabled = true;
         initializeProvider(providerName);
         
-        // Start initial sync
-        syncNow();
+        Log.d(TAG, "Cloud backup enabled with provider: " + providerName);
     }
     
     public void disableBackup() {
         prefs.edit()
             .putBoolean("cloud_backup_enabled", false)
+            .remove("cloud_provider")
             .apply();
-        
+            
         isBackupEnabled = false;
         cloudProvider = null;
+        
+        Log.d(TAG, "Cloud backup disabled");
     }
     
     public boolean isBackupEnabled() {
         return isBackupEnabled;
     }
     
-    public String getCurrentProvider() {
-        return prefs.getString("cloud_provider", "None");
-    }
-    
-    /**
-     * Queue data for backup
-     */
-    public void queueForBackup(long localId, UniversalDataType data) {
+    public void queueForBackup(UniversalDataType data) {
         if (!isBackupEnabled || cloudProvider == null) {
             return;
         }
         
-        BackupItem item = new BackupItem(localId, data);
-        backupQueue.offer(item);
+        BackupItem item = new BackupItem(
+            data.getId(),
+            data.getType(),
+            data.toJson(),
+            data.getFilePath(),
+            System.currentTimeMillis()
+        );
         
-        Log.d(TAG, "Queued for backup: " + data.getType() + " [" + data.getId() + "]");
+        backupQueue.offer(item);
+        Log.d(TAG, "Queued item for backup: " + data.getType());
     }
     
-    /**
-     * Start the backup scheduler
-     */
     private void startBackupScheduler() {
-        // Run backup every 5 minutes
-        scheduler.scheduleWithFixedDelay(this::processBackupQueue, 
-            1, 5, TimeUnit.MINUTES);
+        scheduler.scheduleWithFixedDelay(
+            this::processBackupQueue,
+            1, // Initial delay
+            5, // Period
+            TimeUnit.MINUTES
+        );
     }
     
-    /**
-     * Process the backup queue
-     */
     private void processBackupQueue() {
-        if (!isBackupEnabled || cloudProvider == null || isSyncing) {
+        if (!isBackupEnabled || cloudProvider == null || isSyncing || backupQueue.isEmpty()) {
             return;
         }
         
         isSyncing = true;
+        Log.d(TAG, "Processing backup queue with " + backupQueue.size() + " items");
         
         try {
-            BackupItem item;
-            while ((item = backupQueue.poll()) != null) {
-                backupItem(item);
+            // Process items in batches
+            List<BackupItem> batch = new ArrayList<>();
+            int batchSize = 0;
+            
+            while (!backupQueue.isEmpty() && batchSize < 100) {
+                BackupItem item = backupQueue.poll();
+                if (item != null) {
+                    batch.add(item);
+                    batchSize++;
+                }
             }
+            
+            if (!batch.isEmpty()) {
+                // In a real implementation, this would upload to cloud
+                Log.d(TAG, "Would upload " + batch.size() + " items to cloud");
+                
+                // Mark items as backed up
+                updateBackupStatus(batch);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing backup queue", e);
         } finally {
             isSyncing = false;
         }
     }
     
-    /**
-     * Backup a single item
-     */
-    private void backupItem(BackupItem item) {
-        try {
-            UniversalDataType data = item.data;
-            
-            // Create metadata JSON
-            JSONObject metadata = new JSONObject();
-            metadata.put("type", data.getType());
-            metadata.put("id", data.getId());
-            metadata.put("timestamp", data.getTimestamp());
-            metadata.put("localId", item.localId);
-            
-            String path = "Talita/" + data.getType() + "/" + data.getId() + ".json";
-            
-            // Upload metadata with callback
-            cloudProvider.uploadMetadata(
-                path,
-                data.toJson().getBytes(),
-                new CloudProvider.UploadCallback() {
-                    @Override
-                    public void onSuccess(String uploadedPath) {
-                        Log.d(TAG, "✅ Backed up: " + uploadedPath);
-                        markAsBackedUp(item.localId);
-                    }
-                    
-                    @Override
-                    public void onProgress(int percentage) {
-                        // Could update UI here
-                    }
-                    
-                    @Override
-                    public void onError(String error) {
-                        Log.e(TAG, "❌ Backup failed: " + error);
-                        // Re-queue for retry
-                        backupQueue.offer(item);
-                    }
-                }
-            );
-            
-            // Upload associated file if present
-            if (data.getFilePath() != null) {
-                String filePath = "Talita/" + data.getType() + "/" + data.getId() + "_file";
-                
-                cloudProvider.uploadFile(
-                    filePath,
-                    data.getFilePath(),
-                    new CloudProvider.UploadCallback() {
-                        @Override
-                        public void onSuccess(String uploadedPath) {
-                            Log.d(TAG, "✅ File backed up: " + uploadedPath);
-                        }
-                        
-                        @Override
-                        public void onProgress(int percentage) {
-                            // Could update UI here
-                        }
-                        
-                        @Override
-                        public void onError(String error) {
-                            Log.e(TAG, "❌ File backup failed: " + error);
-                        }
-                    }
-                );
-            }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Backup error", e);
+    private void updateBackupStatus(List<BackupItem> items) {
+        // Update backup status in database
+        for (BackupItem item : items) {
+            Log.d(TAG, "Marked as backed up: " + item.type + " - " + item.id);
         }
     }
     
-    /**
-     * Mark item as backed up in local database
-     */
-    private void markAsBackedUp(long localId) {
-        // Update local database to mark as synced
-        prefs.edit()
-            .putLong("last_backup_" + localId, System.currentTimeMillis())
-            .apply();
-    }
-    
-    /**
-     * Force sync now
-     */
-    public void syncNow() {
-        scheduler.execute(this::processBackupQueue);
-    }
-    
-    /**
-     * Restore from cloud
-     */
-    public void restoreFromCloud(RestoreCallback callback) {
-        if (cloudProvider == null) {
-            callback.onError("No cloud provider configured");
+    public void forceSync() {
+        if (!isBackupEnabled || cloudProvider == null) {
+            Log.w(TAG, "Cannot sync - backup not enabled");
             return;
         }
         
-        scheduler.execute(() -> {
-            try {
-                restoreData(callback);
-            } catch (Exception e) {
-                callback.onError(e.getMessage());
-            }
-        });
+        scheduler.execute(this::processBackupQueue);
     }
     
-    private void restoreData(RestoreCallback callback) {
-        cloudProvider.listFiles("Talita/", new CloudProvider.ListFilesCallback() {
-            @Override
-            public void onSuccess(List<CloudProvider.CloudFile> files) {
-                processRestoredFiles(files, callback);
-            }
-            
-            @Override
-            public void onError(String error) {
-                callback.onError("Failed to list files: " + error);
-            }
-        });
+    public int getQueueSize() {
+        return backupQueue.size();
     }
     
-    private void processRestoredFiles(List<CloudProvider.CloudFile> files, RestoreCallback callback) {
-        List<UniversalDataType> restoredData = new ArrayList<>();
-        int totalFiles = files.size();
-        int[] processedFiles = {0};
-        
-        for (CloudProvider.CloudFile file : files) {
-            if (file.name.endsWith(".json") && !file.name.contains("_file")) {
-                cloudProvider.downloadMetadata(file.name, new CloudProvider.DownloadCallback() {
-                    @Override
-                    public void onSuccess(String jsonData) {
-                        try {
-                            // Parse and restore the data
-                            JSONObject json = new JSONObject(jsonData);
-                            // Create appropriate data type from JSON
-                            // This would need a factory method to recreate the correct type
-                            
-                            processedFiles[0]++;
-                            
-                            if (processedFiles[0] == totalFiles) {
-                                callback.onComplete(restoredData);
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "Failed to parse restored data", e);
-                        }
-                    }
-                    
-                    @Override
-                    public void onProgress(int percentage) {
-                        callback.onProgress(percentage);
-                    }
-                    
-                    @Override
-                    public void onError(String error) {
-                        Log.e(TAG, "Failed to download: " + error);
-                        processedFiles[0]++;
-                        
-                        if (processedFiles[0] == totalFiles) {
-                            callback.onComplete(restoredData);
-                        }
-                    }
-                });
-            } else {
-                processedFiles[0]++;
-                if (processedFiles[0] == totalFiles) {
-                    callback.onComplete(restoredData);
-                }
-            }
-        }
+    public void clearQueue() {
+        backupQueue.clear();
+        Log.d(TAG, "Backup queue cleared");
     }
     
-    /**
-     * Get backup statistics
-     */
-    public BackupStats getBackupStats() {
-        long lastBackup = prefs.getLong("last_backup_time", 0);
-        int queueSize = backupQueue.size();
-        boolean isConnected = cloudProvider != null;
-        
-        return new BackupStats(lastBackup, queueSize, isConnected, isBackupEnabled);
-    }
-    
-    /**
-     * Cleanup resources
-     */
-    public void cleanup() {
+    public void shutdown() {
         scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+        }
     }
     
-    // Inner classes
-    
+    /**
+     * Backup item data class
+     */
     private static class BackupItem {
-        final long localId;
-        final UniversalDataType data;
-        final long queuedTime;
+        final String id;
+        final String type;
+        final String jsonData;
+        final String filePath;
+        final long timestamp;
         
-        BackupItem(long localId, UniversalDataType data) {
-            this.localId = localId;
-            this.data = data;
-            this.queuedTime = System.currentTimeMillis();
+        BackupItem(String id, String type, String jsonData, String filePath, long timestamp) {
+            this.id = id;
+            this.type = type;
+            this.jsonData = jsonData;
+            this.filePath = filePath;
+            this.timestamp = timestamp;
         }
     }
     
-    public static class BackupStats {
-        public final long lastBackupTime;
-        public final int queueSize;
-        public final boolean isConnected;
-        public final boolean isEnabled;
-        
-        BackupStats(long lastBackupTime, int queueSize, boolean isConnected, boolean isEnabled) {
-            this.lastBackupTime = lastBackupTime;
-            this.queueSize = queueSize;
-            this.isConnected = isConnected;
-            this.isEnabled = isEnabled;
-        }
+    /**
+     * Cloud provider interface (to be implemented)
+     */
+    public interface CloudProvider {
+        void initialize(Context context);
+        boolean isAuthenticated();
+        void authenticate(AuthCallback callback);
+        void uploadData(List<BackupItem> items, UploadCallback callback);
+        void downloadData(String type, DownloadCallback callback);
+        void deleteData(String id, DeleteCallback callback);
+        String getProviderName();
     }
     
-    public interface RestoreCallback {
-        void onProgress(int percentage);
-        void onComplete(List<UniversalDataType> restoredData);
+    // Callback interfaces
+    public interface AuthCallback {
+        void onSuccess();
+        void onError(String error);
+    }
+    
+    public interface UploadCallback {
+        void onProgress(int current, int total);
+        void onSuccess(int count);
+        void onError(String error);
+    }
+    
+    public interface DownloadCallback {
+        void onDataReceived(List<JSONObject> data);
+        void onError(String error);
+    }
+    
+    public interface DeleteCallback {
+        void onSuccess();
         void onError(String error);
     }
 }

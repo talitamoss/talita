@@ -11,10 +11,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("https://briarproject.org/maven") }
+        // Add JitPack for MPAndroidChart
         maven { url = uri("https://jitpack.io") }
     }
 }
 
-rootProject.name = "Talita"
+rootProject.name = "DataSovereignty"
 include(":app")

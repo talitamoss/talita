@@ -1,12 +1,10 @@
 package com.core.talita;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
-import android.app.Service;
+import android.Manifest;
+import android.app.*;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -14,55 +12,50 @@ import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
-import android.content.pm.PackageManager;
 import androidx.core.content.ContextCompat;
-import android.Manifest;
+import java.util.Calendar;
 
 /**
- * Background Tracking Service - Continuously collects user data
- *
+ * Background Tracking Service - Runs in foreground to track location/activity
+ * 
  * Features:
- * - Foreground service (survives app closure)
- * - Location tracking with smart intervals
- * - Step counting with daily totals
- * - Activity recognition (walking, driving, etc.)
- * - Battery-optimized collection
- * - Automatic encryption via Universal Data Service
+ * - Continuous location tracking with battery optimization
+ * - Activity recognition (walking, running, driving, etc.)
+ * - Step counting integration
+ * - Smart tracking intervals based on movement
  */
 public class BackgroundTrackingService extends Service implements LocationListener, SensorEventListener {
 
     private static final String TAG = "BackgroundTracking";
-    private static final String CHANNEL_ID = "TalitaTracking";
-    private static final int NOTIFICATION_ID = 1001;
-
-    // Tracking intervals (in milliseconds)
-    private static final long LOCATION_INTERVAL_STATIONARY = 5 * 60 * 1000; // 5 minutes when stationary
+    private static final int NOTIFICATION_ID = AppConstants.TRACKING_NOTIFICATION_ID;
     private static final long LOCATION_INTERVAL_MOVING = 30 * 1000; // 30 seconds when moving
-    private static final long LOCATION_MIN_DISTANCE = 10; // 10 meters minimum distance
+    private static final long LOCATION_INTERVAL_STATIONARY = 5 * 60 * 1000; // 5 minutes when stationary
+    private static final float LOCATION_MIN_DISTANCE = 10.0f; // 10 meters
 
-    // Data collection state
+    // Services
+    private UniversalDataService dataService;
     private LocationManager locationManager;
     private SensorManager sensorManager;
-    private Sensor stepCounterSensor;
-
-    private UniversalDataService dataService;
     private Handler handler;
 
-    // Tracking state
+    // Sensors
+    private Sensor stepCounterSensor;
+
+    // State
+    private boolean isTracking = false;
+    private boolean isMoving = false;
     private Location lastKnownLocation;
     private long lastLocationTime = 0;
     private int dailyStepCount = 0;
-    private int stepCountOffset = 0; // For daily reset
+    private int stepCountOffset = 0;
     private String currentActivity = "unknown";
-    private boolean isMoving = false;
-
-    // Statistics
     private int locationsToday = 0;
     private long serviceStartTime;
 
@@ -89,9 +82,9 @@ public class BackgroundTrackingService extends Service implements LocationListen
         createNotificationChannel();
 
         // Start foreground with location service type for Android 14+
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, createNotification(),
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
         } else {
             startForeground(NOTIFICATION_ID, createNotification());
         }
@@ -143,6 +136,7 @@ public class BackgroundTrackingService extends Service implements LocationListen
         try {
             long interval = isMoving ? LOCATION_INTERVAL_MOVING : LOCATION_INTERVAL_STATIONARY;
 
+            // Request location updates from GPS
             locationManager.requestLocationUpdates(
                     LocationManager.GPS_PROVIDER,
                     interval,
@@ -150,7 +144,7 @@ public class BackgroundTrackingService extends Service implements LocationListen
                     this
             );
 
-            // Also try network provider as backup
+            // Also use network provider as backup
             locationManager.requestLocationUpdates(
                     LocationManager.NETWORK_PROVIDER,
                     interval * 2, // Less frequent for network
@@ -158,10 +152,11 @@ public class BackgroundTrackingService extends Service implements LocationListen
                     this
             );
 
-            Log.d(TAG, "📍 Location tracking started (interval: " + (interval/1000) + "s)");
+            isTracking = true;
+            Log.d(TAG, "📍 Location tracking started with interval: " + interval + "ms");
 
-        } catch (SecurityException e) {
-            Log.e(TAG, "❌ Location permission denied: " + e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to start location tracking", e);
         }
     }
 
@@ -171,9 +166,10 @@ public class BackgroundTrackingService extends Service implements LocationListen
     private void stopLocationTracking() {
         try {
             locationManager.removeUpdates(this);
+            isTracking = false;
             Log.d(TAG, "📍 Location tracking stopped");
-        } catch (SecurityException e) {
-            Log.e(TAG, "❌ Error stopping location tracking: " + e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping location tracking", e);
         }
     }
 
@@ -181,23 +177,19 @@ public class BackgroundTrackingService extends Service implements LocationListen
      * Stop step tracking
      */
     private void stopStepTracking() {
-        if (stepCounterSensor != null) {
+        try {
             sensorManager.unregisterListener(this);
             Log.d(TAG, "👣 Step tracking stopped");
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping step tracking", e);
         }
     }
 
-    /**
-     * Handle location updates
-     */
+    // LocationListener implementation
+
     @Override
     public void onLocationChanged(Location location) {
-        long currentTime = System.currentTimeMillis();
-
-        // Avoid spam - minimum time between locations
-        if (currentTime - lastLocationTime < 10000) { // 10 seconds minimum
-            return;
-        }
+        Log.d(TAG, "📍 New location: " + location.getLatitude() + ", " + location.getLongitude());
 
         // Calculate distance from last location
         float distance = 0;
@@ -205,46 +197,56 @@ public class BackgroundTrackingService extends Service implements LocationListen
             distance = location.distanceTo(lastKnownLocation);
         }
 
-        // Only save if significant movement or time passed
+        // Determine if we should save this location
+        long currentTime = System.currentTimeMillis();
         boolean significantMovement = distance > LOCATION_MIN_DISTANCE;
         boolean significantTime = currentTime - lastLocationTime > LOCATION_INTERVAL_STATIONARY;
 
         if (significantMovement || significantTime) {
-            // Create enhanced location data
-            EnhancedLocationData locationData = new EnhancedLocationData(
-                    location.getLatitude(),
-                    location.getLongitude(),
-                    location.getAccuracy(),
-                    location.getProvider(),
-                    location.getSpeed(),
-                    location.getBearing(),
-                    currentActivity,
-                    dailyStepCount
-            );
+            // Create location data with all available information
+            LocationData locationData = new LocationData.Builder(location.getLatitude(), location.getLongitude())
+                    .accuracy(location.getAccuracy())
+                    .provider(location.getProvider())
+                    .speed(location.getSpeed())
+                    .bearing(location.getBearing())
+                    .activity(currentActivity, 0)  // Activity confidence would come from activity recognition
+                    .steps(dailyStepCount)
+                    .build();
 
             // Save via Universal Data Service (automatic encryption)
-            String dataId = dataService.capture(locationData);
+            dataService.captureData(locationData);
 
-            if (dataId != null) {
-                locationsToday++;
-                lastKnownLocation = location;
-                lastLocationTime = currentTime;
+            locationsToday++;
+            lastKnownLocation = location;
+            lastLocationTime = currentTime;
 
-                // Update movement state
-                isMoving = location.getSpeed() > 1.0; // 1 m/s threshold
+            // Update movement state
+            isMoving = location.getSpeed() > 1.0; // 1 m/s threshold
 
-                // Update notification
-                updateNotification();
+            // Update notification
+            updateNotification();
 
-                Log.d(TAG, "📍 Location saved: " + locationData.getDisplaySummary() +
-                        " (Activity: " + currentActivity + ", Steps: " + dailyStepCount + ")");
-            }
+            Log.d(TAG, "📍 Location saved: " + locationData.getDisplaySummary());
         }
     }
 
-    /**
-     * Handle step counter updates
-     */
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+        Log.d(TAG, "Provider status changed: " + provider + " - " + status);
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+        Log.d(TAG, "Provider enabled: " + provider);
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+        Log.d(TAG, "Provider disabled: " + provider);
+    }
+
+    // SensorEventListener implementation
+
     @Override
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
@@ -261,61 +263,39 @@ public class BackgroundTrackingService extends Service implements LocationListen
             // Save step data every 100 steps
             if (dailyStepCount % 100 == 0 && dailyStepCount > 0) {
                 StepData stepData = new StepData(dailyStepCount);
-                dataService.capture(stepData);
-
-                Log.d(TAG, "👣 Step milestone: " + dailyStepCount + " daily steps");
+                dataService.captureData(stepData);
+                Log.d(TAG, "👣 Steps saved: " + dailyStepCount);
             }
         }
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        // Not needed for step counter
+        // Not used
     }
 
     /**
-     * Update activity from activity recognition
-     */
-    public void updateActivity(String activity) {
-        if (!activity.equals(currentActivity)) {
-            currentActivity = activity;
-
-            // Adjust tracking based on activity
-            boolean wasMoving = isMoving;
-            isMoving = activity.equals("walking") || activity.equals("running") ||
-                    activity.equals("on_bicycle") || activity.equals("in_vehicle");
-
-            // Restart location tracking with new interval if movement state changed
-            if (wasMoving != isMoving) {
-                stopLocationTracking();
-                startLocationTracking();
-            }
-
-            Log.d(TAG, "🏃 Activity changed to: " + activity + " (Moving: " + isMoving + ")");
-        }
-    }
-
-    /**
-     * Check if it's a new day (for step counter reset)
+     * Check if it's a new day
      */
     private boolean isNewDay() {
-        // Simple check - in production you'd want to handle timezone changes
-        long currentDay = System.currentTimeMillis() / (24 * 60 * 60 * 1000);
-        long serviceDay = serviceStartTime / (24 * 60 * 60 * 1000);
-        return currentDay > serviceDay;
+        Calendar now = Calendar.getInstance();
+        Calendar lastCheck = Calendar.getInstance();
+        lastCheck.setTimeInMillis(lastLocationTime);
+
+        return now.get(Calendar.DAY_OF_YEAR) != lastCheck.get(Calendar.DAY_OF_YEAR);
     }
 
     /**
-     * Create notification channel for Android 8+
+     * Create notification channel
      */
     private void createNotificationChannel() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Talita Background Tracking",
+                    AppConstants.NOTIFICATION_CHANNEL_TRACKING,
+                    "Background Tracking",
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Continuously tracks your location and activity");
+            channel.setDescription("Shows when location tracking is active");
             channel.setShowBadge(false);
 
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
@@ -324,22 +304,23 @@ public class BackgroundTrackingService extends Service implements LocationListen
     }
 
     /**
-     * Create persistent notification
+     * Create foreground notification
      */
     private Notification createNotification() {
-        Intent notificationIntent = new Intent(this, DataCollectionActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(
-                this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE
-        );
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Talita is tracking")
-                .setContentText("📍 " + locationsToday + " locations • 👣 " + dailyStepCount + " steps")
-                .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+        String contentText = String.format("📍 %d locations • 👣 %d steps today",
+                locationsToday, dailyStepCount);
+
+        return new NotificationCompat.Builder(this, AppConstants.NOTIFICATION_CHANNEL_TRACKING)
+                .setContentTitle("Tracking your day")
+                .setContentText(contentText)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .build();
     }
 
@@ -351,20 +332,80 @@ public class BackgroundTrackingService extends Service implements LocationListen
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.notify(NOTIFICATION_ID, createNotification());
     }
+}
 
-    // Required LocationListener methods
-    @Override
-    public void onProviderEnabled(String provider) {
-        Log.d(TAG, "📍 Location provider enabled: " + provider);
+/**
+ * Step count data
+ */
+class StepData implements UniversalDataType {
+    private final String id;
+    private final int steps;
+    private final long timestamp;
+    
+    public StepData(int steps) {
+        this.id = UUID.randomUUID().toString();
+        this.steps = steps;
+        this.timestamp = System.currentTimeMillis();
     }
 
     @Override
-    public void onProviderDisabled(String provider) {
-        Log.d(TAG, "📍 Location provider disabled: " + provider);
+    public Map<String, Object> getMetadata() {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("steps", steps);
+        return metadata;
     }
 
     @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-        Log.d(TAG, "📍 Location provider status changed: " + provider + " status: " + status);
+    public String getType() {
+        return "steps";
+    }
+
+    @Override
+    public String getId() {
+        return id;
+    }
+
+    @Override
+    public String toJson() {
+        try {
+            JSONObject json = new JSONObject();
+            json.put("id", id);
+            json.put("type", "steps");
+            json.put("steps", steps);
+            json.put("timestamp", timestamp);
+            return json.toString();
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
+    @Override
+    public String getFilePath() {
+        return null;
+    }
+
+    @Override
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    @Override
+    public double getLatitude() {
+        return 0.0;
+    }
+
+    @Override
+    public double getLongitude() {
+        return 0.0;
+    }
+
+    @Override
+    public String getDisplayName() {
+        return steps + " steps";
+    }
+
+    @Override
+    public String getDisplaySummary() {
+        return getDisplayName();
     }
 }

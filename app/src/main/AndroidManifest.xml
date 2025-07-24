@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -19,20 +21,20 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
-        android:name=".TalitaApp"
+        android:name=".AppMain"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Talita">
+        android:theme="@style/Theme.DataSovereignty">
 
         <!-- MAIN ACTIVITIES -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.Talita">
+            android:theme="@style/Theme.DataSovereignty">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -43,7 +45,7 @@
         <activity android:name=".LocationActivity" />
         <activity android:name=".AudioActivity" />
         <activity android:name=".QuickAddActivity" 
-            android:theme="@style/Theme.Talita.Translucent" />
+            android:theme="@style/Theme.DataSovereignty.Translucent" />
         <activity android:name=".QuickAddTestActivity" />
         
         <!-- DATA MANAGEMENT ACTIVITIES -->
@@ -51,12 +53,12 @@
         <activity android:name=".DataViewActivity" />
         <activity android:name=".DataTypeDetailActivity" />
         <activity android:name=".MyDataActivity"
-            android:theme="@style/Theme.Talita" />
+            android:theme="@style/Theme.DataSovereignty" />
         
         <!-- PATTERN & VISUALIZATION ACTIVITIES -->
         <activity android:name=".PatternsActivity" />
         <activity android:name=".NowViewActivity" 
-            android:theme="@style/Theme.Talita.Fullscreen" />
+            android:theme="@style/Theme.DataSovereignty.Fullscreen" />
         
         <!-- VAULT & EXPORT ACTIVITIES -->
         <activity android:name=".VaultActivity" />
@@ -73,13 +75,13 @@
         
         <!-- PLUGIN ACTIVITIES -->
         <activity android:name=".PluginManagementActivity"
-            android:theme="@style/Theme.Talita" />
+            android:theme="@style/Theme.DataSovereignty" />
         <activity android:name=".LogActivity"
-            android:theme="@style/Theme.Talita.Translucent" />
+            android:theme="@style/Theme.DataSovereignty.Translucent" />
 
         <!-- SERVICES -->
         <service android:name=".BackgroundTrackingService"
-            android:foregroundServiceType="location"
+            android:foregroundServiceType="location|mediaPlayback"
             android:exported="false" />
 
         <!-- RECEIVERS -->

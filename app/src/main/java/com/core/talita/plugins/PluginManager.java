@@ -47,159 +47,122 @@ public class PluginManager {
         registerPlugin(new com.core.talita.plugins.i.SleepPlugin());
         
         // "We" category - Relationship/connection plugins
-        registerPlugin(new com.core.talita.plugins.we.FocusPlugin());
-        registerPlugin(new com.core.talita.plugins.we.RelationshipsPlugin());
+        registerPlugin(new com.core.talita.plugins.we.SharedLocationPlugin());
+        registerPlugin(new com.core.talita.plugins.we.SharedMoodPlugin());
         
-        // "All" category - World/environment plugins
-        registerPlugin(new com.core.talita.plugins.all.LocationPlugin());
+        // "All" category - Universal plugins
+        registerPlugin(new com.core.talita.plugins.all.WeatherPlugin());
+        registerPlugin(new com.core.talita.plugins.all.EnvironmentPlugin());
         
         Log.d(TAG, "Loaded " + plugins.size() + " built-in plugins");
     }
     
     /**
-     * Register a new plugin
+     * Register a plugin
      */
     public void registerPlugin(DataCollectorPlugin plugin) {
-        String id = plugin.getPluginId();
+        String id = plugin.getId();
         plugins.put(id, plugin);
         
-        if (isPluginEnabled(id)) {
-            plugin.onPluginEnabled(context);
+        // Initialize plugin
+        plugin.initialize(context);
+        
+        // Check if enabled
+        boolean isEnabled = prefs.getBoolean("plugin_" + id + "_enabled", true);
+        if (isEnabled) {
+            plugin.enable();
         }
         
+        // Notify listeners
         for (PluginListener listener : listeners) {
             listener.onPluginRegistered(plugin);
         }
         
-        Log.d(TAG, "Registered plugin: " + id + " [" + plugin.getCategory() + "]");
+        Log.d(TAG, "Registered plugin: " + plugin.getName());
     }
     
     /**
-     * Get all registered plugins
+     * Get all plugins
      */
     public List<DataCollectorPlugin> getAllPlugins() {
         return new ArrayList<>(plugins.values());
     }
     
     /**
-     * Get plugins by category (I, We, or All)
+     * Get plugins by category
      */
     public List<DataCollectorPlugin> getPluginsByCategory(String category) {
         return plugins.values().stream()
-            .filter(p -> p.getCategory().equals(category))
-            .sorted((a, b) -> b.getPriority() - a.getPriority())
-            .collect(Collectors.toList());
-    }
-    
-    /**
-     * Get enabled plugins that support quick add
-     */
-    public List<DataCollectorPlugin> getQuickAddPlugins() {
-        return plugins.values().stream()
-            .filter(p -> isPluginEnabled(p.getPluginId()))
-            .filter(DataCollectorPlugin::supportsQuickAdd)
-            .sorted((a, b) -> b.getPriority() - a.getPriority())
-            .collect(Collectors.toList());
-    }
-    
-    /**
-     * Get plugins organized by I • We • All categories
-     */
-    public Map<String, List<DataCollectorPlugin>> getPluginsByCategoryMap() {
-        Map<String, List<DataCollectorPlugin>> categoryMap = new LinkedHashMap<>();
-        
-        // Ensure order: I, We, All
-        for (String category : PluginCategories.getAllCategories()) {
-            categoryMap.put(category, getPluginsByCategory(category));
-        }
-        
-        return categoryMap;
-    }
-    
-    /**
-     * Get a specific plugin
-     */
-    public DataCollectorPlugin getPlugin(String pluginId) {
-        return plugins.get(pluginId);
-    }
-    
-    /**
-     * Check if a plugin is enabled
-     */
-    public boolean isPluginEnabled(String pluginId) {
-        // Core plugins are enabled by default
-        boolean defaultEnabled = isCorePlugin(pluginId);
-        return prefs.getBoolean(pluginId + "_enabled", defaultEnabled);
-    }
-    
-    /**
-     * Enable or disable a plugin
-     */
-    public void setPluginEnabled(String pluginId, boolean enabled) {
-        DataCollectorPlugin plugin = plugins.get(pluginId);
-        if (plugin == null) return;
-        
-        boolean wasEnabled = isPluginEnabled(pluginId);
-        prefs.edit().putBoolean(pluginId + "_enabled", enabled).apply();
-        
-        if (enabled && !wasEnabled) {
-            plugin.onPluginEnabled(context);
-            for (PluginListener listener : listeners) {
-                listener.onPluginEnabled(plugin);
-            }
-        } else if (!enabled && wasEnabled) {
-            plugin.onPluginDisabled(context);
-            for (PluginListener listener : listeners) {
-                listener.onPluginDisabled(plugin);
-            }
-        }
-    }
-    
-    /**
-     * Check if this is a core plugin (enabled by default)
-     */
-    private boolean isCorePlugin(String pluginId) {
-        return pluginId.equals("i.water") || 
-               pluginId.equals("i.exercise") ||
-               pluginId.equals("i.mood");
-    }
-    
-    /**
-     * Get plugin statistics by category
-     */
-    public Map<String, Integer> getPluginStats() {
-        Map<String, Integer> stats = new LinkedHashMap<>();
-        
-        for (String category : PluginCategories.getAllCategories()) {
-            int count = (int) plugins.values().stream()
                 .filter(p -> p.getCategory().equals(category))
-                .count();
-            stats.put(category, count);
-        }
-        
-        return stats;
+                .collect(Collectors.toList());
     }
     
     /**
-     * Add a plugin listener
+     * Get enabled plugins
+     */
+    public List<DataCollectorPlugin> getEnabledPlugins() {
+        return plugins.values().stream()
+                .filter(DataCollectorPlugin::isEnabled)
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get plugin by ID
+     */
+    public DataCollectorPlugin getPlugin(String id) {
+        return plugins.get(id);
+    }
+    
+    /**
+     * Enable/disable plugin
+     */
+    public void setPluginEnabled(String id, boolean enabled) {
+        DataCollectorPlugin plugin = plugins.get(id);
+        if (plugin != null) {
+            if (enabled) {
+                plugin.enable();
+            } else {
+                plugin.disable();
+            }
+            
+            // Save preference
+            prefs.edit().putBoolean("plugin_" + id + "_enabled", enabled).apply();
+            
+            // Notify listeners
+            for (PluginListener listener : listeners) {
+                listener.onPluginStateChanged(plugin, enabled);
+            }
+        }
+    }
+    
+    /**
+     * Add plugin listener
      */
     public void addListener(PluginListener listener) {
         listeners.add(listener);
     }
     
     /**
-     * Remove a plugin listener
+     * Remove plugin listener
      */
     public void removeListener(PluginListener listener) {
         listeners.remove(listener);
     }
     
     /**
-     * Plugin lifecycle listener
+     * Plugin categories
+     */
+    public static class Categories {
+        public static final String I = "I";     // Personal/self
+        public static final String WE = "We";   // Relationships
+        public static final String ALL = "All"; // Universal
+    }
+    
+    /**
+     * Plugin listener interface
      */
     public interface PluginListener {
         void onPluginRegistered(DataCollectorPlugin plugin);
-        void onPluginEnabled(DataCollectorPlugin plugin);
-        void onPluginDisabled(DataCollectorPlugin plugin);
+        void onPluginStateChanged(DataCollectorPlugin plugin, boolean enabled);
     }
 }
