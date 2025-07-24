@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background color -->
+    <item android:drawable="@color/background_dark" />
+    
+    <!-- Logo/Icon in center (optional) -->
+    <!-- Uncomment and add your logo if you have one -->
+    <!--
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/ic_launcher_foreground" />
+    </item>
+    -->
+    
+    <!-- For now, just show app name text -->
+    <item>
+        <shape>
+            <solid android:color="@color/background_dark" />
+        </shape>
+    </item>
+</layer-list>

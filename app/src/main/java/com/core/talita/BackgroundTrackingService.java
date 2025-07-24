@@ -21,6 +21,10 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 import java.util.Calendar;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.UUID;
+import org.json.JSONObject;
 
 /**
  * Background Tracking Service - Runs in foreground to track location/activity

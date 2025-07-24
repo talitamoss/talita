@@ -39,7 +39,7 @@
     
     <!-- Settings -->
     <string name="general_settings">General Settings</string>
-    <string name="privacy_security">Privacy & Security</string>
+    <string name="privacy_security">Privacy and Security</string>
     <string name="data_collection">Data Collection</string>
     <string name="cloud_backup">Cloud Backup</string>
     <string name="export_data">Export Data</string>
