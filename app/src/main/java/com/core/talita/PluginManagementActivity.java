@@ -53,7 +53,10 @@ public class PluginManagementActivity extends AppCompatActivity {
     
     private void setupUI() {
         // Back button
-        findViewById(R.id.back_button).setOnClickListener(v -> finish());
+        View backButton = findViewById(R.id.back_button);
+        if (backButton != null) {
+            backButton.setOnClickListener(v -> finish());
+        }
         
         // Hide search for now (coming soon)
         View searchView = findViewById(R.id.search_view);
@@ -81,11 +84,9 @@ public class PluginManagementActivity extends AppCompatActivity {
             switch (position) {
                 case 0:
                     tab.setText("Installed");
-                    tab.setIcon(R.drawable.ic_installed);
                     break;
                 case 1:
                     tab.setText("Coming Soon");
-                    tab.setIcon(R.drawable.ic_updates);
                     break;
             }
         }).attach();
@@ -135,9 +136,9 @@ public class PluginManagementActivity extends AppCompatActivity {
      */
     public static class InstalledPluginsFragment extends androidx.fragment.app.Fragment {
         private RecyclerView recyclerView;
-        private InstalledPluginAdapter adapter;
-        private PluginManager pluginManager;
+        private InstalledPluginsAdapter adapter;
         private TextView emptyText;
+        private PluginManager pluginManager;
         
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -148,19 +149,11 @@ public class PluginManagementActivity extends AppCompatActivity {
             recyclerView = view.findViewById(R.id.recycler_view);
             emptyText = view.findViewById(R.id.empty_text);
             
-            setupRecyclerView();
+            recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+            
             loadInstalledPlugins();
             
             return view;
-        }
-        
-        private void setupRecyclerView() {
-            recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-            adapter = new InstalledPluginAdapter(new ArrayList<>(), plugin -> {
-                // Handle plugin click
-                showPluginOptions(plugin);
-            });
-            recyclerView.setAdapter(adapter);
         }
         
         private void loadInstalledPlugins() {
@@ -172,19 +165,21 @@ public class PluginManagementActivity extends AppCompatActivity {
             } else {
                 recyclerView.setVisibility(View.VISIBLE);
                 emptyText.setVisibility(View.GONE);
-                adapter.updatePlugins(plugins);
+                
+                adapter = new InstalledPluginsAdapter(plugins, this::showPluginDetails);
+                recyclerView.setAdapter(adapter);
             }
         }
         
-        private void showPluginOptions(DataCollectorPlugin plugin) {
+        private void showPluginDetails(DataCollectorPlugin plugin) {
             boolean isEnabled = pluginManager.isPluginEnabled(plugin.getPluginId());
             
             new AlertDialog.Builder(getContext())
-                .setTitle(plugin.getEmoji() + " " + plugin.getPluginName())
+                .setTitle(plugin.getPluginName())
                 .setMessage("Version: " + plugin.getPluginVersion() + "\n" +
-                          "Author: " + plugin.getAuthor() + "\n" +
-                          "Category: " + plugin.getCategory() + "\n" +
-                          "Status: " + (isEnabled ? "Enabled" : "Disabled"))
+                           "Author: " + plugin.getAuthor() + "\n" +
+                           "Category: " + plugin.getCategory() + "\n\n" +
+                           "Status: " + (isEnabled ? "Enabled" : "Disabled"))
                 .setPositiveButton(isEnabled ? "Disable" : "Enable", (dialog, which) -> {
                     pluginManager.setPluginEnabled(plugin.getPluginId(), !isEnabled);
                     loadInstalledPlugins();
@@ -205,67 +200,51 @@ public class PluginManagementActivity extends AppCompatActivity {
         public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
             View view = inflater.inflate(R.layout.fragment_coming_soon, container, false);
             
-            // Setup coming soon cards
-            setupComingSoonCard(view, R.id.card_marketplace, 
-                "Plugin Marketplace", 
-                "Browse and install community plugins",
-                "🛍️");
-                
-            setupComingSoonCard(view, R.id.card_developer, 
-                "Developer Portal", 
-                "Create and publish your own plugins",
-                "👩‍💻");
-                
-            setupComingSoonCard(view, R.id.card_sdk, 
-                "Plugin SDK", 
-                "Tools and libraries for plugin development",
-                "🛠️");
-                
-            setupComingSoonCard(view, R.id.card_revenue, 
-                "Revenue Sharing", 
-                "Monetize your plugins",
-                "💰");
+            // No need to setup cards manually - they're already in the layout
+            // Just set click listeners for each card
+            
+            CardView marketplaceCard = view.findViewById(R.id.card_marketplace);
+            if (marketplaceCard != null) {
+                marketplaceCard.setOnClickListener(v -> 
+                    Toast.makeText(getContext(), "Plugin Marketplace coming soon!", Toast.LENGTH_SHORT).show());
+            }
+            
+            CardView developerCard = view.findViewById(R.id.card_developer);
+            if (developerCard != null) {
+                developerCard.setOnClickListener(v -> 
+                    Toast.makeText(getContext(), "Developer Portal coming soon!", Toast.LENGTH_SHORT).show());
+            }
+            
+            CardView sdkCard = view.findViewById(R.id.card_sdk);
+            if (sdkCard != null) {
+                sdkCard.setOnClickListener(v -> 
+                    Toast.makeText(getContext(), "Plugin SDK coming soon!", Toast.LENGTH_SHORT).show());
+            }
+            
+            CardView revenueCard = view.findViewById(R.id.card_revenue);
+            if (revenueCard != null) {
+                revenueCard.setOnClickListener(v -> 
+                    Toast.makeText(getContext(), "Revenue Sharing coming soon!", Toast.LENGTH_SHORT).show());
+            }
             
             return view;
-        }
-        
-        private void setupComingSoonCard(View parent, int cardId, String title, String desc, String emoji) {
-            CardView card = parent.findViewById(cardId);
-            if (card != null) {
-                TextView titleView = card.findViewById(android.R.id.text1);
-                TextView descView = card.findViewById(android.R.id.text2);
-                TextView emojiView = card.findViewById(android.R.id.icon);
-                
-                if (titleView != null) titleView.setText(title);
-                if (descView != null) descView.setText(desc);
-                if (emojiView != null) emojiView.setText(emoji);
-                
-                card.setOnClickListener(v -> {
-                    Toast.makeText(getContext(), "Coming soon!", Toast.LENGTH_SHORT).show();
-                });
-            }
         }
     }
     
     /**
      * Adapter for installed plugins
      */
-    private static class InstalledPluginAdapter extends RecyclerView.Adapter<InstalledPluginAdapter.ViewHolder> {
-        private List<DataCollectorPlugin> plugins;
+    private static class InstalledPluginsAdapter extends RecyclerView.Adapter<InstalledPluginsAdapter.ViewHolder> {
+        private final List<DataCollectorPlugin> plugins;
         private final OnPluginClickListener listener;
         
         interface OnPluginClickListener {
             void onPluginClick(DataCollectorPlugin plugin);
         }
         
-        InstalledPluginAdapter(List<DataCollectorPlugin> plugins, OnPluginClickListener listener) {
+        InstalledPluginsAdapter(List<DataCollectorPlugin> plugins, OnPluginClickListener listener) {
             this.plugins = plugins;
             this.listener = listener;
-        }
-        
-        void updatePlugins(List<DataCollectorPlugin> plugins) {
-            this.plugins = plugins;
-            notifyDataSetChanged();
         }
         
         @Override
@@ -278,21 +257,21 @@ public class PluginManagementActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
             DataCollectorPlugin plugin = plugins.get(position);
+            PluginManager pluginManager = PluginManager.getInstance(holder.itemView.getContext());
             
+            // Set plugin info
             holder.emoji.setText(plugin.getEmoji());
             holder.name.setText(plugin.getPluginName());
             holder.version.setText("v" + plugin.getPluginVersion());
             holder.author.setText("by " + plugin.getAuthor());
             
-            // Category badge
+            // Category with color
             holder.category.setText(plugin.getCategory());
-            holder.category.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                PluginCategories.getCategoryColor(plugin.getCategory())
-            ));
+            int categoryColor = PluginCategories.getCategoryColor(plugin.getCategory());
+            holder.category.setTextColor(categoryColor);
             
-            // Enabled state
-            boolean isEnabled = PluginManager.getInstance(holder.itemView.getContext())
-                .isPluginEnabled(plugin.getPluginId());
+            // Status
+            boolean isEnabled = pluginManager.isPluginEnabled(plugin.getPluginId());
             holder.status.setText(isEnabled ? "Enabled" : "Disabled");
             holder.status.setTextColor(isEnabled ? 0xFF4CAF50 : 0xFF757575);
             

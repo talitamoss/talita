@@ -40,7 +40,7 @@ android {
 
     buildFeatures {
         viewBinding = true
-        // Disable data binding to avoid menu/selector issues
+        // Disable data binding completely
         dataBinding = false
     }
 
@@ -51,11 +51,10 @@ android {
 }
 
 dependencies {
-    // Core Android
-    implementation(libs.core.ktx)
-    implementation(libs.appcompat)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.constraintlayout)
+    // Core Android - Use older versions compatible with SDK 34
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     
     // Material Design
     implementation("com.google.android.material:material:1.12.0")
@@ -70,16 +69,16 @@ dependencies {
     implementation("androidx.cardview:cardview:1.0.0")
     
     // Kotlin
-    implementation(libs.kotlin)
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
     
     // Location & Activity Recognition
     implementation("com.google.android.gms:play-services-location:21.3.0")
     
     // Maps
-    implementation(libs.osmdroidAndroid)
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
     
     // QR Code
-    implementation(libs.zxing.android.embedded)
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     
     // Dependency Injection
     implementation("com.google.dagger:dagger:2.51.1")
@@ -89,10 +88,10 @@ dependencies {
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     
     // Core library desugaring
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     
     // Testing
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.ext.junit)
-    androidTestImplementation(libs.espresso.core)
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }

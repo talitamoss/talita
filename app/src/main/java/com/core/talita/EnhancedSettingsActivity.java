@@ -82,8 +82,9 @@ public class EnhancedSettingsActivity extends AppCompatActivity {
         if (debugLoggingSwitch != null) {
             debugLoggingSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 prefs.edit().putBoolean("debug_logging", isChecked).apply();
-                // Apply debug logging changes
-                UniversalDataService.setDebugMode(isChecked);
+                // Debug logging is handled per-instance in UniversalDataService
+                Toast.makeText(this, isChecked ? "Debug logging enabled" : "Debug logging disabled", 
+                    Toast.LENGTH_SHORT).show();
             });
         }
         

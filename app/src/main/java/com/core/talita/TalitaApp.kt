@@ -47,7 +47,8 @@ class TalitaApp : Application() {
         val prefs = getSharedPreferences("EnhancedSettings", MODE_PRIVATE)
         val debugMode = prefs.getBoolean("debug_logging", false)
         if (debugMode) {
-            UniversalDataService.setDebugMode(true)
+            Log.d(TAG, "Debug mode is enabled")
+            // Debug mode is handled per-instance in UniversalDataService
         }
         
         Log.d(TAG, "Application initialized successfully")
@@ -128,10 +129,9 @@ class TalitaApp : Application() {
                 Log.d(TAG, "Created plugins directory")
             }
             
-            // Initialize plugin manager singleton
-            PluginManager.getInstance(this)
-            
-            Log.d(TAG, "Plugin system initialized")
+            // Plugin manager will be initialized when first accessed
+            // via PluginManager.getInstance(context)
+            Log.d(TAG, "Plugin system ready")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize plugin system", e)
         }
