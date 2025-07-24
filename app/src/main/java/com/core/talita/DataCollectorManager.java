@@ -1,316 +1,235 @@
 package com.core.talita;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.util.Log;
-import com.core.talita.collectors.*;
+import com.core.talita.api.*;
+import com.core.talita.plugins.PluginManager;
+import com.core.talita.plugins.DataCollectorPlugin;
 import java.util.*;
-import com.core.talita.dynamic.*;
 
 /**
- * Data Collector Manager - manages all data collectors
- * Works with your existing collector files
+ * Data Collector Manager - manages data collectors from plugins
+ * No more hard-coded collectors - everything comes from plugins
  */
 public class DataCollectorManager {
     private static final String TAG = "DataCollectorManager";
 
     private final Context context;
     private final UniversalDataService dataService;
-    private final List<DataCollector> collectors;
+    private final PluginManager pluginManager;
     private final Map<String, DataCollector> activeCollectors;
 
     public DataCollectorManager(Context context) {
         this.context = context;
-        this.dataService = new UniversalDataService(context);
-        this.collectors = new ArrayList<>();
+        this.dataService = UniversalDataService.getInstance(context);
+        this.pluginManager = PluginManager.getInstance(context);
         this.activeCollectors = new HashMap<>();
 
-        registerAllCollectors();
-
-        Log.d(TAG, "📊 Data Collector Manager initialized with " + collectors.size() + " collectors");
+        Log.d(TAG, "📊 Data Collector Manager initialized");
     }
 
     /**
-     * Register all your existing collectors
-     */
-    @SuppressLint("SuspiciousIndentation")
-    private void registerAllCollectors() {
-        // Register all your existing collectors
-        addCollector(new WaterCollector());
-        addCollector(new ExerciseCollector());
-        addCollector(new MoodCollector());
-        addCollector(new NutritionCollector());
-        addCollector(new SleepCollector());
-        addCollector(new SubstanceCollector());
-
-        Log.d(TAG, "📋 Registered " + collectors.size() + " data collectors");
-	    registerDynamicCollectors();
-
-    }
-
-    /**
-     * Add a collector to the system
-     */
-    public void addCollector(DataCollector collector) {
-        collectors.add(collector);
-        Log.d(TAG, "➕ Added collector: " + collector.getIcon() + " " + collector.getDisplayName());
-    }
-
-    /**
-     * Start collecting for all enabled data types
+     * Start collecting for all enabled plugins
      */
     public void startEnabledCollectors() {
         int startedCount = 0;
 
-        for (DataCollector collector : collectors) {
-            if (collector.isEnabled(context) && collector.isAvailable(context)) {
-                startCollector(collector);
-                startedCount++;
+        // Get collectors from all enabled plugins
+        List<DataCollectorPlugin> enabledPlugins = pluginManager.getEnabledPlugins();
+        
+        for (DataCollectorPlugin plugin : enabledPlugins) {
+            try {
+                DataCollector collector = plugin.createCollector(context);
+                if (collector != null) {
+                    collector.initialize(context);
+                    
+                    // Only start automated collection if configured
+                    if (collector.getSettings().isAutomatedCollection()) {
+                        collector.startAutomatedCollection();
+                    }
+                    
+                    activeCollectors.put(plugin.getPluginId(), collector);
+                    startedCount++;
+                    Log.d(TAG, "▶️ Started: " + collector.getDisplayName() + " from " + plugin.getPluginId());
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to start collector from plugin: " + plugin.getPluginId(), e);
             }
         }
 
-        Log.d(TAG, "🚀 Started " + startedCount + " enabled collectors");
-    }
-
-
-public void registerDynamicCollectors() {
-    CollectorSchemaManager schemaManager = new CollectorSchemaManager(context);
-    for (CollectorSchema schema : schemaManager.getAllSchemas()) {
-        addCollector(new DynamicCollector(schema));
-        Log.d(TAG, "➕ Registered dynamic collector: " + schema.getName());
-    }
-}
-    /**
-     * Start a specific collector
-     */
-    private void startCollector(DataCollector collector) {
-        try {
-            collector.startCollection(context, new DataCollectionCallback() {
-                @Override
-                public void onDataCollected(PersonalData data) {
-                    // Save through Universal Data Service (automatic encryption)
-                    String dataId = dataService.capture(new PersonalDataAdapter(data));
-
-                    if (dataId != null) {
-                        Log.d(TAG, "📊 " + collector.getIcon() + " " + data.getDisplaySummary());
-                    } else {
-                        Log.e(TAG, "❌ Failed to save " + collector.getDisplayName() + " data");
-                    }
-                }
-
-                @Override
-                public void onCollectionError(String error) {
-                    Log.e(TAG, "❌ " + collector.getDisplayName() + " error: " + error);
-                }
-            });
-
-            activeCollectors.put(collector.getDataType(), collector);
-            Log.d(TAG, "✅ Started collector: " + collector.getDisplayName());
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to start " + collector.getDisplayName() + ": " + e.getMessage());
-        }
+        Log.d(TAG, "✅ Started " + startedCount + " collectors from plugins");
     }
 
     /**
-     * Stop a specific collector
-     */
-    public void stopCollector(String dataType) {
-        DataCollector collector = activeCollectors.get(dataType);
-        if (collector != null) {
-            collector.stopCollection(context);
-            activeCollectors.remove(dataType);
-            Log.d(TAG, "🛑 Stopped collector: " + collector.getDisplayName());
-        }
-    }
-
-    /**
-     * Stop all collectors
+     * Stop all active collectors
      */
     public void stopAllCollectors() {
-        for (DataCollector collector : activeCollectors.values()) {
-            collector.stopCollection(context);
+        for (Map.Entry<String, DataCollector> entry : activeCollectors.entrySet()) {
+            try {
+                DataCollector collector = entry.getValue();
+                if (collector.isCollectingAutomatically()) {
+                    collector.stopAutomatedCollection();
+                }
+                collector.onDestroy();
+                Log.d(TAG, "⏹️ Stopped: " + collector.getDisplayName());
+            } catch (Exception e) {
+                Log.e(TAG, "Error stopping collector", e);
+            }
         }
         activeCollectors.clear();
-        Log.d(TAG, "🛑 Stopped all collectors");
     }
 
     /**
-     * Get all available collectors for settings UI
+     * Get active collector by plugin ID
      */
-    public List<DataCollector> getAllCollectors() {
-        return new ArrayList<>(collectors);
+    public DataCollector getActiveCollector(String pluginId) {
+        return activeCollectors.get(pluginId);
     }
 
     /**
-     * Get collectors organized by category for settings UI
+     * Get all available collectors from plugins
      */
-    public Map<String, List<DataCollector>> getCollectorsByCategory() {
-        Map<String, List<DataCollector>> categories = new LinkedHashMap<>();
-
-        for (DataCollector collector : collectors) {
-            String category = getCollectorCategory(collector);
-            categories.computeIfAbsent(category, k -> new ArrayList<>()).add(collector);
-        }
-
-        return categories;
-    }
-
-    /**
-     * Categorize collectors for organized UI
-     */
-    private String getCollectorCategory(DataCollector collector) {
-        String type = collector.getDataType();
-
-        switch (type) {
-            case "location":
-            case "steps":
-            case "activity":
-            case "exercise":
-                return "Movement & Fitness";
-
-            case "water":
-            case "nutrition":
-            case "sleep":
-            case "mood":
-                return "Lifestyle & Wellness";
-
-            case "substance":
-            case "alcohol":
-            case "medication":
-                return "Substances & Habits";
-
-            case "menstrual":
-            case "heartrate":
-            case "weight":
-                return "Health & Biometrics";
-
-            case "screentime":
-            case "appusage":
-                return "Digital Wellness";
-
-            default:
-                return "Other";
-        }
-    }
-
-    /**
-     * Get collector by data type
-     */
-    public DataCollector getCollector(String dataType) {
-        for (DataCollector collector : collectors) {
-            if (collector.getDataType().equals(dataType)) {
-                return collector;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Check if a collector is currently active
-     */
-    public boolean isCollectorActive(String dataType) {
-        return activeCollectors.containsKey(dataType);
-    }
-
-    /**
-     * Get statistics about current collection
-     */
-    public CollectionStats getCollectionStats() {
-        int enabledCount = 0;
-        int availableCount = 0;
-
-        for (DataCollector collector : collectors) {
-            if (collector.isAvailable(context)) {
-                availableCount++;
-                if (collector.isEnabled(context)) {
-                    enabledCount++;
+    public List<DataCollector> getAllAvailableCollectors() {
+        List<DataCollector> collectors = new ArrayList<>();
+        
+        for (DataCollectorPlugin plugin : pluginManager.getAllPlugins()) {
+            try {
+                DataCollector collector = plugin.createCollector(context);
+                if (collector != null) {
+                    collector.initialize(context);
+                    collectors.add(collector);
                 }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to create collector from plugin: " + plugin.getPluginId(), e);
             }
         }
-
-        return new CollectionStats(
-                collectors.size(),
-                availableCount,
-                enabledCount,
-                activeCollectors.size(),
-                getCollectorsByCategory()
-        );
+        
+        return collectors;
     }
 
     /**
-     * Enable/disable a specific collector
+     * Quick logging through plugin collectors
      */
-    public void setCollectorEnabled(String dataType, boolean enabled) {
-        DataCollector collector = getCollector(dataType);
+    public void quickLog(String pluginId, Map<String, Object> data) {
+        DataCollector collector = activeCollectors.get(pluginId);
+        
+        if (collector == null) {
+            // Try to create collector if not active
+            DataCollectorPlugin plugin = pluginManager.getPlugin(pluginId);
+            if (plugin != null) {
+                collector = plugin.createCollector(context);
+                collector.initialize(context);
+            }
+        }
+        
         if (collector != null) {
-            // Store the setting
-            context.getSharedPreferences("personal_data_collectors", Context.MODE_PRIVATE)
-                    .edit()
-                    .putBoolean(dataType + "_enabled", enabled)
-                    .apply();
-
-            if (enabled && collector.isAvailable(context)) {
-                startCollector(collector);
+            CollectorResult result = collector.collectQuick(data);
+            
+            if (result.isSuccess()) {
+                Log.d(TAG, "✅ Quick logged data for: " + pluginId);
             } else {
-                stopCollector(dataType);
+                Log.e(TAG, "❌ Quick log failed for " + pluginId + ": " + result.getErrorMessage());
             }
-
-            Log.d(TAG, "⚙️ " + collector.getDisplayName() + " " + (enabled ? "enabled" : "disabled"));
+        } else {
+            Log.e(TAG, "No collector found for plugin: " + pluginId);
         }
     }
 
     /**
-     * Quick logging methods for easy data entry
+     * Trigger collection UI for a specific plugin
      */
-    public void quickLogWater(int amountMl) {
-        WaterCollector.logWater(context, amountMl);
+    public void triggerCollection(String pluginId) {
+        DataCollector collector = activeCollectors.get(pluginId);
+        
+        if (collector != null) {
+            CollectorResult result = collector.collect();
+            
+            if (result.isSuccess()) {
+                Log.d(TAG, "✅ Collection successful for: " + pluginId);
+            } else {
+                Log.e(TAG, "❌ Collection failed for " + pluginId + ": " + result.getErrorMessage());
+            }
+        } else {
+            Log.e(TAG, "No active collector for plugin: " + pluginId);
+        }
     }
 
-    public void quickLogExercise(String type, String duration) {
-        ExerciseCollector.logExercise(context, type, duration, "moderate");
+    /**
+     * Update collector settings
+     */
+    public void updateCollectorSettings(String pluginId, CollectorSettings newSettings) {
+        DataCollector collector = activeCollectors.get(pluginId);
+        
+        if (collector != null) {
+            collector.updateSettings(newSettings);
+            
+            // Handle automated collection changes
+            if (newSettings.isAutomatedCollection() && !collector.isCollectingAutomatically()) {
+                collector.startAutomatedCollection();
+            } else if (!newSettings.isAutomatedCollection() && collector.isCollectingAutomatically()) {
+                collector.stopAutomatedCollection();
+            }
+            
+            Log.d(TAG, "Updated settings for: " + pluginId);
+        }
     }
 
-    public void quickLogMood(int rating, String description) {
-        MoodCollector.logMood(context, rating, description, "");
-    }
-
-    public void quickLogSleep(double hours, String quality) {
-        long now = System.currentTimeMillis();
-        long bedtime = now - (long)(hours * 60 * 60 * 1000); // Estimate bedtime
-        SleepCollector.logSleep(context, hours, quality, bedtime, now);
-    }
-
-    public void quickLogMeal(String mealType, String description) {
-        NutritionCollector.logMeal(context, mealType, description, "");
-    }
-
-    public void quickLogSubstance(String type, String amount) {
-        SubstanceCollector.logSubstance(context, type, amount, "");
+    /**
+     * Get statistics about collection system
+     */
+    public CollectionStats getStats() {
+        List<DataCollectorPlugin> allPlugins = pluginManager.getAllPlugins();
+        List<DataCollectorPlugin> enabledPlugins = pluginManager.getEnabledPlugins();
+        
+        Map<String, List<DataCollector>> collectorsByCategory = new HashMap<>();
+        int automatedCount = 0;
+        
+        // Group by category and count automated
+        for (Map.Entry<String, DataCollector> entry : activeCollectors.entrySet()) {
+            DataCollector collector = entry.getValue();
+            String category = collector.getCategory();
+            
+            if (!collectorsByCategory.containsKey(category)) {
+                collectorsByCategory.put(category, new ArrayList<>());
+            }
+            collectorsByCategory.get(category).add(collector);
+            
+            if (collector.isCollectingAutomatically()) {
+                automatedCount++;
+            }
+        }
+        
+        return new CollectionStats(
+            allPlugins.size(),
+            enabledPlugins.size(),
+            activeCollectors.size(),
+            automatedCount,
+            collectorsByCategory
+        );
     }
 
     /**
      * Statistics about collection system
      */
     public static class CollectionStats {
-        public final int totalCollectors;
-        public final int availableCollectors;
-        public final int enabledCollectors;
+        public final int totalPlugins;
+        public final int enabledPlugins;
         public final int activeCollectors;
+        public final int automatedCollectors;
         public final Map<String, List<DataCollector>> collectorsByCategory;
 
-        public CollectionStats(int totalCollectors, int availableCollectors,
-                               int enabledCollectors, int activeCollectors,
+        public CollectionStats(int totalPlugins, int enabledPlugins,
+                               int activeCollectors, int automatedCollectors,
                                Map<String, List<DataCollector>> collectorsByCategory) {
-            this.totalCollectors = totalCollectors;
-            this.availableCollectors = availableCollectors;
-            this.enabledCollectors = enabledCollectors;
+            this.totalPlugins = totalPlugins;
+            this.enabledPlugins = enabledPlugins;
             this.activeCollectors = activeCollectors;
+            this.automatedCollectors = automatedCollectors;
             this.collectorsByCategory = collectorsByCategory;
         }
 
         public String getSummary() {
-            return activeCollectors + "/" + enabledCollectors + " collectors active";
+            return activeCollectors + " active (" + automatedCollectors + " automated)";
         }
     }
 }

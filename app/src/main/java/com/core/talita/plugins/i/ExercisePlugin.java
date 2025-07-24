@@ -2,25 +2,23 @@ package com.core.talita.plugins.i;
 
 import android.content.Context;
 import android.graphics.Color;
-import com.core.talita.collectors.DataCollector;
-import com.core.talita.collectors.ExerciseCollector;
+import com.core.talita.api.DataCollector;
+import com.core.talita.plugins.base.SimpleDataCollector;
 import com.core.talita.plugins.DataCollectorPlugin;
-import com.core.talita.plugins.PluginCategories;
 
 /**
- * Exercise Plugin - "I" category
- * Tracks personal physical activity
+ * Exercise tracking plugin
  */
 public class ExercisePlugin extends DataCollectorPlugin {
     
     @Override
     public String getPluginId() {
-        return "i.exercise";
+        return "core.exercise";
     }
     
     @Override
     public String getPluginName() {
-        return "Exercise";
+        return "Exercise Tracker";
     }
     
     @Override
@@ -30,17 +28,17 @@ public class ExercisePlugin extends DataCollectorPlugin {
     
     @Override
     public String getAuthor() {
-        return "Talita Core Team";
+        return "Core Team";
     }
     
     @Override
     public String getCategory() {
-        return PluginCategories.I;
+        return "i"; // Personal category
     }
     
     @Override
     public int getPriority() {
-        return 95;
+        return 85;
     }
     
     @Override
@@ -50,12 +48,12 @@ public class ExercisePlugin extends DataCollectorPlugin {
     
     @Override
     public int getAccentColor() {
-        return Color.parseColor("#FF5722");
+        return Color.parseColor("#10B981"); // Green
     }
     
     @Override
     public int getIconResource() {
-        return 0;
+        return 0; // Use emoji
     }
     
     @Override
@@ -75,22 +73,28 @@ public class ExercisePlugin extends DataCollectorPlugin {
     
     @Override
     public boolean supportsScheduling() {
-        return true;
-    }
-    
-    @Override
-    public DataCollector createCollector(Context context) {
-        return new ExerciseCollector();
-    }
-    
-    @Override
-    public boolean hasSettings() {
         return false;
     }
     
     @Override
+    public DataCollector createCollector(Context context) {
+        return new SimpleDataCollector.Builder("exercise", "Exercise")
+            .description("Log your workouts and physical activities")
+            .emoji("💪")
+            .category("i")
+            .inputHint("What exercise did you do?")
+            .inputType(SimpleDataCollector.InputType.TEXT)
+            .build();
+    }
+    
+    @Override
+    public boolean hasSettings() {
+        return true;
+    }
+    
+    @Override
     public void openSettings(Context context) {
-        // TODO: Settings screen
+        // TODO: Open exercise settings
     }
     
     @Override
@@ -98,7 +102,7 @@ public class ExercisePlugin extends DataCollectorPlugin {
         return new QuickAddConfig(
             "Exercise",
             "Log workout",
-            QuickAddStyle.DURATION_TIMER,
+            QuickAddConfig.QuickAddStyle.GRID,
             true
         );
     }

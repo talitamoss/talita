@@ -2,25 +2,23 @@ package com.core.talita.plugins.i;
 
 import android.content.Context;
 import android.graphics.Color;
-import com.core.talita.collectors.DataCollector;
-import com.core.talita.collectors.SleepCollector;
+import com.core.talita.api.DataCollector;
+import com.core.talita.plugins.base.SimpleDataCollector;
 import com.core.talita.plugins.DataCollectorPlugin;
-import com.core.talita.plugins.PluginCategories;
 
 /**
- * Sleep Plugin - "I" category
- * Tracks personal sleep patterns
+ * Sleep tracking plugin
  */
 public class SleepPlugin extends DataCollectorPlugin {
     
     @Override
     public String getPluginId() {
-        return "i.sleep";
+        return "core.sleep";
     }
     
     @Override
     public String getPluginName() {
-        return "Sleep";
+        return "Sleep Tracker";
     }
     
     @Override
@@ -30,17 +28,17 @@ public class SleepPlugin extends DataCollectorPlugin {
     
     @Override
     public String getAuthor() {
-        return "Talita Core Team";
+        return "Core Team";
     }
     
     @Override
     public String getCategory() {
-        return PluginCategories.I;
+        return "i"; // Personal category
     }
     
     @Override
     public int getPriority() {
-        return 85;
+        return 80;
     }
     
     @Override
@@ -50,12 +48,12 @@ public class SleepPlugin extends DataCollectorPlugin {
     
     @Override
     public int getAccentColor() {
-        return Color.parseColor("#9C27B0");
+        return Color.parseColor("#6366F1"); // Indigo
     }
     
     @Override
     public int getIconResource() {
-        return 0;
+        return 0; // Use emoji
     }
     
     @Override
@@ -75,30 +73,36 @@ public class SleepPlugin extends DataCollectorPlugin {
     
     @Override
     public boolean supportsScheduling() {
-        return true;
+        return true; // For sleep reminders
     }
     
     @Override
     public DataCollector createCollector(Context context) {
-        return new SleepCollector();
+        return new SimpleDataCollector.Builder("sleep", "Sleep")
+            .description("Track your sleep patterns and quality")
+            .emoji("😴")
+            .category("i")
+            .inputHint("Hours of sleep")
+            .inputType(SimpleDataCollector.InputType.DECIMAL)
+            .build();
     }
     
     @Override
     public boolean hasSettings() {
-        return false;
+        return true;
     }
     
     @Override
     public void openSettings(Context context) {
-        // TODO: Settings screen
+        // TODO: Open sleep settings
     }
     
     @Override
     public QuickAddConfig getQuickAddConfig() {
         return new QuickAddConfig(
             "Sleep",
-            "Log sleep hours",
-            QuickAddStyle.NUMERIC_INPUT,
+            "Log sleep",
+            QuickAddConfig.QuickAddStyle.GRID,
             true
         );
     }

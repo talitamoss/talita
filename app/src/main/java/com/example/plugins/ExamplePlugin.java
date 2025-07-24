@@ -4,21 +4,27 @@ import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
-import com.core.talita.PersonalData;
-import com.core.talita.TalitaDataType;
-import com.core.talita.UniversalDataService;
-import com.core.talita.collectors.DataCollector;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+import com.core.talita.api.*;
+import com.core.talita.plugins.base.BaseDataCollector;
 import com.core.talita.plugins.DataCollectorPlugin;
 import com.core.talita.plugins.PluginCategories;
 import com.core.talita.plugins.bridge.PluginBridge;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * ExamplePlugin - Demonstrates how to create a plugin for Talita
  * 
  * This example tracks daily gratitude entries and demonstrates:
- * - Data collection
+ * - Data collection using the new API
  * - Inter-plugin communication
  * - Event handling
  * - Data sharing
@@ -81,17 +87,17 @@ public class ExamplePlugin extends DataCollectorPlugin {
     
     @Override
     public boolean requiresBackgroundTracking() {
-        return false; // Manual entry only
+        return false;
     }
     
     @Override
     public boolean supportsQuickAdd() {
-        return true; // Show in quick add screen
+        return true;
     }
     
     @Override
     public boolean supportsScheduling() {
-        return true; // Can be scheduled for reminders
+        return true; // Can schedule daily reminders
     }
     
     // Create the data collector
@@ -100,7 +106,7 @@ public class ExamplePlugin extends DataCollectorPlugin {
         return new GratitudeCollector(context);
     }
     
-    // Settings
+    // Plugin settings
     @Override
     public boolean hasSettings() {
         return true;
@@ -108,9 +114,8 @@ public class ExamplePlugin extends DataCollectorPlugin {
     
     @Override
     public void openSettings(Context context) {
-        // Launch settings activity
-        // In a real plugin, this would open a custom settings screen
-        Log.d(TAG, "Opening gratitude settings");
+        // In a real implementation, this would open a settings activity
+        Toast.makeText(context, "Gratitude settings", Toast.LENGTH_SHORT).show();
     }
     
     // Quick add configuration
@@ -119,8 +124,8 @@ public class ExamplePlugin extends DataCollectorPlugin {
         return new QuickAddConfig(
             "Gratitude",
             "What are you grateful for?",
-            QuickAddStyle.TEXT_NOTE,
-            true // Show in main grid
+            QuickAddConfig.QuickAddStyle.CARD,
+            true
         );
     }
     
@@ -130,23 +135,11 @@ public class ExamplePlugin extends DataCollectorPlugin {
         super.onPluginEnabled(context);
         Log.d(TAG, "Gratitude plugin enabled");
         
-        // Register with plugin bridge
+        // Register with plugin bridge for inter-plugin communication
         PluginBridge bridge = PluginBridge.getInstance(context);
         
-        // Listen for mood data from mood tracker
-        bridge.addEventListener(getPluginId(), "mood_logged", 
-            (sourcePluginId, eventType, data) -> {
-                // React to mood changes
-                String mood = data.getString("mood", "");
-                if (mood.equals("sad") || mood.equals("anxious")) {
-                    // Suggest gratitude practice
-                    Log.d(TAG, "Mood is " + mood + ", suggesting gratitude practice");
-                }
-            }
-        );
-        
-        // Register data provider
-        bridge.registerDataProvider(getPluginId(), "gratitude_stats",
+        // Register as a data provider
+        bridge.registerDataProvider(getPluginId(), "gratitude_stats", 
             (requestingPluginId, dataType, params, callback) -> {
                 // Provide gratitude statistics to other plugins
                 Bundle stats = calculateGratitudeStats(context);
@@ -193,55 +186,52 @@ public class ExamplePlugin extends DataCollectorPlugin {
     /**
      * Custom data collector for gratitude entries
      */
-    private static class GratitudeCollector implements DataCollector, TalitaDataType {
-        private final Context context;
-        private final UniversalDataService dataService;
+    private static class GratitudeCollector extends BaseDataCollector {
+        private static final String TYPE = "gratitude";
         
-        GratitudeCollector(Context context) {
-            this.context = context;
-            this.dataService = new UniversalDataService(context);
+        public GratitudeCollector(Context context) {
+            super();
         }
         
         @Override
-        public void collect() {
+        public CollectorResult collect() {
+            if (context == null) {
+                return CollectorResult.failure(TYPE, "Collector not initialized");
+            }
+            
             // In a real implementation, this would show a dialog
-            // For now, we'll create a sample entry
-            logGratitude("I'm grateful for the beautiful weather today!");
-        }
-        
-        public void logGratitude(String entry) {
-            // Create personal data entry
-            PersonalData data = new PersonalData(getDataTypeName());
+            // For now, we'll simulate a gratitude entry
+            Map<String, Object> data = new HashMap<>();
+            data.put("entry", "I'm grateful for the beautiful weather today!");
+            data.put("mood", "grateful");
+            data.put("timestamp", System.currentTimeMillis());
             
-            Map<String, Object> gratitudeData = new HashMap<>();
-            gratitudeData.put("entry", entry);
-            gratitudeData.put("timestamp", System.currentTimeMillis());
-            gratitudeData.put("wordCount", entry.split("\\s+").length);
-            
-            data.setData(gratitudeData);
-            
-            // Save using Universal Data Service
-            dataService.saveData(data);
-            
-            // Emit event for other plugins
-            PluginBridge bridge = PluginBridge.getInstance(context);
-            Bundle eventData = new Bundle();
-            eventData.putString("entry", entry);
-            eventData.putLong("timestamp", System.currentTimeMillis());
-            
-            bridge.emitEvent("com.example.gratitude", "gratitude_logged", eventData);
-            
-            Log.d(TAG, "Logged gratitude: " + entry);
+            return collectQuick(data);
         }
         
         @Override
-        public void startCollection(Context context) {
-            // Not needed for manual collection
+        public String getType() {
+            return TYPE;
         }
         
         @Override
-        public void stopCollection(Context context) {
-            // Not needed for manual collection
+        public String getDisplayName() {
+            return "Gratitude Journal";
+        }
+        
+        @Override
+        public String getDescription() {
+            return "Record what you're grateful for each day";
+        }
+        
+        @Override
+        public String getEmoji() {
+            return "🙏";
+        }
+        
+        @Override
+        public String getCategory() {
+            return "i"; // Personal
         }
         
         @Override
@@ -250,59 +240,24 @@ public class ExamplePlugin extends DataCollectorPlugin {
         }
         
         @Override
-        public CollectorSettings getSettings() {
-            return new CollectorSettings()
-                .setFrequency(0) // Manual only
-                .setBatteryOptimized(true);
-        }
-        
-        // TalitaDataType implementation
-        @Override
-        public String getDataTypeName() {
-            return "gratitude";
+        protected CollectorSettings getDefaultSettings() {
+            return new CollectorSettings.Builder()
+                .setEnabled(true)
+                .setAutomatedCollection(false)
+                .setCustomSetting("reminderEnabled", true)
+                .setCustomSetting("reminderTime", "20:00")
+                .build();
         }
         
         @Override
-        public String getDisplayName() {
-            return "Daily Gratitude";
-        }
-        
-        @Override
-        public String getDescription() {
-            return "Track what you're grateful for each day";
-        }
-        
-        @Override
-        public Map<String, Object> serializeData(Object data) {
-            if (data instanceof Map) {
-                return (Map<String, Object>) data;
+        public boolean validateData(Map<String, Object> data) {
+            if (!super.validateData(data)) {
+                return false;
             }
-            return new HashMap<>();
-        }
-        
-        @Override
-        public Object deserializeData(Map<String, Object> data) {
-            return data;
-        }
-        
-        @Override
-        public String getDataCategory() {
-            return "wellness";
-        }
-        
-        @Override
-        public boolean requiresEncryption() {
-            return true; // Personal thoughts should be encrypted
-        }
-        
-        @Override
-        public boolean canExport() {
-            return true;
-        }
-        
-        @Override
-        public String exportFormat() {
-            return "json";
+            
+            // Check for required fields
+            Object entry = data.get("entry");
+            return entry != null && !entry.toString().trim().isEmpty();
         }
     }
 }

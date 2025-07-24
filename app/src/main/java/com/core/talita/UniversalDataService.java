@@ -1,303 +1,323 @@
 package com.core.talita;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
-import android.widget.Toast;
-import org.json.JSONException;
-import org.json.JSONObject;
 import com.core.talita.cloud.CloudBackupManager;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
- * Universal Data Service - handles ALL data types in Talita with ENCRYPTION and CLOUD BACKUP
- * Any data implementing UniversalDataType gets automatic:
- * - Hardware-backed encryption
- * - Database storage
- * - Cloud backup queuing
- * - Sharing capabilities
- * - Consistent error handling
+ * Universal Data Service - Central orchestrator for all data operations
+ * Handles encryption, storage, and backup for any data type
  */
 public class UniversalDataService {
-
     private static final String TAG = "UniversalDataService";
-
+    private static UniversalDataService instance;
+    
     private final Context context;
-    private final LocalDataManager dataManager;
+    private final LocalDataManager localDataManager;
     private final EncryptionService encryptionService;
     private final CloudBackupManager cloudBackupManager;
-
-    public UniversalDataService(Context context) {
-        this.context = context;
-        this.dataManager = new LocalDataManager(context);
+    private final ExecutorService executorService;
+    private final Handler mainHandler;
+    
+    private UniversalDataService(Context context) {
+        this.context = context.getApplicationContext();
+        this.localDataManager = new LocalDataManager(context);
         this.encryptionService = new EncryptionService(context);
-        this.cloudBackupManager = new CloudBackupManager(context);
-
-        Log.d(TAG, "🔐☁️ Universal Data Service initialized with encryption and cloud backup");
-        Log.d(TAG, encryptionService.getEncryptionStatus());
+        this.cloudBackupManager = CloudBackupManager.getInstance(context);
+        this.executorService = Executors.newFixedThreadPool(3);
+        this.mainHandler = new Handler(Looper.getMainLooper());
+        
+        Log.d(TAG, "Universal Data Service initialized");
     }
-
-    /**
-     * Capture any data type - handles encryption and everything automatically
-     */
-    public String capture(UniversalDataType data) {
-        try {
-            Log.d(TAG, "🔒 Capturing and encrypting " + data.getType() + " data: " + data.getDisplayName());
-
-            // 1. Encrypt file if it exists (for audio, photos, etc.)
-            String encryptedFilePath = data.getFilePath();
-            if (encryptedFilePath != null && !encryptedFilePath.isEmpty()) {
-                encryptedFilePath = encryptionService.encryptFile(data.getFilePath());
-                Log.d(TAG, "🔒 File encrypted: " + encryptedFilePath);
-            }
-
-            // 2. Create encrypted version of data with updated file path
-            EncryptedDataWrapper encryptedData = new EncryptedDataWrapper(data, encryptedFilePath);
-
-            // 3. Save to DATABASE (not files!)
-            String dataId = dataManager.saveData(data);
-
-            if (dataId != null) {
-                // 4. Queue for cloud backup
-                queueForCloudBackup(dataId, encryptedData);
-
-                // 5. Handle sharing updates (future feature)
-                updateActiveSharing(dataId, encryptedData);
-
-                // 6. Show success
-                showSuccessToast(data);
-                
-                return dataId;
-            } else {
-                showErrorToast(data);
-                return null;
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to capture data", e);
-            showErrorToast(data);
-            return null;
+    
+    public static synchronized UniversalDataService getInstance(Context context) {
+        if (instance == null) {
+            instance = new UniversalDataService(context);
         }
+        return instance;
     }
-
+    
     /**
-     * Query data across time range (for activity views, reports, etc.)
+     * Main entry point for capturing any data type
      */
-    public List<PersonalData> queryDataInRange(long startTime, long endTime) {
+    public void captureData(UniversalDataType data) {
+        if (data == null) {
+            Log.e(TAG, "Cannot capture null data");
+            return;
+        }
+        
+        executorService.execute(() -> {
+            try {
+                // 1. Validate the data
+                if (data instanceof TalitaDataType) {
+                    ((TalitaDataType) data).validateData(convertToPersonalData(data));
+                }
+                
+                // 2. Encrypt if needed
+                String encryptedJson = encryptionService.encryptData(data.toJson());
+                
+                // 3. Store locally
+                long id = localDataManager.saveData(data.getType(), encryptedJson, 
+                    data.getTimestamp(), data.getFilePath());
+                
+                // 4. Handle file encryption if present
+                if (data.getFilePath() != null) {
+                    encryptionService.encryptFile(data.getFilePath());
+                }
+                
+                // 5. Queue for cloud backup
+                cloudBackupManager.queueForBackup(id, data);
+                
+                Log.d(TAG, "✅ Data captured: " + data.getType() + " [" + data.getId() + "]");
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to capture data", e);
+            }
+        });
+    }
+    
+    /**
+     * Retrieve data by type with automatic decryption
+     */
+    public List<PersonalData> getDataByType(String type) {
         List<PersonalData> result = new ArrayList<>();
         
         try {
-            List<UniversalDataType> dataList = dataManager.queryDataByTimeRange(startTime, endTime);
+            List<UniversalDataType> encryptedData = localDataManager.getDataByType(type);
             
-            for (UniversalDataType data : dataList) {
-                result.add(new PersonalDataAdapter(data));
+            for (UniversalDataType data : encryptedData) {
+                if (data instanceof PersonalData) {
+                    result.add((PersonalData) data);
+                } else if (data instanceof UniversalPersonalData) {
+                    result.add(convertToPersonalData((UniversalPersonalData) data));
+                } else {
+                    // Generic UniversalDataType - convert to PersonalData
+                    result.add(convertToPersonalData(data));
+                }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting data in range", e);
+            Log.e(TAG, "Failed to retrieve data", e);
         }
         
         return result;
     }
-
+    
     /**
-     * Get data in range (alias for queryDataInRange)
+     * Get data within a time range
      */
     public List<PersonalData> getDataInRange(long startTime, long endTime) {
-        return queryDataInRange(startTime, endTime);
-    }
-
-    /**
-     * Get today's data
-     */
-    public List<PersonalData> getTodaysData() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        long startOfDay = cal.getTimeInMillis();
+        List<PersonalData> result = new ArrayList<>();
         
-        cal.add(Calendar.DAY_OF_MONTH, 1);
-        long endOfDay = cal.getTimeInMillis();
-        
-        return getDataInRange(startOfDay, endOfDay);
-    }
-
-    /**
-     * Queue for cloud backup
-     */
-    private void queueForCloudBackup(String dataId, EncryptedDataWrapper data) {
-        Log.d(TAG, "☁️ Queuing encrypted " + data.originalData.getType() + " for cloud backup: " + dataId);
-        cloudBackupManager.queueForBackup(data.originalData);
-    }
-
-    /**
-     * Update any active sharing (future implementation)
-     */
-    private void updateActiveSharing(String dataId, EncryptedDataWrapper data) {
-        Log.d(TAG, "🤝 Updating sharing for encrypted " + data.originalData.getType() + ": " + dataId);
-        // TODO: Notify friends about new data when P2P sharing is ready
-    }
-
-    /**
-     * Show success toast
-     */
-    private void showSuccessToast(UniversalDataType data) {
-        String message = "🔒 " + data.getDisplayName() + " encrypted and saved";
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
-    }
-    public void saveData(PersonalData personalData) {
-    if (personalData == null) {
-        Log.e(TAG, "Cannot save null PersonalData");
-        return;
-    }
-    
-    // Convert PersonalData to UniversalDataType and process
-    processData(personalData);
-}
-
-    /**
-     * Show error toast
-     */
-    private void showErrorToast(UniversalDataType data) {
-        String message = "❌ Failed to encrypt " + data.getDisplayName();
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
-    }
-
-    /**
-     * Get decrypted data of a specific type
-     */
-    public List<DecryptedDataItem> getDecryptedDataByType(String type) {
-        List<DecryptedDataItem> items = new ArrayList<>();
-
         try {
-            List<DataItem> rawItems = dataManager.getDataByType(type);
-            
-            for (DataItem item : rawItems) {
-                // Decrypt the JSON data
-                String decryptedJson = encryptionService.decryptData(item.getDataJson());
-                JSONObject jsonData = new JSONObject(decryptedJson);
-                
-                DecryptedDataItem decryptedItem = new DecryptedDataItem(
-                    item.getId(),
-                    item.getType(),
-                    item.getFilePath(),
-                    item.getCreatedAt(),
-                    jsonData,
-                    encryptionService
-                );
-                
-                items.add(decryptedItem);
+            List<UniversalDataType> data = localDataManager.getDataInRange(startTime, endTime);
+            for (UniversalDataType item : data) {
+                result.add(convertToPersonalData(item));
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting decrypted data", e);
+            Log.e(TAG, "Failed to retrieve data in range", e);
         }
-
-        return items;
-    }
-
-    /**
-     * Get cloud backup status
-     */
-    public boolean isCloudBackupEnabled() {
-        return cloudBackupManager.isEnabled();
-    }
-
-    public void setAutoBackupEnabled(boolean enabled) {
-        cloudBackupManager.setAutoBackupEnabled(enabled);
-        Log.d(TAG, enabled ? 
-            "🔄 Auto cloud backup enabled" : "⏸️ Auto cloud backup disabled");
-    }
-
-    /**
-     * Get cloud backup manager
-     */
-    public CloudBackupManager getCloudBackupManager() {
-        return cloudBackupManager;
-    }
-
-    /**
-     * Get data by type (for backwards compatibility)
-     */
-    public List<PersonalData> getDataByType(String type) {
-        List<PersonalData> results = new ArrayList<>();
-        List<DecryptedDataItem> items = getDecryptedDataByType(type);
         
-        for (DecryptedDataItem item : items) {
+        return result;
+    }
+    
+    /**
+     * Delete data by ID
+     */
+    public void deleteData(String dataId) {
+        executorService.execute(() -> {
             try {
-                Map<String, Object> dataMap = new HashMap<>();
-                Iterator<String> keys = item.decryptedData.keys();
-                while (keys.hasNext()) {
-                    String key = keys.next();
-                    dataMap.put(key, item.decryptedData.get(key));
-                }
-                
-                UniversalPersonalData data = new UniversalPersonalData(type, dataMap);
-                results.add(data);
+                localDataManager.deleteData(dataId);
+                Log.d(TAG, "Data deleted: " + dataId);
             } catch (Exception e) {
-                Log.e(TAG, "Error converting data", e);
+                Log.e(TAG, "Failed to delete data", e);
             }
+        });
+    }
+    
+    /**
+     * Get statistics about stored data
+     */
+    public DataStats getDataStats() {
+        return localDataManager.getDataStats();
+    }
+    
+    /**
+     * Save PersonalData through the universal pipeline
+     * This is a convenience method for plugins
+     */
+    public void saveData(PersonalData personalData) {
+        if (personalData == null) {
+            Log.e(TAG, "Cannot save null PersonalData");
+            return;
+        }
+        
+        captureData(personalData);
+    }
+    
+    /**
+     * Process any UniversalDataType
+     */
+    public void processData(UniversalDataType data) {
+        captureData(data);
+    }
+    
+    /**
+     * Search for data across all types
+     */
+    public List<PersonalData> searchData(String query) {
+        List<PersonalData> results = new ArrayList<>();
+        
+        try {
+            // Get all data types
+            List<String> types = localDataManager.getAllDataTypes();
+            
+            for (String type : types) {
+                List<UniversalDataType> typeData = localDataManager.getDataByType(type);
+                
+                for (UniversalDataType item : typeData) {
+                    // Simple search in display name and summary
+                    if (item.getDisplayName().toLowerCase().contains(query.toLowerCase()) ||
+                        item.getDisplaySummary().toLowerCase().contains(query.toLowerCase())) {
+                        results.add(convertToPersonalData(item));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Search failed", e);
         }
         
         return results;
     }
-
+    
     /**
-     * Wrapper class for encrypted data
+     * Get recent data of all types
      */
-    private static class EncryptedDataWrapper {
-        public final UniversalDataType originalData;
-        public final String encryptedFilePath;
-
-        public EncryptedDataWrapper(UniversalDataType originalData, String encryptedFilePath) {
-            this.originalData = originalData;
-            this.encryptedFilePath = encryptedFilePath;
+    public List<PersonalData> getRecentData(int limit) {
+        List<PersonalData> results = new ArrayList<>();
+        
+        try {
+            List<UniversalDataType> recentData = localDataManager.getRecentData(limit);
+            for (UniversalDataType data : recentData) {
+                results.add(convertToPersonalData(data));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get recent data", e);
+        }
+        
+        return results;
+    }
+    
+    /**
+     * Export data for a specific type
+     */
+    public void exportData(String type, ExportCallback callback) {
+        executorService.execute(() -> {
+            try {
+                List<PersonalData> data = getDataByType(type);
+                String exportPath = ExportManager.exportToJson(context, data, type);
+                
+                mainHandler.post(() -> callback.onSuccess(exportPath));
+            } catch (Exception e) {
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+    
+    /**
+     * Get data grouped by type (for UniversalPersonalData)
+     */
+    public List<PersonalData> getUniversalDataByType(String type) {
+        List<PersonalData> results = new ArrayList<>();
+        
+        try {
+            List<UniversalPersonalData> data = localDataManager.getUniversalDataByType(type);
+            for (UniversalPersonalData item : data) {
+                results.add(convertToPersonalData(item));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get universal data", e);
+        }
+        
+        return results;
+    }
+    
+    /**
+     * Convert UniversalDataType to PersonalData
+     */
+    private PersonalData convertToPersonalData(UniversalDataType data) {
+        if (data instanceof PersonalData) {
+            return (PersonalData) data;
+        }
+        
+        // Create a new PersonalData from UniversalDataType
+        PersonalData pd = PersonalData.create(data.getType());
+        
+        // Copy basic fields
+        Map<String, Object> dataMap = data.getMetadata();
+        if (dataMap == null) {
+            dataMap = new java.util.HashMap<>();
+        }
+        
+        // Add standard fields
+        dataMap.put("id", data.getId());
+        dataMap.put("displayName", data.getDisplayName());
+        dataMap.put("displaySummary", data.getDisplaySummary());
+        
+        pd.setData(dataMap);
+        pd.setLocation(data.getLatitude(), data.getLongitude());
+        if (data.getFilePath() != null) {
+            pd.setFilePath(data.getFilePath());
+        }
+        
+        return pd;
+    }
+    
+    /**
+     * Convert UniversalPersonalData to PersonalData
+     */
+    private PersonalData convertToPersonalData(UniversalPersonalData upd) {
+        PersonalData pd = PersonalData.create(upd.getType());
+        pd.setData(upd.getAllData());
+        if (upd.getFilePath() != null) {
+            pd.setFilePath(upd.getFilePath());
+        }
+        return pd;
+    }
+    
+    /**
+     * Cleanup resources
+     */
+    public void cleanup() {
+        executorService.shutdown();
+    }
+    
+    /**
+     * Data statistics
+     */
+    public static class DataStats {
+        public final long totalEntries;
+        public final long totalSize;
+        public final Map<String, Long> entriesByType;
+        
+        public DataStats(long totalEntries, long totalSize, Map<String, Long> entriesByType) {
+            this.totalEntries = totalEntries;
+            this.totalSize = totalSize;
+            this.entriesByType = entriesByType;
         }
     }
-
+    
     /**
-     * Helper class for decrypted data items
+     * Export callback
      */
-    public static class DecryptedDataItem {
-        public final String id;
-        public final String type;
-        public final String encryptedFilePath;
-        public final long timestamp;
-        public final JSONObject decryptedData;
-        private final EncryptionService encryptionService;
-
-        public DecryptedDataItem(String id, String type, String encryptedFilePath,
-                                 long timestamp, JSONObject decryptedData, EncryptionService encryptionService) {
-            this.id = id;
-            this.type = type;
-            this.encryptedFilePath = encryptedFilePath;
-            this.timestamp = timestamp;
-            this.decryptedData = decryptedData != null ? decryptedData : new JSONObject();
-            this.encryptionService = encryptionService;
-        }
-
-        /**
-         * Get temporary decrypted file for reading/playback
-         * IMPORTANT: Must call cleanupTempFile() when done!
-         */
-        public String getTempDecryptedFilePath() {
-            if (encryptedFilePath == null || encryptedFilePath.isEmpty()) {
-                return null;
-            }
-            return encryptionService.decryptFileToTemp(encryptedFilePath);
-        }
-
-        /**
-         * Clean up temporary decrypted file
-         */
-        public void cleanupTempFile(String tempFilePath) {
-            encryptionService.cleanupTempFile(tempFilePath);
-        }
-
-        /**
-         * Check if file is encrypted
-         */
-        public boolean isFileEncrypted() {
-            return encryptionService.isFileEncrypted(encryptedFilePath);
-        }
+    public interface ExportCallback {
+        void onSuccess(String filePath);
+        void onError(String error);
     }
 }

@@ -7,8 +7,9 @@ import java.util.UUID;
 
 /**
  * Universal personal data class that can represent ANY data type
+ * Implements UniversalDataType only (not PersonalData since it's a class)
  */
-public class UniversalPersonalData implements UniversalDataType, PersonalData {
+public class UniversalPersonalData implements UniversalDataType {
     private final String id;
     private final String type;
     private final long timestamp;
@@ -98,16 +99,17 @@ public class UniversalPersonalData implements UniversalDataType, PersonalData {
 
     @Override
     public String getDisplaySummary() {
+        if (data.containsKey("summary")) {
+            return String.valueOf(data.get("summary"));
+        }
         return getDisplayName();
     }
 
-    // PersonalData methods
-    @Override
+    // Methods that were from PersonalData interface
     public String getDataType() {
         return type;
     }
 
-    @Override
     public Object getValue() {
         return data.get("value");
     }
