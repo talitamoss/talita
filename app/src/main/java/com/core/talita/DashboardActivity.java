@@ -1,149 +1,181 @@
 package com.core.talita;
 
-import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.ScrollView;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.core.talita.collectors.WaterCollector;
+import com.core.talita.api.*;
+import com.core.talita.plugins.PluginManager;
+import com.core.talita.plugins.DataCollectorPlugin;
+import com.core.talita.plugins.core.WaterPlugin;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import android.content.Intent;
+import java.util.*;
 
 /**
- * Dashboard Activity - Main activity for easy data entry
- * Renamed from QuickAddDashboardActivity
- *
- * Features:
- * - Quick add buttons for common activities
- * - Recent activity feed
- * - Daily summary stats
- * - Background tracking status
- * - TEST MODE for debugging
+ * DashboardActivity - Main screen showing quick add tiles and recent activity
+ * Updated to use plugin system instead of hard-coded collectors
  */
 public class DashboardActivity extends AppCompatActivity {
-
     private static final String TAG = "DashboardActivity";
-
-    private DataCollectorManager collectorManager;
-    private TrackingManager trackingManager;
-
+    
     // UI Components
     private RecyclerView quickAddRecyclerView;
     private RecyclerView recentActivityRecyclerView;
-    private TextView dailyStatsText;
-    private TextView trackingStatusText;
-    private CardView trackingStatusCard;
-
+    private TextView tvWaterTotal;
+    private TextView statusText;
+    
     // Adapters
     private QuickAddAdapter quickAddAdapter;
     private RecentActivityAdapter recentActivityAdapter;
-
-    // Test mode components
-    private boolean testMode = false;
+    
+    // Services
+    private DataCollectorManager collectorManager;
+    private PluginManager pluginManager;
+    
+    // Testing
     private TextView testOutputText;
-
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dashboard);
-
+        
         // Initialize services
-        collectorManager = new DataCollectorManager(this);
-        trackingManager = new TrackingManager(this);
-
-        // Enable water collector by default for testing
-        WaterCollector.setEnabled(this, true);
-
-        initializeViews();
+        collectorManager = DataCollectorManager.getInstance(this);
+        pluginManager = PluginManager.getInstance(this);
+        
+        // Find views
+        quickAddRecyclerView = findViewById(R.id.quick_add_recycler);
+        recentActivityRecyclerView = findViewById(R.id.recent_activity_recycler);
+        tvWaterTotal = findViewById(R.id.tv_water_total);
+        statusText = findViewById(R.id.status_text);
+        
+        // Setup UI
         setupQuickAddGrid();
         setupRecentActivityFeed();
-        updateDashboard();
-
-        // Add testing features
-        addTestingFeatures();
+        updateWaterDisplay();
         
-        // Run minimal test in background
-        runMinimalTest();
-
-        // Check for focus collector from intent
-        String focusCollector = getIntent().getStringExtra("focus_collector");
-        if (focusCollector != null) {
-            focusOnCollector(focusCollector);
+        // Add testing features in debug mode
+        if (BuildConfig.DEBUG) {
+            addTestingFeatures();
         }
-
-        Log.d(TAG, "📊 Dashboard Activity initialized");
+        
+        // Start collectors
+        collectorManager.startEnabledCollectors();
     }
-
-    private void initializeViews() {
-        // Quick add grid
-        quickAddRecyclerView = findViewById(R.id.quick_add_recycler_view);
-
-        // Recent activity feed
-        recentActivityRecyclerView = findViewById(R.id.recent_activity_recycler_view);
-
-        // Stats and status
-        dailyStatsText = findViewById(R.id.daily_stats_text);
-        trackingStatusText = findViewById(R.id.tracking_status_text);
-        trackingStatusCard = findViewById(R.id.tracking_status_card);
-
-        // Navigation buttons - these are CardViews, not Buttons!
-        Button settingsButton = findViewById(R.id.settings_button);
-        settingsButton.setOnClickListener(v -> {
-            Intent intent = new Intent(this, SettingsActivity.class);
-            startActivity(intent);
-        });
-
-        CardView locationButton = findViewById(R.id.location_button);
-        locationButton.setOnClickListener(v -> {
-            Intent intent = new Intent(this, LocationActivity.class);
-            startActivity(intent);
-        });
-
-        CardView audioButton = findViewById(R.id.audio_button);
-        audioButton.setOnClickListener(v -> {
-            Intent intent = new Intent(this, AudioActivity.class);
-            startActivity(intent);
-        });
-
-        // Tracking status card click
-        trackingStatusCard.setOnClickListener(v -> toggleBackgroundTracking());
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateWaterDisplay();
+        loadRecentActivity();
     }
-
+    
     private void setupQuickAddGrid() {
-        List<QuickAddItem> quickAddItems = createQuickAddItems();
-
-        quickAddAdapter = new QuickAddAdapter(quickAddItems, this::handleQuickAdd);
+        // Get plugins that support quick add
+        List<DataCollectorPlugin> quickAddPlugins = new ArrayList<>();
+        
+        for (DataCollectorPlugin plugin : pluginManager.getEnabledPlugins()) {
+            if (plugin.supportsQuickAdd()) {
+                quickAddPlugins.add(plugin);
+            }
+        }
+        
+        // Sort by priority
+        quickAddPlugins.sort((a, b) -> Integer.compare(b.getPriority(), a.getPriority()));
+        
+        // Setup adapter
+        quickAddAdapter = new QuickAddAdapter(quickAddPlugins, this::onQuickAddSelected);
         quickAddRecyclerView.setLayoutManager(new GridLayoutManager(this, 3)); // 3 columns
         quickAddRecyclerView.setAdapter(quickAddAdapter);
     }
-
+    
     private void setupRecentActivityFeed() {
         recentActivityAdapter = new RecentActivityAdapter(new ArrayList<>());
         recentActivityRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         recentActivityRecyclerView.setAdapter(recentActivityAdapter);
     }
-
+    
+    private void onQuickAddSelected(DataCollectorPlugin plugin) {
+        Log.d(TAG, "Quick add selected: " + plugin.getPluginName());
+        
+        // Special handling for water plugin (most common)
+        if (plugin.getPluginId().equals("core.water")) {
+            // Quick water logging
+            showWaterQuickAdd();
+        } else {
+            // Trigger collection for other plugins
+            collectorManager.triggerCollection(plugin.getPluginId());
+        }
+    }
+    
+    private void showWaterQuickAdd() {
+        // Create quick water buttons
+        int[] amounts = {100, 250, 500, 750};
+        
+        LinearLayout buttonLayout = new LinearLayout(this);
+        buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
+        
+        for (int amount : amounts) {
+            Button btn = new Button(this);
+            btn.setText(amount + "ml");
+            btn.setOnClickListener(v -> {
+                addWater(amount);
+                Toast.makeText(this, "Added " + amount + "ml", Toast.LENGTH_SHORT).show();
+            });
+            buttonLayout.addView(btn);
+        }
+        
+        // Show in a dialog or bottom sheet
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("💧 Add Water")
+            .setView(buttonLayout)
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+    
+    private void addWater(int amount) {
+        Log.d(TAG, "Adding " + amount + "ml water...");
+        
+        Map<String, Object> data = new HashMap<>();
+        data.put("value", amount);
+        
+        collectorManager.quickLog("core.water", data);
+        updateWaterDisplay();
+    }
+    
+    private void updateWaterDisplay() {
+        if (tvWaterTotal != null) {
+            int total = WaterPlugin.WaterHelper.getTodayTotal(this);
+            tvWaterTotal.setText("💧 " + total + "ml today");
+        }
+    }
+    
+    private void loadRecentActivity() {
+        // Get recent data from UniversalDataService
+        UniversalDataService dataService = UniversalDataService.getInstance(this);
+        List<PersonalData> recentData = dataService.getRecentData(10);
+        
+        // Update adapter
+        recentActivityAdapter.updateData(recentData);
+    }
+    
+    // ===== TESTING FEATURES =====
+    
     private void addTestingFeatures() {
         // Create a test button at the bottom
         Button testButton = new Button(this);
-        testButton.setText("🧪 Test Quick Add");
+        testButton.setText("🧪 Test Plugin System");
         testButton.setBackgroundColor(0xFF4CAF50);
         testButton.setTextColor(0xFFFFFFFF);
         testButton.setOnClickListener(v -> runQuickAddTest());
@@ -155,544 +187,182 @@ public class DashboardActivity extends AppCompatActivity {
         testOutputText.setPadding(20, 20, 20, 20);
         testOutputText.setVisibility(View.GONE);
         
-ViewGroup rootView = findViewById(android.R.id.content);
-if (rootView.getChildAt(0) instanceof ScrollView) {
-    ScrollView scrollView = (ScrollView) rootView.getChildAt(0);
-    // ScrollView can only have one child, so get its child (LinearLayout)
-    if (scrollView.getChildCount() > 0 && scrollView.getChildAt(0) instanceof ViewGroup) {
-        ViewGroup mainLayout = (ViewGroup) scrollView.getChildAt(0);
-        
-        // Create container for test elements
-        LinearLayout testContainer = new LinearLayout(this);
-        testContainer.setOrientation(LinearLayout.VERTICAL);
-        testContainer.addView(testButton);
-        testContainer.addView(testOutputText);
-        
-        mainLayout.addView(testContainer);
+        ViewGroup rootView = findViewById(android.R.id.content);
+        if (rootView.getChildAt(0) instanceof ScrollView) {
+            ScrollView scrollView = (ScrollView) rootView.getChildAt(0);
+            if (scrollView.getChildCount() > 0 && scrollView.getChildAt(0) instanceof ViewGroup) {
+                ViewGroup mainLayout = (ViewGroup) scrollView.getChildAt(0);
+                
+                // Create container for test elements
+                LinearLayout testContainer = new LinearLayout(this);
+                testContainer.setOrientation(LinearLayout.VERTICAL);
+                testContainer.addView(testButton);
+                testContainer.addView(testOutputText);
+                
+                mainLayout.addView(testContainer);
+            }
+        }
     }
-}
-    }
-
+    
     private void runQuickAddTest() {
-        Log.d(TAG, "=== QUICK ADD TEST START ===");
+        Log.d(TAG, "=== PLUGIN SYSTEM TEST START ===");
         
         StringBuilder results = new StringBuilder();
-        results.append("Quick Add Test Results:\n\n");
+        results.append("Plugin System Test Results:\n\n");
         
         try {
             // Test 1: Check services
             results.append("1. Services initialized: ");
-            results.append(collectorManager != null ? "✅\n" : "❌\n");
+            results.append(collectorManager != null && pluginManager != null ? "✅\n" : "❌\n");
             
-            // Test 2: Check water collector
-            results.append("2. Water collector enabled: ");
-	    WaterCollector waterCollector = new WaterCollector();
-	    boolean waterEnabled = waterCollector.isEnabled(this);
-            results.append(waterEnabled ? "✅\n" : "❌ (enabling now...)\n");
+            // Test 2: Check water plugin
+            results.append("2. Water plugin registered: ");
+            DataCollectorPlugin waterPlugin = pluginManager.getPlugin("core.water");
+            results.append(waterPlugin != null ? "✅\n" : "❌\n");
             
-            if (!waterEnabled) {
-                WaterCollector.setEnabled(this, true);
+            // Test 3: Water plugin enabled
+            results.append("3. Water plugin enabled: ");
+            boolean waterEnabled = waterPlugin != null && waterPlugin.isEnabled();
+            results.append(waterEnabled ? "✅\n" : "❌\n");
+            
+            // Test 4: Get initial water total
+            int initialTotal = WaterPlugin.WaterHelper.getTodayTotal(this);
+            results.append("4. Initial water total: ").append(initialTotal).append("ml\n");
+            
+            // Test 5: Log water through plugin system
+            results.append("5. Testing water logging...\n");
+            Map<String, Object> testData = new HashMap<>();
+            testData.put("value", 123);
+            collectorManager.quickLog("core.water", testData);
+            
+            // Test 6: Verify new total
+            int newTotal = WaterPlugin.WaterHelper.getTodayTotal(this);
+            results.append("6. New water total: ").append(newTotal).append("ml ");
+            results.append(newTotal == initialTotal + 123 ? "✅\n" : "❌\n");
+            
+            // Test 7: List all plugins
+            results.append("\n7. Available plugins:\n");
+            for (DataCollectorPlugin plugin : pluginManager.getAllPlugins()) {
+                results.append("   ").append(plugin.getEmoji()).append(" ")
+                      .append(plugin.getPluginName()).append(" [")
+                      .append(plugin.getPluginId()).append("]\n");
             }
             
-            // Test 3: Get initial water total
-            int initialTotal = WaterCollector.getTodayTotal(this);
-            results.append("3. Initial water total: ").append(initialTotal).append("ml\n");
-            
-            // Test 4: Log water
-            results.append("4. Adding 100ml water... ");
-            collectorManager.quickLogWater(100);
-            
-            // Test 5: Check new total
-            int newTotal = WaterCollector.getTodayTotal(this);
-            boolean success = newTotal == initialTotal + 100;
-            results.append(success ? "✅\n" : "❌\n");
-            results.append("   New total: ").append(newTotal).append("ml\n");
-            
-            // Test 6: Check data persistence
-            try {
-                UniversalDataService dataService = new UniversalDataService(this);
-                List<UniversalDataService.DecryptedDataItem> waterData = 
-                    dataService.getDecryptedDataByType("water");
-                results.append("5. Data entries saved: ").append(waterData.size()).append(" ✅\n");
-            } catch (Exception e) {
-                results.append("5. Data persistence: ❌ ").append(e.getMessage()).append("\n");
-            }
+            results.append("\n✅ Plugin system test complete!");
             
         } catch (Exception e) {
             results.append("\n❌ Error: ").append(e.getMessage());
-            Log.e(TAG, "Test error", e);
+            Log.e(TAG, "Test failed", e);
         }
         
-        // Show results
-        new AlertDialog.Builder(this)
-            .setTitle("Quick Add Test Results")
-            .setMessage(results.toString())
-            .setPositiveButton("OK", null)
-            .setNeutralButton("Clear Water Data", (d, w) -> {
-                WaterCollector.clearTodayData(this);
-                updateDashboard();
-                Toast.makeText(this, "Water data cleared", Toast.LENGTH_SHORT).show();
-            })
-            .show();
+        if (testOutputText != null) {
+            testOutputText.setText(results.toString());
+            testOutputText.setVisibility(View.VISIBLE);
+        }
         
-        // Update the dashboard to reflect changes
-        updateDashboard();
-        
-        Log.d(TAG, "=== QUICK ADD TEST END ===");
         Log.d(TAG, results.toString());
+        Log.d(TAG, "=== PLUGIN SYSTEM TEST END ===");
     }
-
-    private void runMinimalTest() {
-        Log.d("QuickTest", "=== MINIMAL TEST ===");
-        try {
-            // Enable water collector
-            WaterCollector.setEnabled(this, true);
-            
-            // Test direct water logging
-            int before = WaterCollector.getTodayTotal(this);
-            Log.d("QuickTest", "Water total before: " + before + "ml");
-            
-            // Log 1ml to test without affecting user's real data much
-            WaterCollector.logWater(this, 1);
-            
-            int after = WaterCollector.getTodayTotal(this);
-            Log.d("QuickTest", "Water total after: " + after + "ml");
-            Log.d("QuickTest", "Test result: " + (after == before + 1 ? "✅ WORKING" : "❌ NOT WORKING"));
-            
-        } catch (Exception e) {
-            Log.e("QuickTest", "Test failed", e);
-        }
-    }
-
-    private void focusOnCollector(String collectorType) {
-        // Show a quick action for the specific collector
-        Toast.makeText(this, "📊 Focus on " + collectorType + " collection", Toast.LENGTH_SHORT).show();
-
-        // Could scroll to or highlight the specific collector
-        // For now, just show a toast
-    }
-
-    @SuppressLint("SuspiciousIndentation")
-    private List<QuickAddItem> createQuickAddItems() {
-        List<QuickAddItem> items = new ArrayList<>();
-
-        // Hydration
-        items.add(new QuickAddItem("💧", "Water", "water", "250ml"));
-        items.add(new QuickAddItem("🥤", "Big Water", "water", "500ml"));
-        items.add(new QuickAddItem("☕", "Coffee", "beverage", "1 cup"));
-
-        // Substances
-        items.add(new QuickAddItem("🚬", "Cigarette", "substance", "1 cigarette"));
-        items.add(new QuickAddItem("🍺", "Beer", "alcohol", "1 beer"));
-        items.add(new QuickAddItem("🍷", "Wine", "alcohol", "1 glass"));
-
-        // Food
-        items.add(new QuickAddItem("🍽️", "Meal", "food", "meal"));
-        items.add(new QuickAddItem("🍎", "Snack", "food", "snack"));
-        items.add(new QuickAddItem("💊", "Medication", "medication", "dose"));
-
-        // Exercise
-        items.add(new QuickAddItem("🏃", "Run", "exercise", "session"));
-        items.add(new QuickAddItem("💪", "Workout", "exercise", "session"));
-        items.add(new QuickAddItem("🚶", "Walk", "exercise", "session"));
-
-        // Health & Mood
-        items.add(new QuickAddItem("😊", "Mood", "mood", "rating"));
-        boolean add = items.add(new QuickAddItem("💤", "Sleep", "sleep", "hours"));
-        items.add(new QuickAddItem("📏", "Weight", "biometric", "measurement"));
-	    items.add(new QuickAddItem("➕", "Create Collector", "custom", "new"));
-
-
-        return items;
-    }
-
-    private void handleQuickAdd(QuickAddItem item) {
-        switch (item.category) {
-            case "water":
-                handleWaterAdd(item);
-                break;
-            case "beverage":
-                handleBeverageAdd(item);
-                break;
-            case "substance":
-                handleSubstanceAdd(item);
-                break;
-            case "alcohol":
-                handleAlcoholAdd(item);
-                break;
-            case "food":
-                handleFoodAdd(item);
-                break;
-            case "medication":
-                handleMedicationAdd(item);
-                break;
-            case "exercise":
-                handleExerciseAdd(item);
-                break;
-            case "mood":
-                handleMoodAdd(item);
-                break;
-            case "sleep":
-                handleSleepAdd(item);
-                break;
-            case "biometric":
-                handleBiometricAdd(item);
-                break;
-            default:
-                showGenericQuickAdd(item);
-case "custom":
-    Log.d("DashboardActivity", "Create Collector clicked");
-    try {
-        startActivity(new Intent(this, CreateCollectorActivity.class));
-    } catch (Exception e) {
-        Log.e("DashboardActivity", "Failed to start CreateCollectorActivity", e);
-        Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-    }
-    break;
-        }
-    }
-
-    private void handleWaterAdd(QuickAddItem item) {
-        // Parse amount from description
-        int amount = item.description.equals("250ml") ? 250 : 500;
-
-        try {
-            // Log for debugging
-            Log.d(TAG, "handleWaterAdd: Adding " + amount + "ml");
-            
-            // Use existing water collector
-            collectorManager.quickLogWater(amount);
-
-            // Show confirmation with today's total
-            int todayTotal = WaterCollector.getTodayTotal(this);
-            String message = String.format("💧 +%dml water logged (Total: %dml today)", amount, todayTotal);
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-
-            updateDashboard();
-
-            Log.d(TAG, "💧 Quick added water: " + amount + "ml - Success!");
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error adding water", e);
-            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void handleExerciseAdd(QuickAddItem item) {
-        // Show duration options
-        String[] durations = {"⚡ 5 min", "🏃 15 min", "💪 30 min", "🔥 45 min", "🎯 60 min"};
-
-        new AlertDialog.Builder(this)
-                .setTitle("How long was your " + item.name.toLowerCase() + "?")
-                .setItems(durations, (dialog, which) -> {
-                    String duration = durations[which].substring(2); // Remove emoji
-
-                    collectorManager.quickLogExercise(item.name.toLowerCase(), duration);
-
-                    Toast.makeText(this, item.icon + " " + duration + " " + item.name.toLowerCase() + " logged", Toast.LENGTH_SHORT).show();
-                    updateDashboard();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void handleMoodAdd(QuickAddItem item) {
-        // Show mood scale
-        String[] moods = {"😰 Terrible", "😕 Bad", "😐 Okay", "😊 Good", "🤩 Amazing"};
-
-        new AlertDialog.Builder(this)
-                .setTitle("How are you feeling?")
-                .setItems(moods, (dialog, which) -> {
-                    int rating = which + 1; // 1-5 scale
-                    String moodText = moods[which].substring(2); // Remove emoji
-
-                    collectorManager.quickLogMood(rating, moodText);
-
-                    Toast.makeText(this, "Mood logged: " + moods[which], Toast.LENGTH_SHORT).show();
-                    updateDashboard();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void handleSleepAdd(QuickAddItem item) {
-        // Show sleep duration options
-        String[] durations = {"😴 4h", "😔 5h", "🙂 6h", "😊 7h", "😃 8h", "🤩 9h+"};
-
-        new AlertDialog.Builder(this)
-                .setTitle("How many hours did you sleep?")
-                .setItems(durations, (dialog, which) -> {
-                    double hours = 4 + which; // 4-9+ hours
-                    String quality = which < 2 ? "poor" : which < 4 ? "fair" : "good";
-
-                    collectorManager.quickLogSleep(hours, quality);
-
-                    Toast.makeText(this, "Sleep logged: " + durations[which], Toast.LENGTH_SHORT).show();
-                    updateDashboard();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void handleBeverageAdd(QuickAddItem item) {
-        // For now, just log as water with note
-        collectorManager.quickLogWater(250); // Standard cup
-        Toast.makeText(this, item.icon + " " + item.name + " logged", Toast.LENGTH_SHORT).show();
-        updateDashboard();
-    }
-
-    private void handleSubstanceAdd(QuickAddItem item) {
-        collectorManager.quickLogSubstance(item.name.toLowerCase(), item.description);
-        Toast.makeText(this, item.icon + " " + item.name + " logged", Toast.LENGTH_SHORT).show();
-        updateDashboard();
-    }
-
-    private void handleAlcoholAdd(QuickAddItem item) {
-        collectorManager.quickLogSubstance(item.name.toLowerCase(), item.description);
-        Toast.makeText(this, item.icon + " " + item.name + " logged", Toast.LENGTH_SHORT).show();
-        updateDashboard();
-    }
-
-    private void handleFoodAdd(QuickAddItem item) {
-        // Show meal options
-        String[] mealTypes = {"🌅 Breakfast", "☀️ Lunch", "🌆 Dinner", "🍿 Snack"};
-
-        new AlertDialog.Builder(this)
-                .setTitle("What type of meal?")
-                .setItems(mealTypes, (dialog, which) -> {
-                    String mealType = mealTypes[which].substring(2); // Remove emoji
-                    collectorManager.quickLogMeal(mealType.toLowerCase(), item.description);
-                    Toast.makeText(this, mealTypes[which] + " logged", Toast.LENGTH_SHORT).show();
-                    updateDashboard();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void handleMedicationAdd(QuickAddItem item) {
-        // For now, generic medication logging
-        collectorManager.quickLogSubstance("medication", item.description);
-        Toast.makeText(this, item.icon + " Medication logged", Toast.LENGTH_SHORT).show();
-        updateDashboard();
-    }
-
-    private void handleBiometricAdd(QuickAddItem item) {
-        // Placeholder for weight/other biometrics
-        Toast.makeText(this, "🚧 " + item.name + " logging coming soon!", Toast.LENGTH_SHORT).show();
-    }
-
-    private void showGenericQuickAdd(QuickAddItem item) {
-        Toast.makeText(this, item.icon + " " + item.name + " logged", Toast.LENGTH_SHORT).show();
-        updateDashboard();
-    }
-
-    private void toggleBackgroundTracking() {
-        if (trackingManager.isTrackingEnabled()) {
-            trackingManager.stopTracking();
-            updateTrackingStatus();
-        } else {
-            trackingManager.startTracking();
-            updateTrackingStatus();
-        }
-    }
-
-    private void updateDashboard() {
-        updateDailyStats();
-        updateTrackingStatus();
-        updateRecentActivity();
-    }
-
-    private void updateDailyStats() {
-        // Get today's statistics
-        int waterToday = WaterCollector.getTodayTotal(this);
-
-        String statsText = String.format("💧 %dml water today", waterToday);
-        dailyStatsText.setText(statsText);
-    }
-
-    private void updateTrackingStatus() {
-        boolean isTracking = trackingManager.isTrackingEnabled();
-
-        if (isTracking) {
-            trackingStatusText.setText("🎯 Background tracking active");
-            trackingStatusText.setTextColor(0xFF4CAF50); // Green
-            trackingStatusCard.setCardBackgroundColor(0xFF2E7D32); // Dark green
-        } else {
-            trackingStatusText.setText("⏸️ Background tracking paused");
-            trackingStatusText.setTextColor(0xFF888888); // Gray
-            trackingStatusCard.setCardBackgroundColor(0xFF2A2A2A); // Dark gray
-        }
-    }
-
-    private void updateRecentActivity() {
-        // Create sample recent activities for now
-        List<RecentActivityItem> recentItems = new ArrayList<>();
-        recentItems.add(new RecentActivityItem("💧", "Water logged", "Just now", System.currentTimeMillis()));
-        recentItems.add(new RecentActivityItem("💪", "Exercise logged", "30m ago", System.currentTimeMillis() - 1800000));
-        recentItems.add(new RecentActivityItem("😊", "Mood logged", "1h ago", System.currentTimeMillis() - 3600000));
-
-        recentActivityAdapter.updateItems(recentItems);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        updateDashboard();
-    }
-
-    /**
-     * Data class for quick add items
-     */
-    public static class QuickAddItem {
-        public final String icon;
-        public final String name;
-        public final String category;
-        public final String description;
-
-        public QuickAddItem(String icon, String name, String category, String description) {
-            this.icon = icon;
-            this.name = name;
-            this.category = category;
-            this.description = description;
-        }
-    }
-
-    /**
-     * Data class for recent activity items
-     */
-    public static class RecentActivityItem {
-        public final String icon;
-        public final String title;
-        public final String timeAgo;
-        public final long timestamp;
-
-        public RecentActivityItem(String icon, String title, String timeAgo, long timestamp) {
-            this.icon = icon;
-            this.title = title;
-            this.timeAgo = timeAgo;
-            this.timestamp = timestamp;
-        }
-    }
-
+    
+    // ===== INNER CLASSES =====
+    
     /**
      * Adapter for quick add grid
      */
-    public static class QuickAddAdapter extends RecyclerView.Adapter<QuickAddAdapter.QuickAddViewHolder> {
-
-        public interface QuickAddClickListener {
-            void onQuickAddClick(QuickAddItem item);
+    private static class QuickAddAdapter extends RecyclerView.Adapter<QuickAddAdapter.ViewHolder> {
+        private final List<DataCollectorPlugin> plugins;
+        private final OnPluginClickListener listener;
+        
+        interface OnPluginClickListener {
+            void onPluginClick(DataCollectorPlugin plugin);
         }
-
-        private final List<QuickAddItem> items;
-        private final QuickAddClickListener listener;
-
-        public QuickAddAdapter(List<QuickAddItem> items, QuickAddClickListener listener) {
-            this.items = items;
+        
+        QuickAddAdapter(List<DataCollectorPlugin> plugins, OnPluginClickListener listener) {
+            this.plugins = plugins;
             this.listener = listener;
         }
-
+        
         @Override
-        public QuickAddViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_quick_add, parent, false);
-            return new QuickAddViewHolder(view);
+        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            // Create a simple card view for each plugin
+            TextView view = new TextView(parent.getContext());
+            view.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                200
+            ));
+            view.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+            view.setPadding(20, 20, 20, 20);
+            return new ViewHolder(view);
         }
-
+        
         @Override
-        public void onBindViewHolder(QuickAddViewHolder holder, int position) {
-            QuickAddItem item = items.get(position);
-            holder.bind(item, listener);
+        public void onBindViewHolder(ViewHolder holder, int position) {
+            DataCollectorPlugin plugin = plugins.get(position);
+            holder.textView.setText(plugin.getEmoji() + "\n" + plugin.getPluginName());
+            holder.textView.setOnClickListener(v -> listener.onPluginClick(plugin));
         }
-
+        
         @Override
         public int getItemCount() {
-            return items.size();
+            return plugins.size();
         }
-
-        static class QuickAddViewHolder extends RecyclerView.ViewHolder {
-            private final TextView iconText;
-            private final TextView nameText;
-            private final CardView cardView;
-
-            QuickAddViewHolder(View itemView) {
-                super(itemView);
-                iconText = itemView.findViewById(R.id.quick_add_icon);
-                nameText = itemView.findViewById(R.id.quick_add_name);
-                cardView = itemView.findViewById(R.id.quick_add_card);
-            }
-
-            void bind(QuickAddItem item, QuickAddClickListener listener) {
-                iconText.setText(item.icon);
-                nameText.setText(item.name);
-
-                cardView.setOnClickListener(v -> {
-                    if (listener != null) {
-                        listener.onQuickAddClick(item);
-                    }
-                });
-
-                // Style the card
-                cardView.setCardBackgroundColor(0xFF2A2A2A);
-                cardView.setRadius(12);
-                cardView.setCardElevation(4);
+        
+        static class ViewHolder extends RecyclerView.ViewHolder {
+            TextView textView;
+            
+            ViewHolder(TextView view) {
+                super(view);
+                textView = view;
             }
         }
     }
-
+    
     /**
      * Adapter for recent activity feed
      */
-    public static class RecentActivityAdapter extends RecyclerView.Adapter<RecentActivityAdapter.RecentActivityViewHolder> {
-
-        private List<RecentActivityItem> items;
-
-        public RecentActivityAdapter(List<RecentActivityItem> items) {
-            this.items = items;
+    private static class RecentActivityAdapter extends RecyclerView.Adapter<RecentActivityAdapter.ViewHolder> {
+        private List<PersonalData> activities;
+        private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        
+        RecentActivityAdapter(List<PersonalData> activities) {
+            this.activities = activities;
         }
-
-        public void updateItems(List<RecentActivityItem> newItems) {
-            this.items = newItems;
+        
+        void updateData(List<PersonalData> newData) {
+            this.activities = newData;
             notifyDataSetChanged();
         }
-
+        
         @Override
-        public RecentActivityViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_recent_activity, parent, false);
-            return new RecentActivityViewHolder(view);
+        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            TextView view = new TextView(parent.getContext());
+            view.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            view.setPadding(20, 10, 20, 10);
+            return new ViewHolder(view);
         }
-
+        
         @Override
-        public void onBindViewHolder(RecentActivityViewHolder holder, int position) {
-            RecentActivityItem item = items.get(position);
-            holder.bind(item);
+        public void onBindViewHolder(ViewHolder holder, int position) {
+            PersonalData data = activities.get(position);
+            String time = timeFormat.format(new Date(data.getTimestamp()));
+            String text = time + " - " + data.getType() + ": " + data.getData().toString();
+            holder.textView.setText(text);
         }
-
+        
         @Override
         public int getItemCount() {
-            return items.size();
+            return activities.size();
         }
-
-        static class RecentActivityViewHolder extends RecyclerView.ViewHolder {
-            private final TextView iconText;
-            private final TextView titleText;
-            private final TextView timeText;
-
-            RecentActivityViewHolder(View itemView) {
-                super(itemView);
-                iconText = itemView.findViewById(R.id.activity_icon);
-                titleText = itemView.findViewById(R.id.activity_title);
-                timeText = itemView.findViewById(R.id.activity_time);
-            }
-
-            void bind(RecentActivityItem item) {
-                iconText.setText(item.icon);
-                titleText.setText(item.title);
-                timeText.setText(item.timeAgo);
-
-                // Style for dark theme
-                titleText.setTextColor(0xFFFFFFFF);
-                timeText.setTextColor(0xFF888888);
+        
+        static class ViewHolder extends RecyclerView.ViewHolder {
+            TextView textView;
+            
+            ViewHolder(TextView view) {
+                super(view);
+                textView = view;
             }
         }
     }

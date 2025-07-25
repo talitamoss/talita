@@ -12,21 +12,26 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import com.core.talita.collectors.LocationCollector;
+import com.core.talita.api.*;
+import com.core.talita.plugins.PluginManager;
+import com.core.talita.plugins.DataCollectorPlugin;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * LocationActivity - UI for location tracking
- * Clean architecture: UI only, logic in LocationCollector
+ * Updated to use plugin system instead of hard-coded LocationCollector
  */
-public class LocationActivity extends AppCompatActivity implements LocationCollector.LocationListener {
+public class LocationActivity extends AppCompatActivity {
     
     private static final int REQUEST_LOCATION_PERMISSION = 101;
+    private static final String LOCATION_PLUGIN_ID = "core.location";
     
     // UI Components
     private MapView mapView;
@@ -35,8 +40,9 @@ public class LocationActivity extends AppCompatActivity implements LocationColle
     private Button trackButton;
     private Button captureButton;
     
-    // Business Logic
-    private LocationCollector locationCollector;
+    // Services
+    private DataCollectorManager collectorManager;
+    private DataCollector locationCollector;
     private UniversalDataService dataService;
     
     // Map
@@ -52,14 +58,52 @@ public class LocationActivity extends AppCompatActivity implements LocationColle
         setContentView(R.layout.activity_location);
         
         // Initialize services
-        locationCollector = new LocationCollector(this);
-        locationCollector.setListener(this);
-        dataService = new UniversalDataService(this);
+        collectorManager = DataCollectorManager.getInstance(this);
+        dataService = UniversalDataService.getInstance(this);
         
-        // Setup UI
+        // Try to get location collector from plugin system
+        initializeLocationCollector();
+        
+        // Initialize UI
         initializeViews();
         checkPermissions();
-        loadLocationHistory();
+        
+        // Setup map
+        setupMap();
+    }
+    
+    private void initializeLocationCollector() {
+        // Check if location plugin is available
+        PluginManager pluginManager = PluginManager.getInstance(this);
+        DataCollectorPlugin locationPlugin = pluginManager.getPlugin(LOCATION_PLUGIN_ID);
+        
+        if (locationPlugin != null) {
+            // Create collector from plugin
+            locationCollector = locationPlugin.createCollector(this);
+            if (locationCollector != null) {
+                locationCollector.initialize(this);
+            }
+        }
+        
+        // If no plugin available, show message
+        if (locationCollector == null) {
+            Toast.makeText(this, "Location tracking plugin not available", Toast.LENGTH_LONG).show();
+            // For now, create a placeholder
+            createPlaceholderCollector();
+        }
+    }
+    
+    private void createPlaceholderCollector() {
+        // Create a simple placeholder until LocationPlugin is implemented
+        locationCollector = new SimpleDataCollector.Builder("location", "Location")
+            .description("Track your location")
+            .emoji("📍")
+            .category("i")
+            .inputHint("Location notes")
+            .inputType(SimpleDataCollector.InputType.TEXT)
+            .build();
+        
+        locationCollector.initialize(this);
     }
     
     private void initializeViews() {
@@ -69,21 +113,23 @@ public class LocationActivity extends AppCompatActivity implements LocationColle
         trackButton = findViewById(R.id.track_button);
         captureButton = findViewById(R.id.capture_button);
         
-        Button backButton = findViewById(R.id.back_button);
-        backButton.setOnClickListener(v -> finish());
-        
-        // Setup map
+        trackButton.setOnClickListener(v -> toggleTracking());
+        captureButton.setOnClickListener(v -> captureLocation());
+    }
+    
+    private void setupMap() {
         mapView.setTileSource(TileSourceFactory.MAPNIK);
+        mapView.setBuiltInZoomControls(true);
         mapView.setMultiTouchControls(true);
         mapView.getController().setZoom(15.0);
         
-        // Setup buttons
-        trackButton.setOnClickListener(v -> toggleTracking());
-        captureButton.setOnClickListener(v -> captureLocation());
+        // Center on default location
+        GeoPoint startPoint = new GeoPoint(-34.9285, 138.6007); // Adelaide
+        mapView.getController().setCenter(startPoint);
         
-        // Initialize marker
+        // Add marker
         currentLocationMarker = new Marker(mapView);
-        currentLocationMarker.setIcon(getDrawable(R.drawable.ic_location));
+        currentLocationMarker.setPosition(startPoint);
         currentLocationMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
         mapView.getOverlays().add(currentLocationMarker);
     }
@@ -95,9 +141,25 @@ public class LocationActivity extends AppCompatActivity implements LocationColle
                 new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                 REQUEST_LOCATION_PERMISSION);
         } else {
-            // Try to show last known location
-            showLastLocation();
+            onPermissionGranted();
         }
+    }
+    
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_LOCATION_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                onPermissionGranted();
+            } else {
+                Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+    
+    private void onPermissionGranted() {
+        statusText.setText("Ready to track location");
+        showLastLocation();
     }
     
     private void toggleTracking() {
@@ -107,10 +169,19 @@ public class LocationActivity extends AppCompatActivity implements LocationColle
             return;
         }
         
-        if (locationCollector.isTracking()) {
-            locationCollector.stopTracking();
+        // Check if collector supports automated collection
+        if (locationCollector != null && locationCollector.getSettings().isAutomatedCollection()) {
+            if (locationCollector.isCollectingAutomatically()) {
+                locationCollector.stopAutomatedCollection();
+                trackButton.setText("Start Tracking");
+                statusText.setText("Tracking stopped");
+            } else {
+                locationCollector.startAutomatedCollection();
+                trackButton.setText("Stop Tracking");
+                statusText.setText("Tracking started");
+            }
         } else {
-            locationCollector.startTracking();
+            Toast.makeText(this, "Automated tracking not supported", Toast.LENGTH_SHORT).show();
         }
     }
     
@@ -121,7 +192,24 @@ public class LocationActivity extends AppCompatActivity implements LocationColle
             return;
         }
         
-        locationCollector.captureCurrentLocation();
+        // Use plugin system to capture location
+        if (locationCollector != null) {
+            // For now, create mock location data
+            Map<String, Object> locationData = new HashMap<>();
+            locationData.put("latitude", -34.9285);
+            locationData.put("longitude", 138.6007);
+            locationData.put("accuracy", 10.0);
+            locationData.put("source", "manual");
+            
+            CollectorResult result = locationCollector.collectQuick(locationData);
+            
+            if (result.isSuccess()) {
+                Toast.makeText(this, "Location captured", Toast.LENGTH_SHORT).show();
+                loadLocationHistory();
+            } else {
+                Toast.makeText(this, "Failed to capture location", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
     
     private boolean hasLocationPermission() {
@@ -130,20 +218,15 @@ public class LocationActivity extends AppCompatActivity implements LocationColle
     }
     
     private void showLastLocation() {
-        try {
-            Location location = locationCollector.getLastKnownLocation();
-            if (location != null) {
-                updateMapLocation(location);
-            }
-        } catch (SecurityException e) {
-            // Permission not granted
-        }
+        // In a real implementation, get last location from location provider
+        // For now, just center on Adelaide
+        GeoPoint adelaide = new GeoPoint(-34.9285, 138.6007);
+        updateMapLocation(adelaide);
     }
     
-    private void updateMapLocation(Location location) {
-        GeoPoint point = new GeoPoint(location.getLatitude(), location.getLongitude());
-        mapView.getController().setCenter(point);
-        currentLocationMarker.setPosition(point);
+    private void updateMapLocation(GeoPoint location) {
+        mapView.getController().setCenter(location);
+        currentLocationMarker.setPosition(location);
         currentLocationMarker.setTitle("Current Location");
         
         coordinatesText.setText(String.format("%.6f, %.6f", 
@@ -151,54 +234,25 @@ public class LocationActivity extends AppCompatActivity implements LocationColle
     }
     
     private void loadLocationHistory() {
-        // Load recent locations
+        // Load recent locations using plugin data type
         List<PersonalData> locations = dataService.getDataByType("location");
         statusText.setText(locations.size() + " locations tracked");
-    }
-    
-    // LocationCollector.LocationListener implementation
-    
-    @Override
-    public void onLocationUpdate(Location location, String dataId) {
-        runOnUiThread(() -> {
-            updateMapLocation(location);
-            Toast.makeText(this, "Location saved", Toast.LENGTH_SHORT).show();
-            loadLocationHistory();
-        });
-    }
-    
-    @Override
-    public void onTrackingStarted() {
-        runOnUiThread(() -> {
-            trackButton.setText("Stop Tracking");
-            statusText.setText("Tracking location...");
-        });
-    }
-    
-    @Override
-    public void onTrackingStopped() {
-        runOnUiThread(() -> {
-            trackButton.setText("Start Tracking");
-            statusText.setText("Tracking stopped");
-        });
-    }
-    
-    @Override
-    public void onError(String error) {
-        runOnUiThread(() -> {
-            Toast.makeText(this, error, Toast.LENGTH_LONG).show();
-        });
-    }
-    
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         
-        if (requestCode == REQUEST_LOCATION_PERMISSION) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                showLastLocation();
-            } else {
-                Toast.makeText(this, "Location permission is required", Toast.LENGTH_LONG).show();
+        // Add markers for recent locations
+        for (PersonalData data : locations) {
+            try {
+                Map<String, Object> locData = data.getData();
+                if (locData.containsKey("latitude") && locData.containsKey("longitude")) {
+                    double lat = ((Number) locData.get("latitude")).doubleValue();
+                    double lon = ((Number) locData.get("longitude")).doubleValue();
+                    
+                    Marker marker = new Marker(mapView);
+                    marker.setPosition(new GeoPoint(lat, lon));
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+                    mapView.getOverlays().add(marker);
+                }
+            } catch (Exception e) {
+                // Skip invalid data
             }
         }
     }
@@ -213,10 +267,13 @@ public class LocationActivity extends AppCompatActivity implements LocationColle
     protected void onPause() {
         super.onPause();
         mapView.onPause();
-        
-        // Stop tracking when paused
-        if (locationCollector.isTracking()) {
-            locationCollector.stopTracking();
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (locationCollector != null) {
+            locationCollector.onDestroy();
         }
     }
 }

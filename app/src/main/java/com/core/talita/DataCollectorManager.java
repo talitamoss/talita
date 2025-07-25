@@ -6,18 +6,32 @@ import com.core.talita.api.*;
 import com.core.talita.plugins.PluginManager;
 import com.core.talita.plugins.DataCollectorPlugin;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * Data Collector Manager - manages data collectors from plugins
- * No more hard-coded collectors - everything comes from plugins
+ * DataCollectorManager - Manages data collectors from plugins
+ * 
+ * This is the central manager for all data collection in the app.
+ * It works with the plugin system to create and manage collectors.
  */
 public class DataCollectorManager {
     private static final String TAG = "DataCollectorManager";
+    private static DataCollectorManager instance;
 
     private final Context context;
     private final UniversalDataService dataService;
     private final PluginManager pluginManager;
     private final Map<String, DataCollector> activeCollectors;
+
+    /**
+     * Get singleton instance
+     */
+    public static DataCollectorManager getInstance(Context context) {
+        if (instance == null) {
+            instance = new DataCollectorManager(context.getApplicationContext());
+        }
+        return instance;
+    }
 
     public DataCollectorManager(Context context) {
         this.context = context;
@@ -25,7 +39,28 @@ public class DataCollectorManager {
         this.pluginManager = PluginManager.getInstance(context);
         this.activeCollectors = new HashMap<>();
 
+        // Register core plugins if not already done
+        registerCorePlugins();
+        
         Log.d(TAG, "📊 Data Collector Manager initialized");
+    }
+
+    /**
+     * Register built-in core plugins
+     */
+    private void registerCorePlugins() {
+        // Check if core plugins are already registered
+        if (pluginManager.getPlugin("core.water") == null) {
+            Log.d(TAG, "Registering core plugins...");
+            
+            // Register core plugins
+            pluginManager.registerPlugin(new com.core.talita.plugins.core.WaterPlugin());
+            // TODO: Add other core plugins as they're created
+            // pluginManager.registerPlugin(new com.core.talita.plugins.core.LocationPlugin());
+            // pluginManager.registerPlugin(new com.core.talita.plugins.core.AudioPlugin());
+            // pluginManager.registerPlugin(new com.core.talita.plugins.core.ExercisePlugin());
+            // pluginManager.registerPlugin(new com.core.talita.plugins.core.MoodPlugin());
+        }
     }
 
     /**
@@ -108,9 +143,33 @@ public class DataCollectorManager {
     }
 
     /**
+     * Get collectors organized by category
+     */
+    public Map<String, List<DataCollector>> getCollectorsByCategory() {
+        Map<String, List<DataCollector>> byCategory = new HashMap<>();
+        
+        for (DataCollectorPlugin plugin : pluginManager.getAllPlugins()) {
+            try {
+                DataCollector collector = plugin.createCollector(context);
+                if (collector != null) {
+                    collector.initialize(context);
+                    
+                    String category = collector.getCategory();
+                    byCategory.computeIfAbsent(category, k -> new ArrayList<>()).add(collector);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to create collector", e);
+            }
+        }
+        
+        return byCategory;
+    }
+
+    /**
      * Quick logging through plugin collectors
      */
     public void quickLog(String pluginId, Map<String, Object> data) {
+        // Get or create collector
         DataCollector collector = activeCollectors.get(pluginId);
         
         if (collector == null) {
@@ -119,6 +178,7 @@ public class DataCollectorManager {
             if (plugin != null) {
                 collector = plugin.createCollector(context);
                 collector.initialize(context);
+                activeCollectors.put(pluginId, collector);
             }
         }
         
@@ -140,6 +200,16 @@ public class DataCollectorManager {
      */
     public void triggerCollection(String pluginId) {
         DataCollector collector = activeCollectors.get(pluginId);
+        
+        if (collector == null) {
+            // Try to create collector
+            DataCollectorPlugin plugin = pluginManager.getPlugin(pluginId);
+            if (plugin != null) {
+                collector = plugin.createCollector(context);
+                collector.initialize(context);
+                activeCollectors.put(pluginId, collector);
+            }
+        }
         
         if (collector != null) {
             CollectorResult result = collector.collect();
@@ -177,59 +247,93 @@ public class DataCollectorManager {
     /**
      * Get statistics about collection system
      */
-    public CollectionStats getStats() {
+    public CollectionStats getCollectionStats() {
         List<DataCollectorPlugin> allPlugins = pluginManager.getAllPlugins();
-        List<DataCollectorPlugin> enabledPlugins = pluginManager.getEnabledPlugins();
+        int totalPlugins = allPlugins.size();
+        int enabledPlugins = 0;
+        int activeCollectors = this.activeCollectors.size();
         
-        Map<String, List<DataCollector>> collectorsByCategory = new HashMap<>();
-        int automatedCount = 0;
-        
-        // Group by category and count automated
-        for (Map.Entry<String, DataCollector> entry : activeCollectors.entrySet()) {
-            DataCollector collector = entry.getValue();
-            String category = collector.getCategory();
-            
-            if (!collectorsByCategory.containsKey(category)) {
-                collectorsByCategory.put(category, new ArrayList<>());
-            }
-            collectorsByCategory.get(category).add(collector);
-            
-            if (collector.isCollectingAutomatically()) {
-                automatedCount++;
+        for (DataCollectorPlugin plugin : allPlugins) {
+            if (plugin.isEnabled()) {
+                enabledPlugins++;
             }
         }
         
-        return new CollectionStats(
-            allPlugins.size(),
-            enabledPlugins.size(),
-            activeCollectors.size(),
-            automatedCount,
-            collectorsByCategory
-        );
+        return new CollectionStats(totalPlugins, enabledPlugins, activeCollectors);
     }
 
     /**
-     * Statistics about collection system
+     * Collection statistics
      */
     public static class CollectionStats {
         public final int totalPlugins;
         public final int enabledPlugins;
         public final int activeCollectors;
-        public final int automatedCollectors;
-        public final Map<String, List<DataCollector>> collectorsByCategory;
-
-        public CollectionStats(int totalPlugins, int enabledPlugins,
-                               int activeCollectors, int automatedCollectors,
-                               Map<String, List<DataCollector>> collectorsByCategory) {
+        
+        public CollectionStats(int totalPlugins, int enabledPlugins, int activeCollectors) {
             this.totalPlugins = totalPlugins;
             this.enabledPlugins = enabledPlugins;
             this.activeCollectors = activeCollectors;
-            this.automatedCollectors = automatedCollectors;
-            this.collectorsByCategory = collectorsByCategory;
         }
-
+        
         public String getSummary() {
-            return activeCollectors + " active (" + automatedCollectors + " automated)";
+            return String.format("Plugins: %d total, %d enabled, %d active", 
+                totalPlugins, enabledPlugins, activeCollectors);
+        }
+    }
+
+    // ========== BACKWARD COMPATIBILITY METHODS ==========
+    // These methods help during migration from old collector system
+
+    /**
+     * Quick log water (backward compatibility)
+     * @deprecated Use quickLog("core.water", data) instead
+     */
+    @Deprecated
+    public void quickLogWater(int amount) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("value", amount);
+        quickLog("core.water", data);
+    }
+
+    /**
+     * Check if a collector is available by type
+     * @deprecated Use plugin system instead
+     */
+    @Deprecated
+    public boolean isCollectorAvailable(String dataType) {
+        // Map old data types to plugin IDs
+        String pluginId = mapDataTypeToPluginId(dataType);
+        DataCollectorPlugin plugin = pluginManager.getPlugin(pluginId);
+        
+        if (plugin != null) {
+            DataCollector collector = plugin.createCollector(context);
+            if (collector != null) {
+                collector.initialize(context);
+                return collector.isAvailable();
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Map old data type names to plugin IDs
+     */
+    private String mapDataTypeToPluginId(String dataType) {
+        switch (dataType.toLowerCase()) {
+            case "water":
+                return "core.water";
+            case "location":
+                return "core.location";
+            case "audio":
+                return "core.audio";
+            case "exercise":
+                return "core.exercise";
+            case "mood":
+                return "core.mood";
+            default:
+                return dataType;
         }
     }
 }

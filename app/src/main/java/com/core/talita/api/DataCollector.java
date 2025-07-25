@@ -5,37 +5,127 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * DataCollector - Base interface for all data collection implementations
+ * DataCollector - Interface for all data collectors
+ * 
+ * Defines the contract that all collectors must implement.
+ * Collectors handle HOW to collect specific types of data.
  */
 public interface DataCollector {
     
-    // Initialization
+    // ===== Core Identity =====
+    
+    /**
+     * Get the data type this collector handles
+     * Examples: "water", "location", "mood", "exercise"
+     */
+    String getDataType();
+    
+    /**
+     * Get display name for UI
+     * Examples: "Water Intake", "Location Tracking", "Mood"
+     */
+    String getDisplayName();
+    
+    /**
+     * Get description of what this collector does
+     */
+    String getDescription();
+    
+    /**
+     * Get emoji icon for this collector
+     * Examples: "💧", "📍", "😊"
+     */
+    String getEmoji();
+    
+    /**
+     * Get category: "i" (personal), "we" (social), "all" (universal)
+     */
+    String getCategory();
+    
+    // ===== Lifecycle =====
+    
+    /**
+     * Initialize the collector with context
+     */
     void initialize(Context context);
+    
+    /**
+     * Clean up resources when collector is destroyed
+     */
     void onDestroy();
     
-    // Core collection methods
-    CollectorResult collect();
-    CollectorResult collectQuick(Map<String, Object> data);
+    // ===== Availability & State =====
     
-    // Automated collection
-    void startAutomatedCollection();
-    void stopAutomatedCollection();
-    boolean isCollectingAutomatically();
+    /**
+     * Check if this collector can work on this device
+     * (has required sensors, permissions available, etc.)
+     */
+    boolean isAvailable();
     
-    // Configuration
-    void updateSettings(CollectorSettings settings);
+    /**
+     * Check if user has enabled this collector
+     */
+    boolean isEnabled();
+    
+    /**
+     * Enable or disable this collector
+     */
+    void setEnabled(boolean enabled);
+    
+    // ===== Settings =====
+    
+    /**
+     * Get current collector settings
+     */
     CollectorSettings getSettings();
     
-    // Metadata
-    String getType();
-    String getDisplayName();
-    String getDescription();
-    String getEmoji();
-    String getCategory();
+    /**
+     * Update collector settings
+     */
+    void updateSettings(CollectorSettings settings);
+    
+    // ===== Permissions =====
+    
+    /**
+     * Get list of required Android permissions
+     * Examples: ["android.permission.ACCESS_FINE_LOCATION"]
+     */
     List<String> getRequiredPermissions();
     
-    // Simplified methods for compatibility
-    default String getDataType() {
-        return getType();
+    // ===== Collection Methods =====
+    
+    /**
+     * Start automated/background collection
+     */
+    void startAutomatedCollection();
+    
+    /**
+     * Stop automated/background collection
+     */
+    void stopAutomatedCollection();
+    
+    /**
+     * Check if currently collecting automatically
+     */
+    boolean isCollectingAutomatically();
+    
+    /**
+     * Trigger manual collection (shows UI if needed)
+     */
+    CollectorResult collect();
+    
+    /**
+     * Quick collection with provided data (no UI)
+     */
+    CollectorResult collectQuick(Map<String, Object> data);
+    
+    // ===== Callbacks =====
+    
+    /**
+     * Callback for data collection events
+     */
+    interface CollectionCallback {
+        void onDataCollected(String dataType, Map<String, Object> data);
+        void onCollectionError(String dataType, String error);
     }
 }
