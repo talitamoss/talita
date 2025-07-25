@@ -6,63 +6,70 @@ import android.content.Intent;
 import android.util.Log;
 import com.google.android.gms.location.ActivityRecognitionResult;
 import com.google.android.gms.location.DetectedActivity;
+import java.util.List;
 
+/**
+ * ActivityRecognitionReceiver - Receives activity updates from Google Play Services
+ * 
+ * Processes detected activities and stores them through the data pipeline
+ */
 public class ActivityRecognitionReceiver extends BroadcastReceiver {
-    private static final String TAG = "ActivityRecognitionReceiver";
-
+    private static final String TAG = "ActivityRecognition";
+    
     @Override
     public void onReceive(Context context, Intent intent) {
         if (ActivityRecognitionResult.hasResult(intent)) {
             ActivityRecognitionResult result = ActivityRecognitionResult.extractResult(intent);
-            handleDetectedActivities(context, result);
+            handleDetectedActivities(context, result.getProbableActivities());
         }
     }
-
-    private void handleDetectedActivities(Context context, ActivityRecognitionResult result) {
-        UniversalDataService dataService = new UniversalDataService(context);
+    
+    private void handleDetectedActivities(Context context, List<DetectedActivity> activities) {
+        UniversalDataService dataService = UniversalDataService.getInstance(context);
         
-        // Get the most probable activity
-        DetectedActivity mostProbableActivity = result.getMostProbableActivity();
-        int confidence = mostProbableActivity.getConfidence();
-        
-        if (confidence > 75) { // Only log high confidence activities
-            String activityName = getActivityName(mostProbableActivity.getType());
-            
-            try {
-                // Create ActivityData with correct constructor (2 parameters)
+        for (DetectedActivity activity : activities) {
+            // Only log activities with reasonable confidence
+            if (activity.getConfidence() >= 50) {
+                String activityName = getActivityName(activity.getType());
+                int confidence = activity.getConfidence();
+                
+                // Create ActivityData
                 ActivityData activityData = new ActivityData(activityName, confidence);
                 
-                // Save using UniversalDataService
-                String id = dataService.capture(activityData);
-                
-                if (id != null) {
-                    Log.d(TAG, "Activity saved: " + activityName + " (" + confidence + "%)");
+                // Only store significant activities to avoid spam
+                if (activityData.isSignificant()) {
+                    // Convert to PersonalData and store
+                    PersonalData personalData = activityData.toPersonalData();
+                    dataService.processData(personalData);
+                    
+                    Log.d(TAG, "Stored activity: " + activityData);
+                } else {
+                    Log.d(TAG, "Detected low-confidence activity: " + activityData);
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to save activity", e);
             }
         }
     }
-
+    
     private String getActivityName(int activityType) {
         switch (activityType) {
             case DetectedActivity.IN_VEHICLE:
-                return "In Vehicle";
+                return "IN_VEHICLE";
             case DetectedActivity.ON_BICYCLE:
-                return "On Bicycle";
+                return "ON_BICYCLE";
             case DetectedActivity.ON_FOOT:
-                return "On Foot";
+                return "ON_FOOT";
             case DetectedActivity.RUNNING:
-                return "Running";
+                return "RUNNING";
             case DetectedActivity.STILL:
-                return "Still";
+                return "STILL";
             case DetectedActivity.TILTING:
-                return "Tilting";
+                return "TILTING";
             case DetectedActivity.WALKING:
-                return "Walking";
+                return "WALKING";
             case DetectedActivity.UNKNOWN:
+                return "UNKNOWN";
             default:
-                return "Unknown";
+                return "UNKNOWN";
         }
     }
 }

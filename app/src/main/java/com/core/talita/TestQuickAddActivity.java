@@ -3,139 +3,129 @@ package com.core.talita;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
+import android.widget.GridLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import com.core.talita.collectors.WaterCollector;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import com.core.talita.plugins.DataCollectorPlugin;
+import com.core.talita.plugins.PluginManager;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 
 /**
- * Simple test activity for Quick Add functionality
- * This is optional - you can delete this file if not needed
+ * Test Quick Add Activity - For testing quick add functionality
+ * Updated to use plugin system
  */
 public class TestQuickAddActivity extends AppCompatActivity {
+    private static final String TAG = "TestQuickAdd";
     
-    private static final String TAG = "QuickAddTest";
-    
-    private TextView testResultsText;
-    private StringBuilder testResults;
+    private GridLayout quickAddGrid;
+    private TextView statusText;
+    private PluginManager pluginManager;
+    private DataCollectorManager collectorManager;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_test_quick_add);
         
-        // Simple UI for test results
-        testResultsText = new TextView(this);
-        testResultsText.setPadding(20, 20, 20, 20);
-        testResultsText.setTextSize(14);
-        setContentView(testResultsText);
+        pluginManager = PluginManager.getInstance(this);
+        collectorManager = DataCollectorManager.getInstance(this);
         
-        testResults = new StringBuilder();
-        testResults.append("=== QUICK ADD SYSTEM TEST ===\n\n");
-        
-        runAllTests();
+        setupViews();
+        loadQuickAddButtons();
     }
     
-    private void runAllTests() {
-        // Test 1: Basic initialization
-        test1_Initialization();
+    private void setupViews() {
+        quickAddGrid = findViewById(R.id.quick_add_grid);
+        statusText = findViewById(R.id.status_text);
         
-        // Test 2: Water logging
-        test2_WaterLogging();
+        Button backButton = findViewById(R.id.back_button);
+        backButton.setOnClickListener(v -> finish());
         
-        // Test 3: Data retrieval
-        test3_DataRetrieval();
-        
-        // Display results
-        testResultsText.setText(testResults.toString());
+        Button refreshButton = findViewById(R.id.refresh_button);
+        refreshButton.setOnClickListener(v -> {
+            quickAddGrid.removeAllViews();
+            loadQuickAddButtons();
+        });
     }
     
-    private void test1_Initialization() {
-        addTestHeader("Test 1: Initialization");
+    private void loadQuickAddButtons() {
+        List<DataCollectorPlugin> quickAddPlugins = pluginManager.getQuickAddPlugins();
         
-        try {
-            // Test UniversalDataService
-            UniversalDataService dataService = new UniversalDataService(this);
-            addResult("UniversalDataService", dataService != null);
-            
-            // Test DataCollectorManager
-            DataCollectorManager manager = new DataCollectorManager(this);
-            addResult("DataCollectorManager", manager != null);
-            
-        } catch (Exception e) {
-            addResult("Initialization", false);
-            logError("Initialization failed", e);
+        statusText.setText("Found " + quickAddPlugins.size() + " quick add plugins");
+        
+        for (DataCollectorPlugin plugin : quickAddPlugins) {
+            Button button = createQuickAddButton(plugin);
+            quickAddGrid.addView(button);
         }
     }
     
-    private void test2_WaterLogging() {
-        addTestHeader("Test 2: Water Logging");
+    private Button createQuickAddButton(DataCollectorPlugin plugin) {
+        Button button = new Button(this);
+        button.setText(plugin.getEmoji() + "\n" + plugin.getPluginName());
+        button.setTextSize(14);
+        button.setPadding(16, 16, 16, 16);
+        
+        GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+        params.width = 0;
+        params.height = GridLayout.LayoutParams.WRAP_CONTENT;
+        params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+        params.setMargins(8, 8, 8, 8);
+        button.setLayoutParams(params);
+        
+        button.setOnClickListener(v -> testQuickAdd(plugin));
+        
+        return button;
+    }
+    
+    private void testQuickAdd(DataCollectorPlugin plugin) {
+        Log.d(TAG, "Testing quick add for: " + plugin.getPluginName());
         
         try {
-            DataCollectorManager manager = new DataCollectorManager(this);
+            // Test with sample data based on plugin type
+            Map<String, Object> testData = createTestData(plugin.getPluginId());
             
-            // Get initial total
-            int initialTotal = WaterCollector.getTodayTotal(this);
-            logVerbose("Initial water total: " + initialTotal + "ml");
-            
-            // Log 250ml
-            manager.quickLogWater(250);
-            addResult("quickLogWater(250) called", true);
-            
-            // Check new total
-            int newTotal = WaterCollector.getTodayTotal(this);
-            boolean increased = newTotal == initialTotal + 250;
-            addResult("Water total increased correctly", increased);
-            logVerbose("New total: " + newTotal + "ml (expected: " + (initialTotal + 250) + "ml)");
+            if (testData != null) {
+                // Use quick log
+                collectorManager.quickLog(plugin.getPluginId(), testData);
+                
+                String message = "✅ Quick logged: " + plugin.getPluginName();
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                statusText.setText(message);
+            } else {
+                // Use regular collection UI
+                plugin.onQuickAddTapped(this);
+                statusText.setText("Triggered UI for: " + plugin.getPluginName());
+            }
             
         } catch (Exception e) {
-            addResult("Water Logging", false);
-            logError("Water logging failed", e);
+            String error = "❌ Error: " + e.getMessage();
+            Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
+            statusText.setText(error);
+            Log.e(TAG, "Quick add error", e);
         }
     }
     
-    private void test3_DataRetrieval() {
-        addTestHeader("Test 3: Data Retrieval");
+    private Map<String, Object> createTestData(String pluginId) {
+        Map<String, Object> data = new HashMap<>();
         
-        try {
-            UniversalDataService dataService = new UniversalDataService(this);
-            
-            // Get all water data
-            List<UniversalDataService.DecryptedDataItem> waterData = 
-                dataService.getDecryptedDataByType("water");
-            
-            addResult("Retrieved water data", waterData != null);
-            addResult("Has water entries", waterData.size() > 0);
-            logVerbose("Total water entries: " + waterData.size());
-            
-        } catch (Exception e) {
-            addResult("Data Retrieval", false);
-            logError("Data retrieval failed", e);
+        // Create test data based on plugin type
+        if (pluginId.contains("water")) {
+            data.put("amount", 250); // 250ml
+            return data;
+        } else if (pluginId.contains("mood")) {
+            data.put("mood", "Happy");
+            data.put("score", 4);
+            return data;
+        } else if (pluginId.contains("exercise")) {
+            data.put("activity", "Walking");
+            data.put("duration", 30);
+            return data;
         }
-    }
-    
-    // Helper methods
-    private void addTestHeader(String header) {
-        testResults.append("\n--- ").append(header).append(" ---\n");
-        Log.d(TAG, "=== " + header + " ===");
-    }
-    
-    private void addResult(String test, boolean passed) {
-        String result = passed ? "✅ PASS" : "❌ FAIL";
-        testResults.append(result).append(" - ").append(test).append("\n");
-        Log.d(TAG, result + " - " + test);
-    }
-    
-    private void logVerbose(String message) {
-        testResults.append("   ℹ️ ").append(message).append("\n");
-        Log.v(TAG, message);
-    }
-    
-    private void logError(String message, Exception e) {
-        testResults.append("   ⚠️ ERROR: ").append(message).append("\n");
-        testResults.append("   ").append(e.getMessage()).append("\n");
-        Log.e(TAG, message, e);
+        
+        // Return null for plugins that need UI
+        return null;
     }
 }

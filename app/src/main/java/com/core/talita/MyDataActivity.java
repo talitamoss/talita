@@ -14,12 +14,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-import com.core.talita.collectors.WaterCollector;
-
 /**
  * My Data Activity - Central analytics and insights hub
- *
- * Now with simple real data integration that works with existing code
+ * Updated to use plugin system instead of hardcoded collectors
  */
 public class MyDataActivity extends AppCompatActivity {
 
@@ -61,7 +58,7 @@ public class MyDataActivity extends AppCompatActivity {
         // Initialize services
         dataManager = new LocalDataManager(this);
         insightsEngine = new InsightsEngine(dataManager);
-        dataService = new UniversalDataService(this);
+        dataService = UniversalDataService.getInstance(this);
 
         initializeViews();
         setupTimeButtons();
@@ -165,163 +162,194 @@ public class MyDataActivity extends AppCompatActivity {
             // Calculate time range
             long endTime = System.currentTimeMillis();
             long startTime = calculateStartTime(period, endTime);
-            
-            // Try to load real data
-            loadRealData(startTime, endTime);
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading data: " + e.getMessage());
-            // Fall back to mock data
-            loadMockData();
-        }
-    }
 
-    private void loadRealData(long startTime, long endTime) {
-        try {
-            // Get data count from database
-            int totalDataPoints = dataManager.getTotalDataCount();
-            int backedUpPoints = dataManager.getBackedUpDataCount();
-            
-            // Calculate life score
-            int lifeScore = insightsEngine.calculateLifeScore(startTime, endTime);
-            String scoreDetails = insightsEngine.getLifeScoreDetails(startTime, endTime);
-            
-            // Generate insights
-            List<Insight> insights = insightsEngine.generateInsights(startTime, endTime);
-            
-            // Get today's stats
-            Map<String, Object> todayStats = getTodayStats();
-            
-            // Update UI
-            updateLifeScore(lifeScore, scoreDetails);
-            updateDataStatus(totalDataPoints, backedUpPoints);
-            updateInsights(insights);
-            updateTodayStats(todayStats);
-            
+            // Load overall stats
+            loadLifeScore(startTime, endTime);
+            loadDataStats();
+
+            // Load insights
+            List<InsightsEngine.Insight> insights = insightsEngine.generateInsights(startTime, endTime);
+            insightsAdapter.updateInsights(insights);
+
+            // Load quick stats
+            loadQuickStats(startTime, endTime);
+
+            Log.d(TAG, "📊 Loaded data for period: " + period);
+
         } catch (Exception e) {
-            Log.e(TAG, "Error loading real data: " + e.getMessage());
-            loadMockData();
+            Log.e(TAG, "Error loading data", e);
         }
-    }
-    
-    private Map<String, Object> getTodayStats() {
-        Map<String, Object> stats = new HashMap<>();
-        
-        try {
-            // Get today's water intake
-            int waterToday = WaterCollector.getTodayTotal(this);
-            float waterL = waterToday / 1000.0f;
-            
-            // Get other stats (these might not have static methods yet)
-            // For now, use placeholder values or zeros
-            stats.put("steps", 0);
-            stats.put("water", waterL);
-            stats.put("mood", "—");
-            stats.put("sleep", 0.0f);
-            
-        } catch (Exception e) {
-            // Default values
-            stats.put("steps", 0);
-            stats.put("water", 0.0f);
-            stats.put("mood", "—");
-            stats.put("sleep", 0.0f);
-        }
-        
-        return stats;
     }
 
     private long calculateStartTime(TimePeriod period, long endTime) {
         Calendar cal = Calendar.getInstance();
         cal.setTimeInMillis(endTime);
-        
+
         switch (period) {
             case TODAY:
                 cal.set(Calendar.HOUR_OF_DAY, 0);
                 cal.set(Calendar.MINUTE, 0);
                 cal.set(Calendar.SECOND, 0);
                 cal.set(Calendar.MILLISECOND, 0);
-                return cal.getTimeInMillis();
-                
+                break;
             case WEEK:
                 cal.add(Calendar.DAY_OF_YEAR, -7);
-                return cal.getTimeInMillis();
-                
+                break;
             case MONTH:
                 cal.add(Calendar.MONTH, -1);
-                return cal.getTimeInMillis();
-                
+                break;
             case ALL:
-                return 0; // All time
-                
-            default:
-                return endTime - (7 * 24 * 60 * 60 * 1000); // Default to week
+                return 0; // Beginning of time
         }
+
+        return cal.getTimeInMillis();
     }
 
-    private void loadMockData() {
-        // Mock Life Score
-        updateLifeScore(87, "Top factors:\n• Sleep consistency ↑\n• Exercise frequency ↑\n• Water intake ↓");
-
-        // Mock Data Status
-        updateDataStatus(2847, 2103);
-
-        // Mock Insights
-        List<Insight> mockInsights = new ArrayList<>();
-        mockInsights.add(new Insight("Better mood on days with >7000 steps", 0.82, "Movement", System.currentTimeMillis()));
-        mockInsights.add(new Insight("Sleep quality improves when water intake >2L", 0.71, "Wellness", System.currentTimeMillis()));
-        mockInsights.add(new Insight("Productivity peaks between 10am-12pm on exercise days", 0.68, "Productivity", System.currentTimeMillis()));
-        updateInsights(mockInsights);
-
-        // Mock Today Stats
-        Map<String, Object> todayStats = new HashMap<>();
-        todayStats.put("steps", 8432);
-        todayStats.put("water", 2.3f);
-        todayStats.put("mood", "😊");
-        todayStats.put("sleep", 7.5f);
-        updateTodayStats(todayStats);
+    private void loadLifeScore(long startTime, long endTime) {
+        // Calculate a simple life score based on data completeness
+        int score = insightsEngine.calculateLifeScore(startTime, endTime);
+        lifeScoreText.setText(String.valueOf(score));
+        
+        // Update details
+        String period = currentPeriod == TimePeriod.TODAY ? "today" : 
+                       currentPeriod == TimePeriod.WEEK ? "this week" :
+                       currentPeriod == TimePeriod.MONTH ? "this month" : "overall";
+        lifeScoreDetails.setText("Your data sovereignty score " + period);
     }
 
-    private void updateLifeScore(int score, String details) {
-        lifeScoreText.setText(String.format("Life Score: %d/100", score));
-        lifeScoreDetails.setText(details);
-
-        // Color based on score
-        int color = getScoreColor(score);
-        lifeScoreText.setTextColor(color);
-    }
-
-    private int getScoreColor(int score) {
-        if (score >= 80) return getColor(R.color.success_green);
-        if (score >= 60) return getColor(R.color.warning_yellow);
-        return getColor(R.color.error_red);
-    }
-
-    private void updateDataStatus(int total, int backedUp) {
-        dataPointsText.setText(String.format("%,d data points", total));
-
-        int pending = total - backedUp;
-        if (pending > 0) {
-            backupStatusText.setText(String.format("%d pending backup", pending));
-            backupStatusText.setTextColor(getColor(R.color.warning_yellow));
+    private void loadDataStats() {
+        UniversalDataService.DataStats stats = dataService.getDataStats();
+        
+        dataPointsText.setText(formatNumber(stats.totalCount));
+        
+        // Show backup status
+        if (stats.totalCount > 0) {
+            backupStatusText.setText("Protected & Encrypted");
+            backupStatusText.setTextColor(0xFF4CAF50); // Green
         } else {
-            backupStatusText.setText("All data backed up ✓");
-            backupStatusText.setTextColor(getColor(R.color.success_green));
+            backupStatusText.setText("Start collecting data");
+            backupStatusText.setTextColor(0xFFFFFFFF); // White
         }
     }
 
-    private void updateInsights(List<Insight> insights) {
-        insightsAdapter.setInsights(insights);
+    private void loadQuickStats(long startTime, long endTime) {
+        try {
+            // Get data for the period
+            List<PersonalData> periodData = dataService.getDataInRange(startTime, endTime);
+            
+            // Calculate stats by type
+            int waterTotal = 0;
+            int stepCount = 0;
+            String lastMood = "—";
+            String lastSleep = "—";
+            
+            for (PersonalData data : periodData) {
+                switch (data.getType()) {
+                    case "water":
+                        Object amount = data.getValue("amount");
+                        if (amount instanceof Number) {
+                            waterTotal += ((Number) amount).intValue();
+                        }
+                        break;
+                        
+                    case "steps":
+                        Object steps = data.getValue("count");
+                        if (steps instanceof Number) {
+                            stepCount = Math.max(stepCount, ((Number) steps).intValue());
+                        }
+                        break;
+                        
+                    case "mood":
+                        Object mood = data.getValue("mood");
+                        if (mood != null) {
+                            lastMood = mood.toString();
+                        }
+                        break;
+                        
+                    case "sleep":
+                        Object hours = data.getValue("hours");
+                        if (hours != null) {
+                            lastSleep = hours + "h";
+                        }
+                        break;
+                }
+            }
+            
+            // Update UI
+            todayWaterText.setText(waterTotal + "ml");
+            todayStepsText.setText(formatNumber(stepCount) + " steps");
+            todayMoodText.setText(lastMood);
+            todaySleepText.setText(lastSleep);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading quick stats", e);
+            // Set defaults
+            todayWaterText.setText("—");
+            todayStepsText.setText("—");
+            todayMoodText.setText("—");
+            todaySleepText.setText("—");
+        }
     }
 
-    private void updateTodayStats(Map<String, Object> stats) {
-        todayStepsText.setText(String.format("%,d", (int) stats.get("steps")));
-        todayWaterText.setText(String.format("%.1fL", (float) stats.get("water")));
-        todayMoodText.setText((String) stats.get("mood"));
-        todaySleepText.setText(String.format("%.1fh", (float) stats.get("sleep")));
+    private String formatNumber(long number) {
+        if (number < 1000) {
+            return String.valueOf(number);
+        } else if (number < 1000000) {
+            return String.format("%.1fK", number / 1000.0);
+        } else {
+            return String.format("%.1fM", number / 1000000.0);
+        }
     }
 
     // Time period enum
-    enum TimePeriod {
+    private enum TimePeriod {
         TODAY, WEEK, MONTH, ALL
+    }
+
+    // Adapter for insights
+    private static class InsightsAdapter extends RecyclerView.Adapter<InsightsAdapter.ViewHolder> {
+        private List<InsightsEngine.Insight> insights = new ArrayList<>();
+
+        void updateInsights(List<InsightsEngine.Insight> newInsights) {
+            this.insights = newInsights;
+            notifyDataSetChanged();
+        }
+
+        @Override
+        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            View view = android.view.LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_insight, parent, false);
+            return new ViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(ViewHolder holder, int position) {
+            InsightsEngine.Insight insight = insights.get(position);
+            holder.bind(insight);
+        }
+
+        @Override
+        public int getItemCount() {
+            return insights.size();
+        }
+
+        static class ViewHolder extends RecyclerView.ViewHolder {
+            TextView titleText;
+            TextView descriptionText;
+            TextView emojiText;
+
+            ViewHolder(View itemView) {
+                super(itemView);
+                titleText = itemView.findViewById(R.id.insight_title);
+                descriptionText = itemView.findViewById(R.id.insight_description);
+                emojiText = itemView.findViewById(R.id.insight_emoji);
+            }
+
+            void bind(InsightsEngine.Insight insight) {
+                titleText.setText(insight.title);
+                descriptionText.setText(insight.description);
+                emojiText.setText(insight.emoji);
+            }
+        }
     }
 }

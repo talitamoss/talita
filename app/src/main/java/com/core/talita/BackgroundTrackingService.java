@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.UUID;
 import org.json.JSONObject;
+import com.core.talita.StepData;
 
 /**
  * Background Tracking Service - Runs in foreground to track location/activity
@@ -337,20 +338,6 @@ public class BackgroundTrackingService extends Service implements LocationListen
         notificationManager.notify(NOTIFICATION_ID, createNotification());
     }
 }
-
-/**
- * Step count data
- */
-class StepData implements UniversalDataType {
-    private final String id;
-    private final int steps;
-    private final long timestamp;
-    
-    public StepData(int steps) {
-        this.id = UUID.randomUUID().toString();
-        this.steps = steps;
-        this.timestamp = System.currentTimeMillis();
-    }
 
     @Override
     public Map<String, Object> getMetadata() {

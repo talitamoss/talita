@@ -7,113 +7,233 @@ import android.view.View;
 import com.core.talita.api.DataCollector;
 import com.core.talita.api.PluginContext;
 import com.core.talita.api.PluginResult;
+import com.core.talita.api.QuickAddConfig;
 import java.util.Map;
 
 /**
  * Base class for all data collector plugins
  * 
  * Plugins are modular extensions that can collect specific types of data.
- * They are organized into three categories: I, We, All
+ * They define WHAT data to collect and provide the collector that knows HOW.
  */
 public abstract class DataCollectorPlugin {
     
+    protected PluginContext pluginContext;
+    
+    // ===== Plugin Identity =====
+    
     /**
-     * Plugin metadata - must be implemented by all plugins
+     * Get unique plugin identifier
+     * Example: "core.water", "community.meditation"
      */
     public abstract String getPluginId();
+    
+    /**
+     * Get human-readable plugin name
+     */
     public abstract String getPluginName();
-    public abstract String getPluginVersion();
+    
+    /**
+     * Get plugin description
+     */
+    public abstract String getDescription();
+    
+    /**
+     * Get plugin author
+     */
     public abstract String getAuthor();
-    public abstract String getCategory(); // "I", "We", or "All"
-    public abstract int getPriority(); // 0-100, higher = more important
     
     /**
-     * Visual identity
+     * Get plugin version
      */
-    public abstract String getEmoji(); // Emoji icon for the plugin
-    public abstract int getAccentColor(); // Color for UI elements
-    public abstract int getIconResource(); // Optional drawable resource
+    public abstract String getVersion();
     
     /**
-     * Plugin capabilities
+     * Get category: "i" (personal), "we" (social), "all" (universal)
      */
-    public abstract String[] getRequiredPermissions();
-    public abstract boolean requiresBackgroundTracking();
-    public abstract boolean supportsQuickAdd();
-    public abstract boolean supportsScheduling();
-    public abstract DataCollector createCollector(Context context);
+    public abstract String getCategory();
     
     /**
-     * Plugin lifecycle
+     * Get emoji icon for this plugin
      */
-    public void initialize(Context context) {
-        // Override if needed
-    }
+    public abstract String getEmoji();
     
-    public void enable() {
-        // Override if needed
-    }
+    // ===== Plugin Lifecycle =====
     
-    public void disable() {
-        // Override if needed
-    }
-    
-    public boolean isEnabled() {
-        return true; // Override to check actual state
+    /**
+     * Initialize the plugin
+     */
+    public final void initialize(Context context) {
+        this.pluginContext = new PluginContext(context, getPluginId());
+        onInitialize(pluginContext);
     }
     
     /**
-     * Get simple ID without package prefix
+     * Called when plugin is initialized
+     * Override to perform setup
      */
-    public String getId() {
-        return getPluginId();
+    protected void onInitialize(PluginContext context) {
+        // Default implementation - override if needed
     }
     
     /**
-     * Get display name
+     * Called when plugin is enabled
      */
-    public String getName() {
-        return getPluginName();
+    public void onPluginEnabled(Context context) {
+        // Override to handle plugin being enabled
+        pluginContext.log("Plugin enabled: " + getPluginName());
     }
     
     /**
-     * Configuration UI
+     * Called when plugin is disabled
      */
-    public boolean hasSettings() {
+    public void onPluginDisabled(Context context) {
+        // Override to handle plugin being disabled
+        pluginContext.log("Plugin disabled: " + getPluginName());
+    }
+    
+    // ===== Configuration =====
+    
+    /**
+     * Get plugin priority (higher = more important)
+     * Used for sorting in UI
+     */
+    public int getPriority() {
+        return 50; // Default medium priority
+    }
+    
+    /**
+     * Check if this plugin supports quick add
+     */
+    public boolean supportsQuickAdd() {
+        return true; // Most plugins support quick add
+    }
+    
+    /**
+     * Get quick add configuration
+     */
+    public QuickAddConfig getQuickAddConfig() {
+        // Default configuration
+        return new QuickAddConfig.Builder()
+            .setTitle(getPluginName())
+            .setDescription("Add " + getPluginName().toLowerCase())
+            .setStyle("TILE")
+            .build();
+    }
+    
+    /**
+     * Check if plugin has settings UI
+     */
+    public boolean hasSettingsUI() {
         return false; // Override if plugin has settings
     }
     
-    public void openSettings(Context context) {
-        // Override to open settings activity
+    /**
+     * Get settings activity intent
+     */
+    public Intent getSettingsIntent(Context context) {
+        return null; // Override to provide settings activity
+    }
+    
+    // ===== Data Collection =====
+    
+    /**
+     * Create the data collector for this plugin
+     * This is the main purpose - to provide a collector
+     */
+    public abstract DataCollector createCollector(Context context);
+    
+    /**
+     * Handle quick add tap
+     * Default implementation uses the collector
+     */
+    public void onQuickAddTapped(Context context) {
+        DataCollector collector = createCollector(context);
+        if (collector != null) {
+            collector.initialize(context);
+            collector.collect();
+        }
+    }
+    
+    // ===== Advanced Features =====
+    
+    /**
+     * Handle custom actions
+     */
+    public PluginResult handleAction(String action, Bundle params) {
+        return PluginResult.failure("Unknown action: " + action);
     }
     
     /**
-     * Quick Add support
+     * Get custom UI view for embedding
      */
-    public QuickAddConfig getQuickAddConfig() {
-        return null; // Override if supports quick add
+    public View getCustomView(Context context, String viewType) {
+        return null; // Override to provide custom views
     }
     
     /**
-     * Quick Add configuration
+     * Export plugin data
      */
-    public static class QuickAddConfig {
-        public final String title;
-        public final String description;
-        public final String style;
-        public final boolean showInMainGrid;
-        
-        public enum QuickAddStyle {
-            GRID,
-            LIST,
-            CARD
+    public PluginResult exportData(String format) {
+        return PluginResult.failure("Export not supported");
+    }
+    
+    /**
+     * Import plugin data
+     */
+    public PluginResult importData(String format, String data) {
+        return PluginResult.failure("Import not supported");
+    }
+    
+    // ===== Inter-plugin Communication =====
+    
+    /**
+     * Receive data from another plugin
+     */
+    public void onDataReceived(String fromPluginId, String dataType, Bundle data) {
+        // Override to handle data from other plugins
+    }
+    
+    /**
+     * Check dependencies
+     */
+    public boolean checkDependencies() {
+        return true; // Override if plugin has dependencies
+    }
+    
+    // ===== Helpers =====
+    
+    /**
+     * Get the plugin context
+     */
+    protected PluginContext getPluginContext() {
+        return pluginContext;
+    }
+    
+    /**
+     * Log a message
+     */
+    protected void log(String message) {
+        if (pluginContext != null) {
+            pluginContext.log(message);
         }
-        
-        public QuickAddConfig(String title, String description, String style, boolean showInMainGrid) {
-            this.title = title;
-            this.description = description;
-            this.style = style;
-            this.showInMainGrid = showInMainGrid;
+    }
+    
+    /**
+     * Log an error
+     */
+    protected void logError(String message, Throwable error) {
+        if (pluginContext != null) {
+            pluginContext.logError(message, error);
         }
+    }
+    
+    @Override
+    public String toString() {
+        return "Plugin{" +
+                "id='" + getPluginId() + '\'' +
+                ", name='" + getPluginName() + '\'' +
+                ", version='" + getVersion() + '\'' +
+                '}';
     }
 }

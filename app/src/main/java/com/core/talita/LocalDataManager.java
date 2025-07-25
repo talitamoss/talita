@@ -1,309 +1,361 @@
 package com.core.talita;
 
-import android.annotation.SuppressLint;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
-import org.json.JSONObject;
-import org.json.JSONException;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.Calendar;
-import java.util.Iterator;
+import java.util.*;
 
 /**
- * LocalDataManager - Handles all database operations
- * Single source of truth for all encrypted data storage
+ * LocalDataManager - Handles local SQLite database operations
+ * 
+ * Stores encrypted data with metadata for quick queries
+ * All actual data is encrypted - only type and timestamp are searchable
  */
 public class LocalDataManager {
     private static final String TAG = "LocalDataManager";
-    private static final String DATABASE_NAME = "talita_db";
     
-    private LocalDatabase dbHelper;
-    private Context context;
-    private EncryptionService encryptionService;
+    private final DatabaseHelper dbHelper;
+    private final Context context;
     
     public LocalDataManager(Context context) {
-        this.context = context;
-        this.dbHelper = new LocalDatabase(context);
-        this.encryptionService = new EncryptionService(context);
+        this.context = context.getApplicationContext();
+        this.dbHelper = new DatabaseHelper(context);
     }
     
     /**
-     * Save data using UniversalDataType interface
-     * This ensures ALL data goes to the database
+     * Save encrypted data
      */
-    public String saveData(UniversalDataType data) {
+    public long saveData(UniversalDataType data) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        
         try {
-            // Encrypt the JSON data
-            String encryptedJson = encryptionService.encryptDataTypeJson(data.toJson());
-            
-            // Handle file encryption if needed
-            String encryptedFilePath = null;
-            if (data.getFilePath() != null && !data.getFilePath().isEmpty()) {
-                encryptedFilePath = encryptionService.encryptFile(data.getFilePath());
-            }
-            
-            // Save to database
-            SQLiteDatabase db = dbHelper.getWritableDatabase();
             ContentValues values = new ContentValues();
-            values.put("id", data.getId());
-            values.put("type", data.getType());
-            values.put("created_at", data.getTimestamp());
-            values.put("data_json", encryptedJson);  // Encrypted JSON
-            values.put("file_path", encryptedFilePath);
-            values.put("cloud_status", "local");
+            values.put(DatabaseHelper.COLUMN_TYPE, data.getType());
+            values.put(DatabaseHelper.COLUMN_DATA, data.getEncryptedData());
+            values.put(DatabaseHelper.COLUMN_TIMESTAMP, data.getTimestamp());
+            values.put(DatabaseHelper.COLUMN_SUMMARY, data.getSummary());
+            values.put(DatabaseHelper.COLUMN_SYNCED, 0); // Not synced initially
             
-            long result = db.insert("data_items", null, values);
-            db.close();
-            
-            if (result != -1) {
-                Log.d(TAG, "✅ Saved encrypted " + data.getType() + " to database");
-                return data.getId();
-            }
+            long id = db.insert(DatabaseHelper.TABLE_DATA, null, values);
+            Log.d(TAG, "Saved data with ID: " + id);
+            return id;
             
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error saving data: " + e.getMessage());
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Query data by time range
-     */
-    public List<UniversalDataType> queryDataByTimeRange(long startTime, long endTime) {
-        List<UniversalDataType> results = new ArrayList<>();
-        
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        String query = "SELECT * FROM data_items WHERE created_at >= ? AND created_at <= ?";
-        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(startTime), String.valueOf(endTime)});
-        
-        while (cursor.moveToNext()) {
-            try {
-                @SuppressLint("Range") String encryptedJson = cursor.getString(cursor.getColumnIndex("data_json"));
-                String decryptedJson = encryptionService.decryptData(encryptedJson);
-                JSONObject jsonObject = new JSONObject(decryptedJson);
-                
-                Map<String, Object> dataMap = jsonToMap(jsonObject);
-                @SuppressLint("Range") String type = cursor.getString(cursor.getColumnIndex("type"));
-                
-                UniversalPersonalData data = new UniversalPersonalData(type, dataMap);
-                results.add(data);
-                
-            } catch (Exception e) {
-                Log.e(TAG, "Error parsing data item", e);
-            }
-        }
-        
-        cursor.close();
-        db.close();
-        
-        return results;
-    }
-    
-    /**
-     * Get data by type
-     */
-    @SuppressLint("Range")
-    public List<DataItem> getDataByType(String type) {
-        List<DataItem> results = new ArrayList<>();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        
-        Cursor cursor = db.query("data_items", null, "type = ?", 
-            new String[]{type}, null, null, "created_at DESC");
-        
-        while (cursor.moveToNext()) {
-            DataItem item = new DataItem();
-            item.setId(cursor.getString(cursor.getColumnIndex("id")));
-            item.setType(cursor.getString(cursor.getColumnIndex("type")));
-            item.setDataJson(cursor.getString(cursor.getColumnIndex("data_json")));
-            item.setFilePath(cursor.getString(cursor.getColumnIndex("file_path")));
-            item.setCreatedAt(cursor.getLong(cursor.getColumnIndex("created_at")));
-            results.add(item);
-        }
-        
-        cursor.close();
-        db.close();
-        
-        return results;
-    }
-    
-    /**
-     * Delete all data
-     */
-    public void deleteAllData() {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        db.delete("data_items", null, null);
-        db.close();
-        Log.d(TAG, "🗑️ All data deleted");
-    }
-    
-    /**
-     * Get total database size
-     */
-    public long getDatabaseSize() {
-        try {
-            File dbFile = context.getDatabasePath(DATABASE_NAME);
-            if (dbFile.exists()) {
-                return dbFile.length();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting database size", e);
-        }
-        return 0;
-    }
-    
-    /**
-     * Clear all data including files
-     */
-    public void clearAllData() {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        try {
-            // Delete all database records
-            db.delete("data_items", null, null);
-            db.delete("location_points", null, null);
-            
-            // Delete audio files
-            File audioDir = new File(context.getFilesDir(), "audio");
-            if (audioDir.exists()) {
-                File[] files = audioDir.listFiles();
-                if (files != null) {
-                    for (File file : files) {
-                        file.delete();
-                    }
-                }
-            }
-            
-            Log.d(TAG, "✅ All data cleared");
-        } catch (Exception e) {
-            Log.e(TAG, "Error clearing data", e);
+            Log.e(TAG, "Error saving data", e);
+            return -1;
         } finally {
             db.close();
         }
     }
     
     /**
-     * Save location point
+     * Get all data of a specific type
      */
-    public String saveLocationPoint(double latitude, double longitude, double accuracy, String context) {
-        String id = UUID.randomUUID().toString();
+    public List<UniversalDataType> getDataByType(String type) {
+        List<UniversalDataType> result = new ArrayList<>();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
         
         try {
-            Map<String, Object> locationData = new HashMap<>();
-            locationData.put("latitude", latitude);
-            locationData.put("longitude", longitude);
-            locationData.put("accuracy", accuracy);
-            locationData.put("context", context);
-            locationData.put("timestamp", System.currentTimeMillis());
+            String query = "SELECT * FROM " + DatabaseHelper.TABLE_DATA + 
+                          " WHERE " + DatabaseHelper.COLUMN_TYPE + " = ?" +
+                          " ORDER BY " + DatabaseHelper.COLUMN_TIMESTAMP + " DESC";
             
-            // Create UniversalPersonalData for location
-            UniversalPersonalData data = new UniversalPersonalData("location", locationData);
+            Cursor cursor = db.rawQuery(query, new String[]{type});
             
-            // Save using the universal method
-            return saveData(data);
+            while (cursor.moveToNext()) {
+                UniversalDataType data = cursorToData(cursor);
+                result.add(data);
+            }
+            cursor.close();
             
         } catch (Exception e) {
-            Log.e(TAG, "Error saving location", e);
-            return null;
+            Log.e(TAG, "Error getting data by type", e);
+        } finally {
+            db.close();
         }
+        
+        return result;
     }
     
     /**
-     * Save audio recording
+     * Get recent data
      */
-    public String saveAudioRecording(String filePath, long durationMs, double latitude, double longitude) {
-        String id = UUID.randomUUID().toString();
+    public List<UniversalDataType> getRecentData(int limit) {
+        List<UniversalDataType> result = new ArrayList<>();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
         
         try {
-            Map<String, Object> audioData = new HashMap<>();
-            audioData.put("duration_ms", durationMs);
-            audioData.put("latitude", latitude);
-            audioData.put("longitude", longitude);
-            audioData.put("file_path", filePath);
-            audioData.put("timestamp", System.currentTimeMillis());
+            String query = "SELECT * FROM " + DatabaseHelper.TABLE_DATA + 
+                          " ORDER BY " + DatabaseHelper.COLUMN_TIMESTAMP + " DESC" +
+                          " LIMIT ?";
             
-            // Create UniversalPersonalData for audio
-            UniversalPersonalData data = new UniversalPersonalData("audio", audioData);
-            data.setFilePath(filePath);
+            Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(limit)});
             
-            // Save using the universal method
-            return saveData(data);
+            while (cursor.moveToNext()) {
+                UniversalDataType data = cursorToData(cursor);
+                result.add(data);
+            }
+            cursor.close();
             
         } catch (Exception e) {
-            Log.e(TAG, "Error saving audio", e);
-            return null;
+            Log.e(TAG, "Error getting recent data", e);
+        } finally {
+            db.close();
         }
+        
+        return result;
     }
     
     /**
-     * Helper method to convert JSONObject to Map
+     * Get data within time range
      */
-    private Map<String, Object> jsonToMap(JSONObject jsonObject) throws JSONException {
-        Map<String, Object> map = new HashMap<>();
-        Iterator<String> keys = jsonObject.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            map.put(key, jsonObject.get(key));
+    public List<UniversalDataType> getDataInRange(long startTime, long endTime) {
+        List<UniversalDataType> result = new ArrayList<>();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        
+        try {
+            String query = "SELECT * FROM " + DatabaseHelper.TABLE_DATA + 
+                          " WHERE " + DatabaseHelper.COLUMN_TIMESTAMP + " BETWEEN ? AND ?" +
+                          " ORDER BY " + DatabaseHelper.COLUMN_TIMESTAMP + " DESC";
+            
+            Cursor cursor = db.rawQuery(query, 
+                new String[]{String.valueOf(startTime), String.valueOf(endTime)});
+            
+            while (cursor.moveToNext()) {
+                UniversalDataType data = cursorToData(cursor);
+                result.add(data);
+            }
+            cursor.close();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting data in range", e);
+        } finally {
+            db.close();
         }
-        return map;
+        
+        return result;
     }
     
     /**
-     * Get items by type (for backwards compatibility)
+     * Get data statistics by type
      */
-    public List<DataItem> getItemsByType(String type) {
-        return getDataByType(type);
+    public Map<String, Long> getDataStatsByType() {
+        Map<String, Long> stats = new HashMap<>();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        
+        try {
+            String query = "SELECT " + DatabaseHelper.COLUMN_TYPE + ", COUNT(*) as count" +
+                          " FROM " + DatabaseHelper.TABLE_DATA +
+                          " GROUP BY " + DatabaseHelper.COLUMN_TYPE;
+            
+            Cursor cursor = db.rawQuery(query, null);
+            
+            while (cursor.moveToNext()) {
+                String type = cursor.getString(0);
+                long count = cursor.getLong(1);
+                stats.put(type, count);
+            }
+            cursor.close();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting data stats", e);
+        } finally {
+            db.close();
+        }
+        
+        return stats;
     }
-
-    public long getDataCount() {
-    SQLiteDatabase db = dbHelper.getReadableDatabase();
-    long count = 0;
-    
-    try {
-        count = DatabaseUtils.queryNumEntries(db, DatabaseHelper.TABLE_DATA);
-    } catch (Exception e) {
-        Log.e(TAG, "Error getting data count", e);
-    }
-    
-    return count;
-}
     
     /**
      * Get total data count
      */
-    public int getTotalDataCount() {
+    public long getDataCount() {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
-        String query = "SELECT COUNT(*) FROM data_items";
-        Cursor cursor = db.rawQuery(query, null);
-        int count = 0;
-        if (cursor.moveToFirst()) {
-            count = cursor.getInt(0);
+        long count = 0;
+        
+        try {
+            count = DatabaseUtils.queryNumEntries(db, DatabaseHelper.TABLE_DATA);
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting data count", e);
+        } finally {
+            db.close();
         }
-        cursor.close();
-        db.close();
+        
         return count;
     }
     
     /**
-     * Get backed up data count
+     * Get total data size (approximate based on encrypted data length)
      */
-    public int getBackedUpDataCount() {
+    public long getTotalDataSize() {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
-        String query = "SELECT COUNT(*) FROM data_items WHERE cloud_status = ?";
-        Cursor cursor = db.rawQuery(query, new String[]{"backed_up"});
-        int count = 0;
-        if (cursor.moveToFirst()) {
-            count = cursor.getInt(0);
+        long totalSize = 0;
+        
+        try {
+            String query = "SELECT SUM(LENGTH(" + DatabaseHelper.COLUMN_DATA + ")) FROM " + 
+                          DatabaseHelper.TABLE_DATA;
+            
+            Cursor cursor = db.rawQuery(query, null);
+            if (cursor.moveToFirst()) {
+                totalSize = cursor.getLong(0);
+            }
+            cursor.close();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting total data size", e);
+        } finally {
+            db.close();
         }
-        cursor.close();
-        db.close();
-        return count;
+        
+        return totalSize;
+    }
+    
+    /**
+     * Delete data by type
+     */
+    public boolean deleteDataByType(String type) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        
+        try {
+            int deleted = db.delete(DatabaseHelper.TABLE_DATA,
+                DatabaseHelper.COLUMN_TYPE + " = ?",
+                new String[]{type});
+            
+            Log.d(TAG, "Deleted " + deleted + " records of type: " + type);
+            return deleted > 0;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting data by type", e);
+            return false;
+        } finally {
+            db.close();
+        }
+    }
+    
+    /**
+     * Mark data as synced
+     */
+    public void markAsSynced(long id) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        
+        try {
+            ContentValues values = new ContentValues();
+            values.put(DatabaseHelper.COLUMN_SYNCED, 1);
+            
+            db.update(DatabaseHelper.TABLE_DATA, values,
+                DatabaseHelper.COLUMN_ID + " = ?",
+                new String[]{String.valueOf(id)});
+                
+        } catch (Exception e) {
+            Log.e(TAG, "Error marking as synced", e);
+        } finally {
+            db.close();
+        }
+    }
+    
+    /**
+     * Get unsynced data
+     */
+    public List<UniversalDataType> getUnsyncedData() {
+        List<UniversalDataType> result = new ArrayList<>();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        
+        try {
+            String query = "SELECT * FROM " + DatabaseHelper.TABLE_DATA + 
+                          " WHERE " + DatabaseHelper.COLUMN_SYNCED + " = 0" +
+                          " ORDER BY " + DatabaseHelper.COLUMN_TIMESTAMP + " ASC";
+            
+            Cursor cursor = db.rawQuery(query, null);
+            
+            while (cursor.moveToNext()) {
+                UniversalDataType data = cursorToData(cursor);
+                result.add(data);
+            }
+            cursor.close();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting unsynced data", e);
+        } finally {
+            db.close();
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Helper to convert cursor to data object
+     */
+    private UniversalDataType cursorToData(Cursor cursor) {
+        long id = cursor.getLong(cursor.getColumnIndex(DatabaseHelper.COLUMN_ID));
+        String type = cursor.getString(cursor.getColumnIndex(DatabaseHelper.COLUMN_TYPE));
+        String data = cursor.getString(cursor.getColumnIndex(DatabaseHelper.COLUMN_DATA));
+        long timestamp = cursor.getLong(cursor.getColumnIndex(DatabaseHelper.COLUMN_TIMESTAMP));
+        String summary = cursor.getString(cursor.getColumnIndex(DatabaseHelper.COLUMN_SUMMARY));
+        
+        return new UniversalDataType(id, type, data, timestamp, summary);
+    }
+    
+    /**
+     * Database helper class
+     */
+    private static class DatabaseHelper extends SQLiteOpenHelper {
+        private static final String DATABASE_NAME = "personal_data.db";
+        private static final int DATABASE_VERSION = 1;
+        
+        // Table name
+        public static final String TABLE_DATA = "encrypted_data";
+        
+        // Columns
+        public static final String COLUMN_ID = "id";
+        public static final String COLUMN_TYPE = "data_type";
+        public static final String COLUMN_DATA = "encrypted_data";
+        public static final String COLUMN_TIMESTAMP = "timestamp";
+        public static final String COLUMN_SUMMARY = "summary";
+        public static final String COLUMN_SYNCED = "synced";
+        
+        // Create table SQL
+        private static final String CREATE_TABLE = 
+            "CREATE TABLE " + TABLE_DATA + " (" +
+            COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            COLUMN_TYPE + " TEXT NOT NULL, " +
+            COLUMN_DATA + " TEXT NOT NULL, " +
+            COLUMN_TIMESTAMP + " INTEGER NOT NULL, " +
+            COLUMN_SUMMARY + " TEXT, " +
+            COLUMN_SYNCED + " INTEGER DEFAULT 0" +
+            ")";
+        
+        // Indexes for performance
+        private static final String CREATE_TYPE_INDEX = 
+            "CREATE INDEX idx_type ON " + TABLE_DATA + "(" + COLUMN_TYPE + ")";
+            
+        private static final String CREATE_TIMESTAMP_INDEX = 
+            "CREATE INDEX idx_timestamp ON " + TABLE_DATA + "(" + COLUMN_TIMESTAMP + ")";
+            
+        private static final String CREATE_SYNCED_INDEX = 
+            "CREATE INDEX idx_synced ON " + TABLE_DATA + "(" + COLUMN_SYNCED + ")";
+        
+        public DatabaseHelper(Context context) {
+            super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        }
+        
+        @Override
+        public void onCreate(SQLiteDatabase db) {
+            db.execSQL(CREATE_TABLE);
+            db.execSQL(CREATE_TYPE_INDEX);
+            db.execSQL(CREATE_TIMESTAMP_INDEX);
+            db.execSQL(CREATE_SYNCED_INDEX);
+            
+            Log.d(TAG, "Database created");
+        }
+        
+        @Override
+        public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+            // Handle database upgrades here
+            Log.d(TAG, "Database upgrade from " + oldVersion + " to " + newVersion);
+        }
     }
 }

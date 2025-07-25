@@ -11,41 +11,31 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.core.talita.api.*;
-import com.core.talita.plugins.base.BaseDataCollector;
 import com.core.talita.plugins.DataCollectorPlugin;
-import com.core.talita.plugins.PluginCategories;
-import com.core.talita.plugins.bridge.PluginBridge;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
- * ExamplePlugin - Demonstrates how to create a plugin for Talita
+ * ExamplePlugin - Demonstration of how to create a custom plugin
  * 
- * This example tracks daily gratitude entries and demonstrates:
- * - Data collection using the new API
- * - Inter-plugin communication
- * - Event handling
- * - Data sharing
+ * This example shows a gratitude journal plugin
  */
 public class ExamplePlugin extends DataCollectorPlugin {
-    private static final String TAG = "GratitudePlugin";
+    private static final String TAG = "ExamplePlugin";
     
-    // Plugin metadata
     @Override
     public String getPluginId() {
-        return "com.example.gratitude";
+        return "example.gratitude";
     }
     
     @Override
     public String getPluginName() {
-        return "Daily Gratitude";
+        return "Gratitude Journal";
     }
     
     @Override
-    public String getPluginVersion() {
-        return "1.0.0";
+    public String getDescription() {
+        return "Track what you're grateful for each day";
     }
     
     @Override
@@ -54,40 +44,23 @@ public class ExamplePlugin extends DataCollectorPlugin {
     }
     
     @Override
-    public String getCategory() {
-        return PluginCategories.I; // Personal/self category
+    public String getVersion() {
+        return "1.0.0";
     }
     
     @Override
-    public int getPriority() {
-        return 75; // Medium-high priority
+    public String getCategory() {
+        return "i"; // Personal category
     }
     
-    // Visual customization
     @Override
     public String getEmoji() {
         return "🙏";
     }
     
     @Override
-    public int getAccentColor() {
-        return Color.parseColor("#FFC107"); // Amber
-    }
-    
-    @Override
-    public int getIconResource() {
-        return 0; // No custom icon, use emoji
-    }
-    
-    // Plugin capabilities
-    @Override
-    public String[] getRequiredPermissions() {
-        return new String[0]; // No special permissions needed
-    }
-    
-    @Override
-    public boolean requiresBackgroundTracking() {
-        return false;
+    public int getPriority() {
+        return 75; // Higher priority
     }
     
     @Override
@@ -96,122 +69,93 @@ public class ExamplePlugin extends DataCollectorPlugin {
     }
     
     @Override
-    public boolean supportsScheduling() {
-        return true; // Can schedule daily reminders
+    public QuickAddConfig getQuickAddConfig() {
+        return new QuickAddConfig.Builder()
+            .setTitle("Gratitude")
+            .setDescription("What are you grateful for?")
+            .setStyle(QuickAddConfig.QuickAddStyle.CARD)
+            .setIconColor(Color.parseColor("#FF6B6B"))
+            .build();
     }
     
-    // Create the data collector
     @Override
     public DataCollector createCollector(Context context) {
-        return new GratitudeCollector(context);
-    }
-    
-    // Plugin settings
-    @Override
-    public boolean hasSettings() {
-        return true;
+        return new GratitudeCollector();
     }
     
     @Override
-    public void openSettings(Context context) {
-        // In a real implementation, this would open a settings activity
-        Toast.makeText(context, "Gratitude settings", Toast.LENGTH_SHORT).show();
-    }
-    
-    // Quick add configuration
-    @Override
-    public QuickAddConfig getQuickAddConfig() {
-        return new QuickAddConfig(
-            "Gratitude",
-            "What are you grateful for?",
-            QuickAddConfig.QuickAddStyle.CARD,
-            true
-        );
-    }
-    
-    // Plugin lifecycle
-    @Override
-    public void onPluginEnabled(Context context) {
-        super.onPluginEnabled(context);
-        Log.d(TAG, "Gratitude plugin enabled");
-        
-        // Register with plugin bridge for inter-plugin communication
-        PluginBridge bridge = PluginBridge.getInstance(context);
-        
-        // Register as a data provider
-        bridge.registerDataProvider(getPluginId(), "gratitude_stats", 
-            (requestingPluginId, dataType, params, callback) -> {
-                // Provide gratitude statistics to other plugins
-                Bundle stats = calculateGratitudeStats(context);
-                callback.onSuccess(stats);
-            }
-        );
-        
-        // Register message handler
-        bridge.registerMessageHandler(getPluginId(), 
-            (fromPluginId, messageType, data, callback) -> {
-                Log.d(TAG, "Received message from " + fromPluginId + ": " + messageType);
-                
-                if (messageType.equals("request_entry")) {
-                    // Another plugin is requesting a gratitude entry
-                    Bundle response = new Bundle();
-                    response.putBoolean("accepted", true);
-                    callback.onSuccess(response);
-                }
-            }
-        );
+    public void onQuickAddTapped(Context context) {
+        // Show custom UI for gratitude entry
+        showGratitudeDialog(context);
     }
     
     @Override
-    public void onPluginDisabled(Context context) {
-        super.onPluginDisabled(context);
-        Log.d(TAG, "Gratitude plugin disabled");
+    protected void onInitialize(PluginContext context) {
+        super.onInitialize(context);
+        log("Gratitude plugin initialized");
         
-        // Unregister from plugin bridge
-        PluginBridge.getInstance(context).unregisterPlugin(getPluginId());
-    }
-    
-    // Helper method to calculate statistics
-    private Bundle calculateGratitudeStats(Context context) {
-        Bundle stats = new Bundle();
-        
-        // In a real implementation, this would query the database
-        stats.putInt("total_entries", 42);
-        stats.putInt("current_streak", 7);
-        stats.putInt("longest_streak", 14);
-        
-        return stats;
+        // Check if user has used this before
+        boolean hasUsedBefore = context.getBooleanSetting("has_used", false);
+        if (!hasUsedBefore) {
+            context.showToast("Welcome to Gratitude Journal! 🙏");
+            context.putSetting("has_used", true);
+        }
     }
     
     /**
-     * Custom data collector for gratitude entries
+     * Show gratitude entry dialog
+     */
+    private void showGratitudeDialog(Context context) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(context);
+        builder.setTitle("🙏 Gratitude Entry");
+        
+        // Create input layout
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(32, 16, 32, 16);
+        
+        TextView prompt = new TextView(context);
+        prompt.setText("What are you grateful for today?");
+        prompt.setTextSize(16);
+        layout.addView(prompt);
+        
+        EditText input = new EditText(context);
+        input.setHint("I'm grateful for...");
+        input.setMinLines(3);
+        layout.addView(input);
+        
+        builder.setView(layout);
+        
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            String gratitude = input.getText().toString().trim();
+            if (!gratitude.isEmpty()) {
+                // Save through collector
+                GratitudeCollector collector = new GratitudeCollector();
+                collector.initialize(context);
+                
+                Map<String, Object> data = new HashMap<>();
+                data.put("gratitude", gratitude);
+                data.put("mood", "grateful");
+                
+                CollectorResult result = collector.collectQuick(data);
+                if (result.isSuccess()) {
+                    Toast.makeText(context, "✅ Gratitude saved!", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+        
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+    
+    /**
+     * Custom collector for gratitude entries
      */
     private static class GratitudeCollector extends BaseDataCollector {
-        private static final String TYPE = "gratitude";
-        
-        public GratitudeCollector(Context context) {
-            super();
-        }
         
         @Override
-        public CollectorResult collect() {
-            if (context == null) {
-                return CollectorResult.failure(TYPE, "Collector not initialized");
-            }
-            
-            // In a real implementation, this would show a dialog
-            // For now, we'll simulate a gratitude entry
-            Map<String, Object> data = new HashMap<>();
-            data.put("entry", "I'm grateful for the beautiful weather today!");
-            data.put("mood", "grateful");
-            data.put("timestamp", System.currentTimeMillis());
-            
-            return collectQuick(data);
-        }
-        
-        @Override
-        public String getType() {
-            return TYPE;
+        public String getDataType() {
+            return "gratitude";
         }
         
         @Override
@@ -221,7 +165,7 @@ public class ExamplePlugin extends DataCollectorPlugin {
         
         @Override
         public String getDescription() {
-            return "Record what you're grateful for each day";
+            return "Daily gratitude entries";
         }
         
         @Override
@@ -231,33 +175,41 @@ public class ExamplePlugin extends DataCollectorPlugin {
         
         @Override
         public String getCategory() {
-            return "i"; // Personal
+            return "i";
         }
         
         @Override
-        public List<String> getRequiredPermissions() {
-            return new ArrayList<>(); // No special permissions
+        protected boolean checkDeviceCapabilities() {
+            // No special capabilities needed
+            return true;
         }
         
         @Override
-        protected CollectorSettings getDefaultSettings() {
-            return new CollectorSettings.Builder()
-                .setEnabled(true)
-                .setAutomatedCollection(false)
-                .setCustomSetting("reminderEnabled", true)
-                .setCustomSetting("reminderTime", "20:00")
-                .build();
+        protected void onStartCollection() {
+            // Not used for manual entry
         }
         
         @Override
-        public boolean validateData(Map<String, Object> data) {
-            if (!super.validateData(data)) {
-                return false;
+        protected void onStopCollection() {
+            // Not used for manual entry
+        }
+        
+        @Override
+        protected CollectorResult performCollection() {
+            // This would show UI, but for now return pending
+            return CollectorResult.pending(getDataType());
+        }
+        
+        @Override
+        protected CollectorResult performQuickCollection(Map<String, Object> data) {
+            if (!data.containsKey("gratitude")) {
+                return CollectorResult.failure(getDataType(), "No gratitude text provided");
             }
             
-            // Check for required fields
-            Object entry = data.get("entry");
-            return entry != null && !entry.toString().trim().isEmpty();
+            // Store the data
+            handleCollectedData(data);
+            
+            return CollectorResult.success(getDataType(), data);
         }
     }
 }

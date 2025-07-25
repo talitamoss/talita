@@ -1,23 +1,35 @@
 package com.core.talita.dynamic;
 
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
-import com.core.talita.*;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.*;
+import com.core.talita.R;
+import com.core.talita.api.*;
 import java.util.*;
 
 /**
  * A collector that works with any CollectorSchema
- * This is the magic - one collector class that can handle ANY user-defined schema
+ * Updated to implement the API DataCollector interface
  */
 public class DynamicCollector implements DataCollector {
     private static final String TAG = "DynamicCollector";
     private static final String PREFS_NAME = "user_collectors";
     
     private final CollectorSchema schema;
+    private Context context;
+    private CollectorSettings settings;
+    private boolean isCollecting = false;
     
     public DynamicCollector(CollectorSchema schema) {
         this.schema = schema;
+        this.settings = new CollectorSettings.Builder()
+            .setAutomatedCollection(false) // User-defined collectors are manual by default
+            .setCollectionFrequency(0)
+            .build();
     }
     
     @Override
@@ -32,208 +44,279 @@ public class DynamicCollector implements DataCollector {
     }
     
     @Override
-    public String getIcon() {
+    public String getDescription() {
+        return schema.getDescription() != null ? schema.getDescription() : 
+               "User-defined collector for " + schema.getName();
+    }
+    
+    @Override
+    public String getEmoji() {
         return schema.getIcon();
     }
     
     @Override
-    public boolean isAvailable(Context context) {
+    public String getCategory() {
+        return schema.getCategory() != null ? schema.getCategory() : "i";
+    }
+    
+    @Override
+    public void initialize(Context context) {
+        this.context = context;
+        Log.d(TAG, "Initialized dynamic collector: " + schema.getName());
+    }
+    
+    @Override
+    public void onDestroy() {
+        if (isCollecting) {
+            stopAutomatedCollection();
+        }
+        Log.d(TAG, "Destroyed dynamic collector: " + schema.getName());
+    }
+    
+    @Override
+    public boolean isAvailable() {
         // User-defined collectors are always available
         return true;
     }
     
     @Override
-    public boolean isEnabled(Context context) {
+    public boolean isEnabled() {
+        if (context == null) return true;
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getBoolean(schema.getId() + "_enabled", true); // Default to enabled
+        return prefs.getBoolean(schema.getId() + "_enabled", true);
     }
     
     @Override
-    public void startCollection(Context context, DataCollectionCallback callback) {
-        // Most user-defined collectors will be manual entry
-        // Could add notification reminders here in the future
-        Log.d(TAG, "Started dynamic collector: " + schema.getName());
-    }
-    
-    @Override
-    public void stopCollection(Context context) {
-        Log.d(TAG, "Stopped dynamic collector: " + schema.getName());
-    }
-    
-    @Override
-    public List<String> getRequiredPermissions() {
-        List<String> permissions = new ArrayList<>();
-        
-        // Check if any fields require special permissions
-        for (CollectorSchema.FieldDefinition field : schema.getFields()) {
-            switch (field.getType()) {
-                case LOCATION:
-                    if (!permissions.contains(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
-                        permissions.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
-                    }
-                    break;
-                case PHOTO:
-                    if (!permissions.contains(android.Manifest.permission.CAMERA)) {
-                        permissions.add(android.Manifest.permission.CAMERA);
-                    }
-                    break;
-                case AUDIO:
-                    if (!permissions.contains(android.Manifest.permission.RECORD_AUDIO)) {
-                        permissions.add(android.Manifest.permission.RECORD_AUDIO);
-                    }
-                    break;
-            }
-        }
-        
-        return permissions;
+    public void setEnabled(boolean enabled) {
+        if (context == null) return;
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putBoolean(schema.getId() + "_enabled", enabled).apply();
     }
     
     @Override
     public CollectorSettings getSettings() {
-        return new CollectorSettings()
-                .setFrequency(0) // Manual entry
-                .setBatteryOptimized(true);
+        return settings;
     }
     
-    /**
-     * Static method to log data for any dynamic collector
-     * This is what gets called when user enters data
-     */
-    public static void logData(Context context, CollectorSchema schema, Map<String, Object> fieldValues) {
-        Log.d(TAG, "Logging data for schema: " + schema.getName());
+    @Override
+    public void updateSettings(CollectorSettings settings) {
+        this.settings = settings;
+    }
+    
+    @Override
+    public List<String> getRequiredPermissions() {
+        // User-defined collectors typically don't need special permissions
+        return new ArrayList<>();
+    }
+    
+    @Override
+    public void startAutomatedCollection() {
+        // Most user-defined collectors will be manual entry
+        // Could add notification reminders here in the future
+        isCollecting = true;
+        Log.d(TAG, "Started automated collection for: " + schema.getName());
+    }
+    
+    @Override
+    public void stopAutomatedCollection() {
+        isCollecting = false;
+        Log.d(TAG, "Stopped automated collection for: " + schema.getName());
+    }
+    
+    @Override
+    public boolean isCollectingAutomatically() {
+        return isCollecting;
+    }
+    
+    @Override
+    public CollectorResult collect() {
+        if (context == null) {
+            return CollectorResult.failure(getDataType(), "Collector not initialized");
+        }
         
-        // Build the data map
-        Map<String, Object> dataMap = new HashMap<>();
-        dataMap.put("display_name", schema.getIcon() + " " + schema.getName());
-        dataMap.put("schema_id", schema.getId());
-        dataMap.put("schema_name", schema.getName());
-        dataMap.put("timestamp", System.currentTimeMillis());
+        // Show input dialog based on schema fields
+        showInputDialog();
+        return CollectorResult.pending(getDataType());
+    }
+    
+    @Override
+    public CollectorResult collectQuick(Map<String, Object> data) {
+        if (context == null) {
+            return CollectorResult.failure(getDataType(), "Collector not initialized");
+        }
         
-        // Add all field values
-        dataMap.putAll(fieldValues);
-        
-        // Create summary from first few fields
-        String summary = createSummary(schema, fieldValues);
-        dataMap.put("summary", summary);
-        
-        // Save through Universal Data Service
         try {
-            UniversalPersonalData data = new UniversalPersonalData("custom_" + schema.getId(), dataMap);
-            UniversalDataService dataService = new UniversalDataService(context);
-            String dataId = dataService.capture(new PersonalDataAdapter(data));
+            // Validate against schema
+            Map<String, Object> validatedData = validateData(data);
             
-            if (dataId != null) {
-                Log.d(TAG, "✅ Dynamic data saved: " + summary);
-            } else {
-                Log.e(TAG, "❌ Failed to save dynamic data");
-            }
+            // Return success with validated data
+            return CollectorResult.success(getDataType(), validatedData);
         } catch (Exception e) {
-            Log.e(TAG, "Error saving dynamic data", e);
+            return CollectorResult.failure(getDataType(), e.getMessage());
         }
     }
     
     /**
-     * Create a human-readable summary from the field values
+     * Show input dialog based on schema fields
      */
-    private static String createSummary(CollectorSchema schema, Map<String, Object> fieldValues) {
-        StringBuilder summary = new StringBuilder();
-        int fieldCount = 0;
+    private void showInputDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle(schema.getName());
+        
+        // Create custom view for inputs
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(32, 16, 32, 16);
+        
+        // Create input fields based on schema
+        Map<String, View> fieldViews = new HashMap<>();
         
         for (CollectorSchema.FieldDefinition field : schema.getFields()) {
-            String fieldId = field.getId();
+            TextView label = new TextView(context);
+            label.setText(field.getName() + (field.isRequired() ? " *" : ""));
+            label.setPadding(0, 16, 0, 8);
+            layout.addView(label);
             
-            if (fieldValues.containsKey(fieldId) && fieldCount < 3) {
-                if (fieldCount > 0) {
-                    summary.append(", ");
+            View inputView = createInputForField(field);
+            fieldViews.put(field.getName(), inputView);
+            layout.addView(inputView);
+        }
+        
+        builder.setView(layout);
+        
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            try {
+                Map<String, Object> data = collectDataFromViews(fieldViews);
+                CollectorResult result = collectQuick(data);
+                
+                if (result.isSuccess()) {
+                    Toast.makeText(context, "✅ Data saved", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(context, "❌ " + result.getErrorMessage(), 
+                                 Toast.LENGTH_SHORT).show();
                 }
+            } catch (Exception e) {
+                Toast.makeText(context, "Error: " + e.getMessage(), 
+                             Toast.LENGTH_SHORT).show();
+            }
+        });
+        
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+    
+    /**
+     * Create appropriate input view for field type
+     */
+    private View createInputForField(CollectorSchema.FieldDefinition field) {
+        switch (field.getType()) {
+            case NUMBER:
+                EditText numberInput = new EditText(context);
+                numberInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+                numberInput.setHint("Enter number");
+                return numberInput;
                 
-                summary.append(field.getName()).append(": ");
-                Object value = fieldValues.get(fieldId);
+            case DECIMAL:
+                EditText decimalInput = new EditText(context);
+                decimalInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | 
+                                         android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                decimalInput.setHint("Enter decimal");
+                return decimalInput;
                 
-                if (value != null) {
-                    summary.append(value.toString());
-                    
-                    // Add unit if present
-                    String unit = field.getUnit();
-                    if (unit != null && !unit.isEmpty()) {
-                        summary.append(" ").append(unit);
-                    }
-                }
+            case BOOLEAN:
+                CheckBox checkBox = new CheckBox(context);
+                return checkBox;
                 
-                fieldCount++;
+            case CHOICE:
+                Spinner spinner = new Spinner(context);
+                // Would populate with choices from field.getValidation()
+                return spinner;
+                
+            case DATE:
+                Button dateButton = new Button(context);
+                dateButton.setText("Select Date");
+                // Would show date picker on click
+                return dateButton;
+                
+            case TIME:
+                Button timeButton = new Button(context);
+                timeButton.setText("Select Time");
+                // Would show time picker on click
+                return timeButton;
+                
+            case TEXT:
+            default:
+                EditText textInput = new EditText(context);
+                textInput.setHint("Enter text");
+                return textInput;
+        }
+    }
+    
+    /**
+     * Collect data from input views
+     */
+    private Map<String, Object> collectDataFromViews(Map<String, View> fieldViews) 
+            throws Exception {
+        Map<String, Object> data = new HashMap<>();
+        
+        for (CollectorSchema.FieldDefinition field : schema.getFields()) {
+            View view = fieldViews.get(field.getName());
+            Object value = extractValueFromView(view, field);
+            
+            if (field.isRequired() && (value == null || value.toString().isEmpty())) {
+                throw new Exception(field.getName() + " is required");
+            }
+            
+            data.put(field.getName(), value);
+        }
+        
+        return data;
+    }
+    
+    /**
+     * Extract value from view based on field type
+     */
+    private Object extractValueFromView(View view, CollectorSchema.FieldDefinition field) {
+        switch (field.getType()) {
+            case NUMBER:
+                String numText = ((EditText) view).getText().toString();
+                return numText.isEmpty() ? null : Integer.parseInt(numText);
+                
+            case DECIMAL:
+                String decText = ((EditText) view).getText().toString();
+                return decText.isEmpty() ? null : Double.parseDouble(decText);
+                
+            case BOOLEAN:
+                return ((CheckBox) view).isChecked();
+                
+            case CHOICE:
+                return ((Spinner) view).getSelectedItem();
+                
+            case TEXT:
+            default:
+                return ((EditText) view).getText().toString();
+        }
+    }
+    
+    /**
+     * Validate data against schema
+     */
+    private Map<String, Object> validateData(Map<String, Object> data) throws Exception {
+        Map<String, Object> validated = new HashMap<>();
+        
+        for (CollectorSchema.FieldDefinition field : schema.getFields()) {
+            Object value = data.get(field.getName());
+            
+            if (field.isRequired() && (value == null || value.toString().isEmpty())) {
+                throw new Exception(field.getName() + " is required");
+            }
+            
+            // Add validated value
+            if (value != null) {
+                validated.put(field.getName(), value);
             }
         }
         
-        // If no fields, return a default summary
-        if (fieldCount == 0) {
-            return "Entry logged";
-        }
-        
-        return summary.toString();
-    }
-    
-    /**
-     * Enable/disable this dynamic collector
-     */
-    public static void setEnabled(Context context, String schemaId, boolean enabled) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putBoolean(schemaId + "_enabled", enabled).apply();
-        
-        Log.d(TAG, "Dynamic collector " + schemaId + " " + (enabled ? "enabled" : "disabled"));
-    }
-    
-    /**
-     * Get the schema for this collector
-     */
-    public CollectorSchema getSchema() {
-        return schema;
-    }
-    
-    /**
-     * Quick test method for dynamic collectors
-     */
-    public static void testDynamicCollector(Context context) {
-        Log.d(TAG, "=== TESTING DYNAMIC COLLECTOR ===");
-        
-        try {
-            // Create a test schema
-            CollectorSchema testSchema = new CollectorSchema("Blood Pressure", "🩺")
-                .setDescription("Track blood pressure readings")
-                .addField(new CollectorSchema.FieldDefinition("Systolic", CollectorSchema.FieldDefinition.FieldType.NUMBER)
-                    .withRange(80, 200)
-                    .withUnit("mmHg")
-                    .required())
-                .addField(new CollectorSchema.FieldDefinition("Diastolic", CollectorSchema.FieldDefinition.FieldType.NUMBER)
-                    .withRange(40, 120)
-                    .withUnit("mmHg")
-                    .required())
-                .addField(new CollectorSchema.FieldDefinition("Pulse", CollectorSchema.FieldDefinition.FieldType.NUMBER)
-                    .withRange(40, 200)
-                    .withUnit("bpm"))
-                .addField(new CollectorSchema.FieldDefinition("Notes", CollectorSchema.FieldDefinition.FieldType.TEXT)
-                    .withHint("Any symptoms or context"));
-            
-            // Create a dynamic collector
-            DynamicCollector collector = new DynamicCollector(testSchema);
-            
-            Log.d(TAG, "Created collector: " + collector.getDisplayName());
-            Log.d(TAG, "Data type: " + collector.getDataType());
-            Log.d(TAG, "Required permissions: " + collector.getRequiredPermissions());
-            
-            // Test logging data
-            Map<String, Object> testData = new HashMap<>();
-            testData.put(testSchema.getFields().get(0).getId(), 120); // Systolic
-            testData.put(testSchema.getFields().get(1).getId(), 80);  // Diastolic
-            testData.put(testSchema.getFields().get(2).getId(), 72);  // Pulse
-            testData.put(testSchema.getFields().get(3).getId(), "Feeling good");
-            
-            // Log the data
-            logData(context, testSchema, testData);
-            
-            Log.d(TAG, "✅ Dynamic collector test complete!");
-            
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Dynamic collector test failed", e);
-        }
+        return validated;
     }
 }

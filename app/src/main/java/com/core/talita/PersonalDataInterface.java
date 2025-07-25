@@ -1,47 +1,32 @@
 package com.core.talita;
 
+import java.util.Map;
+
 /**
- * This interface defines the contract that all data types must implement
- * to work with the universal data processing pipeline.
+ * PersonalDataInterface - Common interface for all personal data types
+ * 
+ * This interface allows different data implementations to work with
+ * the universal data pipeline.
  */
 public interface PersonalDataInterface {
-    /**
-     * Unique identifier for this data instance
-     */
-    String getId();
     
     /**
-     * Type of data (e.g., "location", "audio", "mood")
+     * Get the data type (e.g., "water", "mood", "location")
      */
     String getType();
     
     /**
-     * Unix timestamp when data was collected
+     * Get the actual data as a map
+     */
+    Map<String, Object> getData();
+    
+    /**
+     * Get metadata about this data
+     */
+    Map<String, Object> getMetadata();
+    
+    /**
+     * Get the timestamp when this data was created
      */
     long getTimestamp();
-    
-    /**
-     * The actual data value (JSON string format)
-     */
-    String getValue();
-    
-    /**
-     * Additional metadata about the data (JSON string format)
-     */
-    String getMetadata();
-    
-    /**
-     * Human-readable display name
-     */
-    String getDisplayName();
-    
-    /**
-     * Whether this data is encrypted
-     */
-    boolean isEncrypted();
-    
-    /**
-     * Whether this data has been backed up to cloud
-     */
-    boolean isBackedUp();
 }

@@ -1,50 +1,38 @@
 package com.core.talita;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.ViewGroup;
+import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.core.talita.collectors.WaterCollector;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 /**
- * Data Summary Activity - Shows user what they've been up to
- *
- * Features:
- * - Daily/weekly/monthly summaries
- * - Recent activity timeline
- * - Statistics and trends
- * - Quick access to detailed views
+ * Data Summary Activity - Overview of collected data
+ * Updated to use plugin system instead of hardcoded collectors
  */
 public class DataSummaryActivity extends AppCompatActivity {
-
     private static final String TAG = "DataSummaryActivity";
 
-    private UniversalDataService dataService;
-    private DataCollectorManager collectorManager;
-
     // UI Components
+    private TextView totalDataPointsText;
     private TextView todayStatsText;
     private TextView weekStatsText;
-    private TextView totalDataPointsText;
     private RecyclerView recentActivityRecycler;
     private RecyclerView dataTypesRecycler;
-
+    
+    // Services
+    private UniversalDataService dataService;
+    private LocalDataManager dataManager;
+    
     // Adapters
     private RecentSummaryAdapter recentAdapter;
-    private DataTypeStatsAdapter dataTypesAdapter;
+    private DataTypeStatsAdapter dataTypeAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,100 +40,87 @@ public class DataSummaryActivity extends AppCompatActivity {
         setContentView(R.layout.activity_data_summary);
 
         // Initialize services
-        dataService = new UniversalDataService(this);
-        collectorManager = new DataCollectorManager(this);
+        dataService = UniversalDataService.getInstance(this);
+        dataManager = new LocalDataManager(this);
 
+        // Setup UI
         initializeViews();
-        setupRecyclerViews();
-        loadSummaryData();
-
-        Log.d(TAG, "📈 Data Summary Activity initialized");
+        loadDataStats();
+        loadTodayStats();
+        loadWeekStats();
+        loadRecentActivity();
+        loadDataTypeStats();
     }
 
     private void initializeViews() {
-        // Stats text views
-        todayStatsText = findViewById(R.id.today_stats_text);
-        weekStatsText = findViewById(R.id.week_stats_text);
-        totalDataPointsText = findViewById(R.id.total_data_points_text);
-
-        // RecyclerViews
-        recentActivityRecycler = findViewById(R.id.recent_activity_recycler);
-        dataTypesRecycler = findViewById(R.id.data_types_recycler);
-
-        // Navigation buttons
+        // Back button
         Button backButton = findViewById(R.id.back_button);
         backButton.setOnClickListener(v -> finish());
 
-        Button recordButton = findViewById(R.id.record_button);
-        recordButton.setOnClickListener(v -> {
-            Intent intent = new Intent(this, DashboardActivity.class);
-            startActivity(intent);
-        });
+        // Stats text views
+        totalDataPointsText = findViewById(R.id.total_data_points);
+        todayStatsText = findViewById(R.id.today_stats);
+        weekStatsText = findViewById(R.id.week_stats);
 
-        // Data type cards
-        setupDataTypeCards();
-    }
-
-    private void setupDataTypeCards() {
-        // Location Card
-        CardView locationCard = findViewById(R.id.location_card);
-        locationCard.setOnClickListener(v -> {
-            Intent intent = new Intent(this, LocationActivity.class);
-            startActivity(intent);
-        });
-
-        // Audio Card
-        CardView audioCard = findViewById(R.id.audio_card);
-        audioCard.setOnClickListener(v -> {
-            Intent intent = new Intent(this, AudioActivity.class);
-            startActivity(intent);
-        });
-
-        // All Data Types Card
-        CardView allDataCard = findViewById(R.id.all_data_card);
-        allDataCard.setOnClickListener(v -> {
-            Intent intent = new Intent(this, DataCollectionActivity.class);
-            startActivity(intent);
-        });
-    }
-
-    private void setupRecyclerViews() {
-        // Recent activity
-        recentAdapter = new RecentSummaryAdapter(new ArrayList<>());
+        // Recent activity recycler
+        recentActivityRecycler = findViewById(R.id.recent_activity_recycler);
         recentActivityRecycler.setLayoutManager(new LinearLayoutManager(this));
+        recentAdapter = new RecentSummaryAdapter();
         recentActivityRecycler.setAdapter(recentAdapter);
 
-        // Data types stats
-        dataTypesAdapter = new DataTypeStatsAdapter(new ArrayList<>());
-        dataTypesRecycler.setLayoutManager(new LinearLayoutManager(this));
-        dataTypesRecycler.setAdapter(dataTypesAdapter);
+        // Data types recycler
+        dataTypesRecycler = findViewById(R.id.data_types_recycler);
+        dataTypesRecycler.setLayoutManager(new LinearLayoutManager(this, 
+            LinearLayoutManager.HORIZONTAL, false));
+        dataTypeAdapter = new DataTypeStatsAdapter();
+        dataTypesRecycler.setAdapter(dataTypeAdapter);
     }
 
-    private void loadSummaryData() {
-        // Load today's statistics
-        loadTodayStats();
-
-        // Load week statistics
-        loadWeekStats();
-
-        // Load recent activity
-        loadRecentActivity();
-
-        // Load data type statistics
-        loadDataTypeStats();
+    private void loadDataStats() {
+        try {
+            UniversalDataService.DataStats stats = dataService.getDataStats();
+            totalDataPointsText.setText(String.format("%,d", stats.totalCount));
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading data stats", e);
+            totalDataPointsText.setText("0");
+        }
     }
 
     private void loadTodayStats() {
         try {
-            // Get today's water total
-            int waterToday = WaterCollector.getTodayTotal(this);
+            // Get today's data
+            Calendar cal = Calendar.getInstance();
+            cal.set(Calendar.HOUR_OF_DAY, 0);
+            cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0);
+            long startOfDay = cal.getTimeInMillis();
+            long now = System.currentTimeMillis();
 
-            // Get today's date
-            SimpleDateFormat sdf = new SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault());
-            String todayDate = sdf.format(new Date());
+            List<PersonalData> todayData = dataService.getDataInRange(startOfDay, now);
+            
+            // Count by type
+            Map<String, Integer> typeCounts = new HashMap<>();
+            int waterToday = 0;
+            
+            for (PersonalData data : todayData) {
+                String type = data.getType();
+                typeCounts.put(type, typeCounts.getOrDefault(type, 0) + 1);
+                
+                // Sum water intake
+                if ("water".equals(type)) {
+                    Object amount = data.getValue("amount");
+                    if (amount instanceof Number) {
+                        waterToday += ((Number) amount).intValue();
+                    }
+                }
+            }
 
-            // Count today's activities (simplified for now)
-            int activitiesToday = calculateTodayActivities();
+            // Format today's date
+            SimpleDateFormat dateFormat = new SimpleDateFormat("MMMM d", Locale.getDefault());
+            String todayDate = dateFormat.format(new Date());
+
+            // Count today's activities
+            int activitiesToday = todayData.size();
 
             String todayStats = String.format(
                     "%s\n💧 %dml water • 📊 %d activities logged",
@@ -162,13 +137,28 @@ public class DataSummaryActivity extends AppCompatActivity {
 
     private void loadWeekStats() {
         try {
-            // Calculate this week's stats (simplified)
-            int weeklyActivities = calculateWeekActivities();
-            int activeDays = calculateActiveDays();
+            // Get this week's data
+            Calendar cal = Calendar.getInstance();
+            cal.add(Calendar.DAY_OF_YEAR, -7);
+            long weekAgo = cal.getTimeInMillis();
+            long now = System.currentTimeMillis();
+
+            List<PersonalData> weekData = dataService.getDataInRange(weekAgo, now);
+            
+            // Calculate stats
+            Set<String> activeDays = new HashSet<>();
+            for (PersonalData data : weekData) {
+                cal.setTimeInMillis(data.getTimestamp());
+                String day = String.format("%d-%d-%d", 
+                    cal.get(Calendar.YEAR),
+                    cal.get(Calendar.MONTH),
+                    cal.get(Calendar.DAY_OF_MONTH));
+                activeDays.add(day);
+            }
 
             String weekStats = String.format(
                     "This Week\n📈 %d total activities • 🗓️ %d active days",
-                    weeklyActivities, activeDays
+                    weekData.size(), activeDays.size()
             );
 
             weekStatsText.setText(weekStats);
@@ -181,15 +171,19 @@ public class DataSummaryActivity extends AppCompatActivity {
 
     private void loadRecentActivity() {
         try {
+            List<PersonalData> recentData = dataService.getRecentData(10);
             List<RecentSummaryItem> recentItems = new ArrayList<>();
-
-            // Get recent data from different collectors
-            // This is simplified - in production you'd query the actual database
-            recentItems.add(new RecentSummaryItem("💧", "Water logged", "250ml", "5 minutes ago"));
-            recentItems.add(new RecentSummaryItem("📍", "Location recorded", "Home area", "15 minutes ago"));
-            recentItems.add(new RecentSummaryItem("💪", "Exercise logged", "30 min walk", "2 hours ago"));
-            recentItems.add(new RecentSummaryItem("😊", "Mood logged", "Good mood", "4 hours ago"));
-            recentItems.add(new RecentSummaryItem("🎤", "Audio recorded", "Voice memo", "Yesterday"));
+            
+            SimpleDateFormat timeFormat = new SimpleDateFormat("h:mm a", Locale.getDefault());
+            
+            for (PersonalData data : recentData) {
+                String emoji = getEmojiForType(data.getType());
+                String title = getTitleForType(data.getType());
+                String summary = createSummaryForData(data);
+                String time = getRelativeTime(data.getTimestamp());
+                
+                recentItems.add(new RecentSummaryItem(emoji, title, summary, time));
+            }
 
             recentAdapter.updateItems(recentItems);
 
@@ -200,142 +194,204 @@ public class DataSummaryActivity extends AppCompatActivity {
 
     private void loadDataTypeStats() {
         try {
+            UniversalDataService.DataStats stats = dataService.getDataStats();
             List<DataTypeStatItem> dataTypeStats = new ArrayList<>();
 
-            // Get stats for each data type
-            dataTypeStats.add(new DataTypeStatItem("💧", "Water", "12 entries", "2.1L today"));
-            dataTypeStats.add(new DataTypeStatItem("📍", "Location", "156 points", "3 places visited"));
-            dataTypeStats.add(new DataTypeStatItem("🎤", "Audio", "8 recordings", "45 min total"));
-            dataTypeStats.add(new DataTypeStatItem("💪", "Exercise", "5 sessions", "2.5 hours this week"));
-            dataTypeStats.add(new DataTypeStatItem("😊", "Mood", "7 entries", "Avg: Good"));
+            for (Map.Entry<String, Long> entry : stats.countByType.entrySet()) {
+                String type = entry.getKey();
+                long count = entry.getValue();
+                String emoji = getEmojiForType(type);
+                String displayName = getTitleForType(type);
+                
+                dataTypeStats.add(new DataTypeStatItem(emoji, displayName, count));
+            }
 
-            dataTypesAdapter.updateItems(dataTypeStats);
-
-            // Update total data points
-            int totalPoints = calculateTotalDataPoints();
-            totalDataPointsText.setText(totalPoints + " total data points collected");
+            // Sort by count descending
+            dataTypeStats.sort((a, b) -> Long.compare(b.count, a.count));
+            
+            dataTypeAdapter.updateItems(dataTypeStats);
 
         } catch (Exception e) {
             Log.e(TAG, "Error loading data type stats: " + e.getMessage());
         }
     }
 
-    // Helper methods for calculations (simplified for now)
-    private int calculateTodayActivities() {
-        // In production, query database for today's entries
-        return 5; // Placeholder
-    }
-
-    private int calculateWeekActivities() {
-        // In production, query database for this week's entries
-        return 23; // Placeholder
-    }
-
-    private int calculateActiveDays() {
-        // In production, count unique days with data this week
-        return 4; // Placeholder
-    }
-
-    private int calculateTotalDataPoints() {
-        // In production, count all data entries across all types
-        return 487; // Placeholder
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        loadSummaryData(); // Refresh data when returning to activity
-    }
-
-    // Data classes
-    public static class RecentSummaryItem {
-        public final String icon;
-        public final String title;
-        public final String details;
-        public final String timeAgo;
-
-        public RecentSummaryItem(String icon, String title, String details, String timeAgo) {
-            this.icon = icon;
-            this.title = title;
-            this.details = details;
-            this.timeAgo = timeAgo;
+    private String getEmojiForType(String type) {
+        switch (type) {
+            case "water": return "💧";
+            case "mood": return "😊";
+            case "exercise": return "💪";
+            case "location": return "📍";
+            case "sleep": return "😴";
+            case "nutrition": return "🍎";
+            case "audio": return "🎤";
+            default: return "📊";
         }
     }
 
-    public static class DataTypeStatItem {
-        public final String icon;
-        public final String name;
-        public final String count;
-        public final String summary;
+    private String getTitleForType(String type) {
+        switch (type) {
+            case "water": return "Water";
+            case "mood": return "Mood";
+            case "exercise": return "Exercise";
+            case "location": return "Location";
+            case "sleep": return "Sleep";
+            case "nutrition": return "Nutrition";
+            case "audio": return "Audio Note";
+            default: return type.substring(0, 1).toUpperCase() + type.substring(1);
+        }
+    }
 
-        public DataTypeStatItem(String icon, String name, String count, String summary) {
-            this.icon = icon;
+    private String createSummaryForData(PersonalData data) {
+        switch (data.getType()) {
+            case "water":
+                Object amount = data.getValue("amount");
+                return amount != null ? amount + "ml" : "Water logged";
+                
+            case "mood":
+                Object mood = data.getValue("mood");
+                return mood != null ? mood.toString() : "Mood logged";
+                
+            case "exercise":
+                Object activity = data.getValue("activity");
+                return activity != null ? activity.toString() : "Exercise logged";
+                
+            default:
+                return data.getType() + " recorded";
+        }
+    }
+
+    private String getRelativeTime(long timestamp) {
+        long diff = System.currentTimeMillis() - timestamp;
+        
+        if (diff < 60000) { // Less than 1 minute
+            return "Just now";
+        } else if (diff < 3600000) { // Less than 1 hour
+            return (diff / 60000) + " minutes ago";
+        } else if (diff < 86400000) { // Less than 1 day
+            return (diff / 3600000) + " hours ago";
+        } else if (diff < 172800000) { // Less than 2 days
+            return "Yesterday";
+        } else {
+            return (diff / 86400000) + " days ago";
+        }
+    }
+
+    // Data classes for adapters
+    static class RecentSummaryItem {
+        final String emoji;
+        final String title;
+        final String summary;
+        final String time;
+
+        RecentSummaryItem(String emoji, String title, String summary, String time) {
+            this.emoji = emoji;
+            this.title = title;
+            this.summary = summary;
+            this.time = time;
+        }
+    }
+
+    static class DataTypeStatItem {
+        final String emoji;
+        final String name;
+        final long count;
+
+        DataTypeStatItem(String emoji, String name, long count) {
+            this.emoji = emoji;
             this.name = name;
             this.count = count;
-            this.summary = summary;
         }
     }
 
-    // Simplified adapters (you could expand these)
-    private static class RecentSummaryAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-        private List<RecentSummaryItem> items;
+    // Simple adapter implementations
+    private static class RecentSummaryAdapter extends RecyclerView.Adapter<RecentSummaryAdapter.ViewHolder> {
+        private List<RecentSummaryItem> items = new ArrayList<>();
 
-        public RecentSummaryAdapter(List<RecentSummaryItem> items) {
-            this.items = items;
-        }
-
-        public void updateItems(List<RecentSummaryItem> newItems) {
+        void updateItems(List<RecentSummaryItem> newItems) {
             this.items = newItems;
             notifyDataSetChanged();
         }
 
         @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            // Use existing recent activity layout
-            return new RecyclerView.ViewHolder(
-                    LayoutInflater.from(parent.getContext())
-                            .inflate(R.layout.item_recent_activity, parent, false)) {};
+        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            View view = android.view.LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_recent_summary, parent, false);
+            return new ViewHolder(view);
         }
 
         @Override
-        public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            // Bind data to views (simplified)
+        public void onBindViewHolder(ViewHolder holder, int position) {
+            RecentSummaryItem item = items.get(position);
+            holder.bind(item);
         }
 
         @Override
         public int getItemCount() {
             return items.size();
         }
+
+        static class ViewHolder extends RecyclerView.ViewHolder {
+            TextView emojiText, titleText, summaryText, timeText;
+
+            ViewHolder(View itemView) {
+                super(itemView);
+                emojiText = itemView.findViewById(R.id.emoji_text);
+                titleText = itemView.findViewById(R.id.title_text);
+                summaryText = itemView.findViewById(R.id.summary_text);
+                timeText = itemView.findViewById(R.id.time_text);
+            }
+
+            void bind(RecentSummaryItem item) {
+                emojiText.setText(item.emoji);
+                titleText.setText(item.title);
+                summaryText.setText(item.summary);
+                timeText.setText(item.time);
+            }
+        }
     }
 
-    private static class DataTypeStatsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-        private List<DataTypeStatItem> items;
+    private static class DataTypeStatsAdapter extends RecyclerView.Adapter<DataTypeStatsAdapter.ViewHolder> {
+        private List<DataTypeStatItem> items = new ArrayList<>();
 
-        public DataTypeStatsAdapter(List<DataTypeStatItem> items) {
-            this.items = items;
-        }
-
-        public void updateItems(List<DataTypeStatItem> newItems) {
+        void updateItems(List<DataTypeStatItem> newItems) {
             this.items = newItems;
             notifyDataSetChanged();
         }
 
         @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            // Use existing recent activity layout
-            return new RecyclerView.ViewHolder(
-                    LayoutInflater.from(parent.getContext())
-                            .inflate(R.layout.item_recent_activity, parent, false)) {};
+        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            View view = android.view.LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_data_type_stat, parent, false);
+            return new ViewHolder(view);
         }
 
         @Override
-        public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            // Bind data to views (simplified)
+        public void onBindViewHolder(ViewHolder holder, int position) {
+            DataTypeStatItem item = items.get(position);
+            holder.bind(item);
         }
 
         @Override
         public int getItemCount() {
             return items.size();
+        }
+
+        static class ViewHolder extends RecyclerView.ViewHolder {
+            TextView emojiText, nameText, countText;
+
+            ViewHolder(View itemView) {
+                super(itemView);
+                emojiText = itemView.findViewById(R.id.emoji_text);
+                nameText = itemView.findViewById(R.id.name_text);
+                countText = itemView.findViewById(R.id.count_text);
+            }
+
+            void bind(DataTypeStatItem item) {
+                emojiText.setText(item.emoji);
+                nameText.setText(item.name);
+                countText.setText(String.valueOf(item.count));
+            }
         }
     }
 }

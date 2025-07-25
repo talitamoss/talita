@@ -8,33 +8,31 @@ import org.json.JSONObject;
 import java.util.*;
 
 /**
- * Manages user-defined collector schemas
- * Handles persistence, templates, and schema operations
+ * CollectorSchemaManager - Manages user-created collector schemas
+ * 
+ * Stores schemas in SharedPreferences and provides templates
  */
 public class CollectorSchemaManager {
     private static final String TAG = "SchemaManager";
     private static final String PREFS_NAME = "collector_schemas";
-    private static final String SCHEMAS_KEY = "user_schemas";
-    private static final String VERSION_KEY = "schema_version";
+    private static final String SCHEMAS_KEY = "schemas";
+    private static final String VERSION_KEY = "version";
     private static final int CURRENT_VERSION = 1;
     
     private final Context context;
     private final Map<String, CollectorSchema> schemas;
     
     public CollectorSchemaManager(Context context) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.schemas = new LinkedHashMap<>();
         
-        // Load existing schemas
         loadSchemas();
         
-        // Add default templates if this is first run
+        // Add default templates if none exist
         if (schemas.isEmpty()) {
-            Log.d(TAG, "First run - adding default templates");
             addDefaultTemplates();
+            saveSchemas();
         }
-        
-        Log.d(TAG, "Initialized with " + schemas.size() + " schemas");
     }
     
     /**
@@ -43,20 +41,19 @@ public class CollectorSchemaManager {
     private void loadSchemas() {
         try {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            String schemasJson = prefs.getString(SCHEMAS_KEY, "[]");
+            String schemasJson = prefs.getString(SCHEMAS_KEY, null);
             
-            JSONArray array = new JSONArray(schemasJson);
-            for (int i = 0; i < array.length(); i++) {
-                try {
-                    String schemaJson = array.getJSONObject(i).toString();
-                    CollectorSchema schema = CollectorSchema.fromJson(schemaJson);
-                    if (schema != null) {
+            if (schemasJson != null) {
+                JSONArray array = new JSONArray(schemasJson);
+                for (int i = 0; i < array.length(); i++) {
+                    try {
+                        CollectorSchema schema = CollectorSchema.fromJson(array.getString(i));
                         schemas.put(schema.getId(), schema);
-                        Log.d(TAG, "Loaded schema: " + schema.getName());
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to load schema at index " + i, e);
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "Failed to load schema at index " + i, e);
                 }
+                Log.d(TAG, "Loaded " + schemas.size() + " schemas");
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to load schemas", e);
@@ -70,7 +67,7 @@ public class CollectorSchemaManager {
         try {
             JSONArray array = new JSONArray();
             for (CollectorSchema schema : schemas.values()) {
-                array.put(new JSONObject(schema.toJson()));
+                array.put(schema.toJson());
             }
             
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -113,9 +110,6 @@ public class CollectorSchemaManager {
         if (removed != null) {
             saveSchemas();
             Log.d(TAG, "Removed schema: " + removed.getName());
-            
-            // Also disable the collector
-            DynamicCollector.setEnabled(context, schemaId, false);
         }
     }
     
@@ -147,68 +141,22 @@ public class CollectorSchemaManager {
     }
     
     /**
-     * Check if a schema exists
-     */
-    public boolean hasSchema(String schemaId) {
-        return schemas.containsKey(schemaId);
-    }
-    
-    /**
-     * Import a schema from JSON
-     */
-    public CollectorSchema importSchema(String jsonString) {
-        try {
-            CollectorSchema schema = CollectorSchema.fromJson(jsonString);
-            if (schema != null) {
-                // Generate new ID to avoid conflicts
-                CollectorSchema newSchema = new CollectorSchema(schema.getName(), schema.getIcon());
-                newSchema.setCategory(schema.getCategory());
-                newSchema.setDescription(schema.getDescription());
-                
-                // Copy fields
-                for (CollectorSchema.FieldDefinition field : schema.getFields()) {
-                    newSchema.addField(field);
-                }
-                
-                addSchema(newSchema);
-                return newSchema;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to import schema", e);
-        }
-        return null;
-    }
-    
-    /**
-     * Export a schema to JSON
-     */
-    public String exportSchema(String schemaId) {
-        CollectorSchema schema = getSchema(schemaId);
-        return schema != null ? schema.toJson() : null;
-    }
-    
-    /**
      * Add default template schemas
      */
     private void addDefaultTemplates() {
-        // Basic health templates
+        Log.d(TAG, "Adding default templates");
+        
         addHealthTemplates();
-        
-        // Lifestyle templates
         addLifestyleTemplates();
-        
-        // Hobby templates
         addHobbyTemplates();
-        
-        // Productivity templates
         addProductivityTemplates();
     }
     
     private void addHealthTemplates() {
-        // Blood Pressure Tracker
+        // Blood Pressure
         CollectorSchema bloodPressure = new CollectorSchema("Blood Pressure", "🩺")
-            .setCategory("Health")
-            .setDescription("Track blood pressure and heart rate")
+            .setCategory("i")
+            .setDescription("Track blood pressure readings")
             .addField(new CollectorSchema.FieldDefinition("Systolic", CollectorSchema.FieldDefinition.FieldType.NUMBER)
                 .withRange(80, 200)
                 .withUnit("mmHg")
@@ -217,19 +165,18 @@ public class CollectorSchemaManager {
                 .withRange(40, 120)
                 .withUnit("mmHg")
                 .required())
-            .addField(new CollectorSchema.FieldDefinition("Heart Rate", CollectorSchema.FieldDefinition.FieldType.NUMBER)
+            .addField(new CollectorSchema.FieldDefinition("Pulse", CollectorSchema.FieldDefinition.FieldType.NUMBER)
                 .withRange(40, 200)
                 .withUnit("bpm"))
-            .addField(new CollectorSchema.FieldDefinition("Arm", CollectorSchema.FieldDefinition.FieldType.CHOICE)
-                .withChoices("Left", "Right"))
-            .addField(new CollectorSchema.FieldDefinition("Notes", CollectorSchema.FieldDefinition.FieldType.TEXT));
+            .addField(new CollectorSchema.FieldDefinition("Notes", CollectorSchema.FieldDefinition.FieldType.TEXT)
+                .withHint("Any symptoms or context"));
         
         // Pain Tracker
         CollectorSchema painTracker = new CollectorSchema("Pain Log", "🤕")
-            .setCategory("Health")
-            .setDescription("Track pain levels and locations")
-            .addField(new CollectorSchema.FieldDefinition("Pain Level", CollectorSchema.FieldDefinition.FieldType.SCALE)
-                .withRange(0, 10)
+            .setCategory("i")
+            .setDescription("Track pain episodes and management")
+            .addField(new CollectorSchema.FieldDefinition("Severity", CollectorSchema.FieldDefinition.FieldType.SCALE)
+                .withRange(1, 10)
                 .required())
             .addField(new CollectorSchema.FieldDefinition("Location", CollectorSchema.FieldDefinition.FieldType.TEXT)
                 .required())
@@ -245,7 +192,7 @@ public class CollectorSchemaManager {
     private void addLifestyleTemplates() {
         // Gratitude Journal
         CollectorSchema gratitude = new CollectorSchema("Gratitude", "🙏")
-            .setCategory("Lifestyle")
+            .setCategory("i")
             .setDescription("Daily gratitude practice")
             .addField(new CollectorSchema.FieldDefinition("Grateful For", CollectorSchema.FieldDefinition.FieldType.TEXT)
                 .required())
@@ -255,7 +202,7 @@ public class CollectorSchemaManager {
         
         // Dream Journal
         CollectorSchema dreams = new CollectorSchema("Dreams", "💭")
-            .setCategory("Lifestyle")
+            .setCategory("i")
             .setDescription("Record and analyze your dreams")
             .addField(new CollectorSchema.FieldDefinition("Dream Description", CollectorSchema.FieldDefinition.FieldType.TEXT)
                 .required())
@@ -263,43 +210,39 @@ public class CollectorSchemaManager {
                 .withRange(1, 10))
             .addField(new CollectorSchema.FieldDefinition("Type", CollectorSchema.FieldDefinition.FieldType.CHOICE)
                 .withChoices("Normal", "Lucid", "Nightmare", "Recurring"))
-            .addField(new CollectorSchema.FieldDefinition("Emotions", CollectorSchema.FieldDefinition.FieldType.TEXT))
-            .addField(new CollectorSchema.FieldDefinition("Interpretation", CollectorSchema.FieldDefinition.FieldType.TEXT));
+            .addField(new CollectorSchema.FieldDefinition("Emotions", CollectorSchema.FieldDefinition.FieldType.TEXT));
         
         schemas.put(gratitude.getId(), gratitude);
         schemas.put(dreams.getId(), dreams);
     }
     
     private void addHobbyTemplates() {
-        // Book Reading
-        CollectorSchema reading = new CollectorSchema("Reading Log", "📚")
-            .setCategory("Hobbies")
-            .setDescription("Track your reading progress")
+        // Reading Log
+        CollectorSchema reading = new CollectorSchema("Reading", "📚")
+            .setCategory("i")
+            .setDescription("Track books and reading progress")
             .addField(new CollectorSchema.FieldDefinition("Book Title", CollectorSchema.FieldDefinition.FieldType.TEXT)
                 .required())
             .addField(new CollectorSchema.FieldDefinition("Author", CollectorSchema.FieldDefinition.FieldType.TEXT))
             .addField(new CollectorSchema.FieldDefinition("Pages Read", CollectorSchema.FieldDefinition.FieldType.NUMBER)
-                .withRange(0, 1000))
-            .addField(new CollectorSchema.FieldDefinition("Reading Time", CollectorSchema.FieldDefinition.FieldType.DURATION)
-                .withUnit("minutes"))
+                .withRange(1, 1000))
             .addField(new CollectorSchema.FieldDefinition("Rating", CollectorSchema.FieldDefinition.FieldType.SCALE)
                 .withRange(1, 5))
             .addField(new CollectorSchema.FieldDefinition("Notes", CollectorSchema.FieldDefinition.FieldType.TEXT));
         
         // Garden Log
-        CollectorSchema garden = new CollectorSchema("Garden Log", "🌱")
-            .setCategory("Hobbies")
-            .setDescription("Track plant growth and garden activities")
+        CollectorSchema garden = new CollectorSchema("Garden", "🌱")
+            .setCategory("i")
+            .setDescription("Track plant care and garden progress")
             .addField(new CollectorSchema.FieldDefinition("Plant", CollectorSchema.FieldDefinition.FieldType.TEXT)
                 .required())
-            .addField(new CollectorSchema.FieldDefinition("Activity", CollectorSchema.FieldDefinition.FieldType.CHOICE)
-                .withChoices("Planted", "Watered", "Fertilized", "Pruned", "Harvested"))
+            .addField(new CollectorSchema.FieldDefinition("Action", CollectorSchema.FieldDefinition.FieldType.CHOICE)
+                .withChoices("Watered", "Fertilized", "Pruned", "Planted", "Harvested"))
             .addField(new CollectorSchema.FieldDefinition("Growth Stage", CollectorSchema.FieldDefinition.FieldType.CHOICE)
                 .withChoices("Seed", "Sprout", "Vegetative", "Flowering", "Fruiting"))
             .addField(new CollectorSchema.FieldDefinition("Health", CollectorSchema.FieldDefinition.FieldType.SCALE)
                 .withRange(1, 5))
-            .addField(new CollectorSchema.FieldDefinition("Notes", CollectorSchema.FieldDefinition.FieldType.TEXT))
-            .addField(new CollectorSchema.FieldDefinition("Photo", CollectorSchema.FieldDefinition.FieldType.PHOTO));
+            .addField(new CollectorSchema.FieldDefinition("Notes", CollectorSchema.FieldDefinition.FieldType.TEXT));
         
         schemas.put(reading.getId(), reading);
         schemas.put(garden.getId(), garden);
@@ -308,7 +251,7 @@ public class CollectorSchemaManager {
     private void addProductivityTemplates() {
         // Pomodoro Sessions
         CollectorSchema pomodoro = new CollectorSchema("Pomodoro", "🍅")
-            .setCategory("Productivity")
+            .setCategory("i")
             .setDescription("Track focused work sessions")
             .addField(new CollectorSchema.FieldDefinition("Task", CollectorSchema.FieldDefinition.FieldType.TEXT)
                 .required())
@@ -322,7 +265,7 @@ public class CollectorSchemaManager {
         
         // Learning Progress
         CollectorSchema learning = new CollectorSchema("Learning", "🎓")
-            .setCategory("Productivity")
+            .setCategory("i")
             .setDescription("Track learning and skill development")
             .addField(new CollectorSchema.FieldDefinition("Subject", CollectorSchema.FieldDefinition.FieldType.TEXT)
                 .required())
@@ -344,13 +287,9 @@ public class CollectorSchemaManager {
      */
     public Set<String> getAllCategories() {
         Set<String> categories = new LinkedHashSet<>();
-        categories.add("Health");
-        categories.add("Lifestyle");
-        categories.add("Hobbies");
-        categories.add("Productivity");
-        categories.add("Fitness");
-        categories.add("Finance");
-        categories.add("Other");
+        categories.add("i");    // Personal
+        categories.add("we");   // Social
+        categories.add("all");  // Universal
         
         // Add any custom categories from schemas
         for (CollectorSchema schema : schemas.values()) {

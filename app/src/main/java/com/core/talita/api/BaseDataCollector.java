@@ -42,6 +42,25 @@ public abstract class BaseDataCollector implements DataCollector {
     }
     
     /**
+     * Clean up resources
+     */
+    @Override
+    public void onDestroy() {
+        if (isCollecting) {
+            stopAutomatedCollection();
+        }
+        Log.d(TAG, "Destroyed collector: " + getDataType());
+    }
+    
+    /**
+     * Get the type - delegates to getDataType()
+     * This provides the missing getType() method
+     */
+    public String getType() {
+        return getDataType();
+    }
+    
+    /**
      * Check if available on this device
      */
     @Override
@@ -74,12 +93,9 @@ public abstract class BaseDataCollector implements DataCollector {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit().putBoolean(getDataType() + "_enabled", enabled).apply();
         
-        // Stop collection if disabling
         if (!enabled && isCollecting) {
             stopAutomatedCollection();
         }
-        
-        Log.d(TAG, getDataType() + " enabled: " + enabled);
     }
     
     /**
@@ -87,6 +103,9 @@ public abstract class BaseDataCollector implements DataCollector {
      */
     @Override
     public CollectorSettings getSettings() {
+        if (settings == null) {
+            settings = loadSettings();
+        }
         return settings;
     }
     
@@ -96,15 +115,7 @@ public abstract class BaseDataCollector implements DataCollector {
     @Override
     public void updateSettings(CollectorSettings newSettings) {
         this.settings = newSettings;
-        saveSettings();
-        
-        // Apply changes
-        if (isCollecting) {
-            stopAutomatedCollection();
-            if (settings.isAutomatedCollection()) {
-                startAutomatedCollection();
-            }
-        }
+        saveSettings(newSettings);
     }
     
     /**
@@ -113,23 +124,15 @@ public abstract class BaseDataCollector implements DataCollector {
     @Override
     public void startAutomatedCollection() {
         if (!isAvailable() || !isEnabled()) {
-            Log.w(TAG, "Cannot start collection - collector not available or enabled");
+            Log.w(TAG, "Cannot start automated collection - collector not available or enabled");
             return;
         }
         
-        if (!settings.isAutomatedCollection()) {
-            Log.w(TAG, "Automated collection not enabled in settings");
-            return;
+        if (!isCollecting) {
+            isCollecting = true;
+            onStartCollection();
+            Log.d(TAG, "Started automated collection for: " + getDataType());
         }
-        
-        if (isCollecting) {
-            Log.d(TAG, "Already collecting");
-            return;
-        }
-        
-        isCollecting = true;
-        onStartCollection();
-        Log.d(TAG, "Started automated collection: " + getDataType());
     }
     
     /**
@@ -137,17 +140,15 @@ public abstract class BaseDataCollector implements DataCollector {
      */
     @Override
     public void stopAutomatedCollection() {
-        if (!isCollecting) {
-            return;
+        if (isCollecting) {
+            isCollecting = false;
+            onStopCollection();
+            Log.d(TAG, "Stopped automated collection for: " + getDataType());
         }
-        
-        isCollecting = false;
-        onStopCollection();
-        Log.d(TAG, "Stopped automated collection: " + getDataType());
     }
     
     /**
-     * Check if currently collecting
+     * Check if collecting automatically
      */
     @Override
     public boolean isCollectingAutomatically() {
@@ -190,8 +191,35 @@ public abstract class BaseDataCollector implements DataCollector {
         return new ArrayList<>(); // Override if permissions needed
     }
     
+    // Protected methods for subclasses
+    
     /**
-     * Handle data collected
+     * Check device capabilities (override in subclass)
+     */
+    protected abstract boolean checkDeviceCapabilities();
+    
+    /**
+     * Called when automated collection starts (override in subclass)
+     */
+    protected abstract void onStartCollection();
+    
+    /**
+     * Called when automated collection stops (override in subclass)
+     */
+    protected abstract void onStopCollection();
+    
+    /**
+     * Perform manual collection (override in subclass)
+     */
+    protected abstract CollectorResult performCollection();
+    
+    /**
+     * Perform quick collection with data (override in subclass)
+     */
+    protected abstract CollectorResult performQuickCollection(Map<String, Object> data);
+    
+    /**
+     * Handle collected data
      */
     protected void handleCollectedData(Map<String, Object> data) {
         if (activeCallback != null) {
@@ -227,26 +255,32 @@ public abstract class BaseDataCollector implements DataCollector {
      * Load settings from preferences
      */
     protected CollectorSettings loadSettings() {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String key = getDataType() + "_settings";
+        SharedPreferences prefs = context.getSharedPreferences(
+            PREFS_NAME + "_" + getDataType(), Context.MODE_PRIVATE);
         
-        // Load saved settings or return defaults
-        return CollectorSettings.getDefault(); // Override to load custom settings
+        return new CollectorSettings.Builder()
+            .setAutomatedCollection(prefs.getBoolean("automated", false))
+            .setCollectionFrequency(prefs.getInt("frequency", 60))
+            .setNotificationsEnabled(prefs.getBoolean("notifications", false))
+            .build();
     }
     
     /**
      * Save settings to preferences
      */
-    protected void saveSettings() {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String key = getDataType() + "_settings";
+    protected void saveSettings(CollectorSettings settings) {
+        SharedPreferences prefs = context.getSharedPreferences(
+            PREFS_NAME + "_" + getDataType(), Context.MODE_PRIVATE);
         
-        // Save settings
-        // Override to implement custom saving
+        prefs.edit()
+            .putBoolean("automated", settings.isAutomatedCollection())
+            .putInt("frequency", settings.getCollectionFrequency())
+            .putBoolean("notifications", settings.isNotificationsEnabled())
+            .apply();
     }
     
     /**
-     * Check missing permissions
+     * Get missing permissions
      */
     protected List<String> getMissingPermissions() {
         List<String> missing = new ArrayList<>();
@@ -259,42 +293,4 @@ public abstract class BaseDataCollector implements DataCollector {
         
         return missing;
     }
-    
-    /**
-     * Cleanup resources
-     */
-    @Override
-    public void onDestroy() {
-        if (isCollecting) {
-            stopAutomatedCollection();
-        }
-        activeCallback = null;
-    }
-    
-    // Abstract methods to implement
-    
-    /**
-     * Check if device has required capabilities
-     */
-    protected abstract boolean checkDeviceCapabilities();
-    
-    /**
-     * Called when automated collection starts
-     */
-    protected abstract void onStartCollection();
-    
-    /**
-     * Called when automated collection stops
-     */
-    protected abstract void onStopCollection();
-    
-    /**
-     * Perform manual collection
-     */
-    protected abstract CollectorResult performCollection();
-    
-    /**
-     * Perform quick collection with provided data
-     */
-    protected abstract CollectorResult performQuickCollection(Map<String, Object> data);
 }

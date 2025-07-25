@@ -3,13 +3,17 @@ package com.core.talita;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import com.core.talita.dynamic.*;
+import com.core.talita.api.DataCollector;
+import com.core.talita.api.CollectorResult;
 import java.util.*;
 
 /**
  * Activity for creating custom collectors
+ * Updated to work with the new plugin system
  */
 public class CreateCollectorActivity extends AppCompatActivity {
     private static final String TAG = "CreateCollector";
@@ -21,6 +25,7 @@ public class CreateCollectorActivity extends AppCompatActivity {
     private LinearLayout fieldsContainer;
     private Button addFieldButton;
     private Button saveButton;
+    private Button testButton;
     
     private List<FieldView> fieldViews;
     private CollectorSchemaManager schemaManager;
@@ -45,46 +50,52 @@ public class CreateCollectorActivity extends AppCompatActivity {
         fieldsContainer = findViewById(R.id.fields_container);
         addFieldButton = findViewById(R.id.add_field_button);
         saveButton = findViewById(R.id.save_collector_button);
+        testButton = findViewById(R.id.test_collector_button);
+        
+        // Back button
+        findViewById(R.id.back_button).setOnClickListener(v -> finish());
         
         addFieldButton.setOnClickListener(v -> addNewField());
         saveButton.setOnClickListener(v -> saveCollector());
+        
+        if (testButton != null) {
+            testButton.setOnClickListener(v -> testCollector());
+        }
         
         // Add one field by default
         addNewField();
     }
     
     private void setupSpinners() {
-        // Icon selection
-        String[] icons = {"📊", "💧", "🏃", "😊", "💤", "🍽️", "💊", "🎯", "🛶", "🧘", 
-                         "📚", "🎨", "🎵", "💰", "🌡️", "📝", "🏋️", "🚴", "🏊", "🧗",
-                         "🎮", "📷", "🌱", "🐕", "✈️", "🏠", "🚗", "⏰", "💡", "🔧"};
+        // Icons
+        String[] icons = {"💊", "🩺", "💧", "🏃", "🧘", "😊", "🍎", "💤", "📝", "📊", 
+                         "🎯", "💡", "🌱", "📚", "🎨", "🎵", "🏋️", "🚶", "🧠", "❤️"};
         ArrayAdapter<String> iconAdapter = new ArrayAdapter<>(this, 
-            android.R.layout.simple_spinner_item, icons);
-        iconAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            android.R.layout.simple_spinner_dropdown_item, icons);
         iconSpinner.setAdapter(iconAdapter);
         
-        // Category selection
-        List<String> categories = new ArrayList<>(schemaManager.getAllCategories());
-        ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this,
-            android.R.layout.simple_spinner_item, categories);
-        categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // Categories
+        String[] categories = {"i", "we", "all"};
+        String[] categoryDisplayNames = {"Personal (I)", "Social (We)", "Universal (All)"};
+        ArrayAdapter<String> categoryAdapter = new ArrayAdapter<String>(this, 
+            android.R.layout.simple_spinner_dropdown_item, categoryDisplayNames) {
+            @Override
+            public String getItem(int position) {
+                return categories[position];
+            }
+        };
         categorySpinner.setAdapter(categoryAdapter);
     }
     
     private void addNewField() {
         FieldView fieldView = new FieldView(this);
-        fieldsContainer.addView(fieldView);
-        fieldViews.add(fieldView);
-        
         fieldView.setOnRemoveListener(() -> {
             fieldsContainer.removeView(fieldView);
             fieldViews.remove(fieldView);
-            
-            // Don't allow removing all fields
-            if (fieldViews.isEmpty()) {
-                addNewField();
-            }
         });
+        
+        fieldsContainer.addView(fieldView);
+        fieldViews.add(fieldView);
     }
     
     private void saveCollector() {
@@ -109,8 +120,10 @@ public class CreateCollectorActivity extends AppCompatActivity {
             schema.setDescription(description);
         }
         
-        String category = (String) categorySpinner.getSelectedItem();
-        schema.setCategory(category);
+        // Get the actual category value
+        int categoryPosition = categorySpinner.getSelectedItemPosition();
+        String[] categories = {"i", "we", "all"};
+        schema.setCategory(categories[categoryPosition]);
         
         // Add all fields
         for (FieldView fieldView : fieldViews) {
@@ -123,83 +136,122 @@ public class CreateCollectorActivity extends AppCompatActivity {
         // Save the schema
         schemaManager.addSchema(schema);
         
-        // Register with DataCollectorManager
-        DataCollectorManager collectorManager = new DataCollectorManager(this);
-        collectorManager.addCollector(new DynamicCollector(schema));
-        
         Toast.makeText(this, "✅ Collector created successfully!", Toast.LENGTH_SHORT).show();
         finish();
     }
     
+    private void testCollector() {
+        // Create temporary schema for testing
+        String name = nameInput.getText().toString().trim();
+        if (name.isEmpty()) {
+            name = "Test Collector";
+        }
+        
+        String icon = (String) iconSpinner.getSelectedItem();
+        CollectorSchema testSchema = new CollectorSchema(name, icon);
+        
+        for (FieldView fieldView : fieldViews) {
+            CollectorSchema.FieldDefinition field = fieldView.getFieldDefinition();
+            if (field != null) {
+                testSchema.addField(field);
+            }
+        }
+        
+        // Create and test the collector
+        DynamicCollector collector = new DynamicCollector(testSchema);
+        collector.initialize(this);
+        
+        // Trigger collection UI
+        CollectorResult result = collector.collect();
+        Log.d(TAG, "Test result: " + result);
+    }
+    
     /**
-     * Custom view for defining a field
+     * View for creating a field
      */
     private static class FieldView extends LinearLayout {
         private EditText nameInput;
-        private EditText unitInput;
         private Spinner typeSpinner;
-        private CheckBox requiredCheckbox;
-        private ImageButton removeButton;
+        private CheckBox requiredCheck;
+        private EditText unitInput;
         private OnRemoveListener removeListener;
         
         interface OnRemoveListener {
             void onRemove();
         }
         
-        public FieldView(android.content.Context context) {
-            super(context);
+        public FieldView(CreateCollectorActivity activity) {
+            super(activity);
             setOrientation(VERTICAL);
+            setPadding(16, 16, 16, 16);
+            setBackgroundResource(R.drawable.rounded_rectangle);
             
-            // Inflate the field definition layout
-            LayoutInflater.from(context).inflate(R.layout.view_field_definition, this, true);
+            // Inflate or create views
+            setupFieldViews(activity);
+        }
+        
+        private void setupFieldViews(CreateCollectorActivity activity) {
+            // Field name
+            TextView nameLabel = new TextView(activity);
+            nameLabel.setText("Field Name");
+            nameLabel.setTextColor(0xFFFFFFFF);
+            addView(nameLabel);
             
-            nameInput = findViewById(R.id.field_name);
-            unitInput = findViewById(R.id.field_unit);
-            typeSpinner = findViewById(R.id.field_type);
-            requiredCheckbox = findViewById(R.id.field_required);
-            removeButton = findViewById(R.id.remove_field);
+            nameInput = new EditText(activity);
+            nameInput.setHint("e.g., Blood Sugar");
+            nameInput.setTextColor(0xFFFFFFFF);
+            nameInput.setHintTextColor(0xFF888888);
+            addView(nameInput);
             
-            setupTypeSpinner();
+            // Field type
+            TextView typeLabel = new TextView(activity);
+            typeLabel.setText("Type");
+            typeLabel.setTextColor(0xFFFFFFFF);
+            typeLabel.setPadding(0, 16, 0, 0);
+            addView(typeLabel);
             
+            typeSpinner = new Spinner(activity);
+            String[] types = {"Text", "Number", "Decimal", "Yes/No", "Choice", "Scale", "Date", "Time"};
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(activity, 
+                android.R.layout.simple_spinner_dropdown_item, types);
+            typeSpinner.setAdapter(adapter);
+            addView(typeSpinner);
+            
+            // Required checkbox
+            requiredCheck = new CheckBox(activity);
+            requiredCheck.setText("Required field");
+            requiredCheck.setTextColor(0xFFFFFFFF);
+            requiredCheck.setPadding(0, 16, 0, 0);
+            addView(requiredCheck);
+            
+            // Unit input (optional)
+            TextView unitLabel = new TextView(activity);
+            unitLabel.setText("Unit (optional)");
+            unitLabel.setTextColor(0xFFFFFFFF);
+            unitLabel.setPadding(0, 16, 0, 0);
+            addView(unitLabel);
+            
+            unitInput = new EditText(activity);
+            unitInput.setHint("e.g., mg/dL, minutes, etc.");
+            unitInput.setTextColor(0xFFFFFFFF);
+            unitInput.setHintTextColor(0xFF888888);
+            addView(unitInput);
+            
+            // Remove button
+            Button removeButton = new Button(activity);
+            removeButton.setText("Remove Field");
+            removeButton.setTextColor(0xFFFF0000);
             removeButton.setOnClickListener(v -> {
                 if (removeListener != null) {
                     removeListener.onRemove();
                 }
             });
             
-            // Show/hide unit field based on type
-            typeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    String type = (String) parent.getItemAtPosition(position);
-                    boolean showUnit = type.equals("Number") || type.equals("Duration");
-                    unitInput.setVisibility(showUnit ? VISIBLE : GONE);
-                }
-                
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
-            });
-        }
-        
-        private void setupTypeSpinner() {
-            // User-friendly type names
-            String[] typeNames = {
-                "Text",         // TEXT
-                "Number",       // NUMBER
-                "Choice",       // CHOICE
-                "Scale",        // SCALE
-                "Yes/No",       // BOOLEAN
-                "Time",         // TIME
-                "Date",         // DATE
-                "Duration",     // DURATION
-                "Location",     // LOCATION
-                "Photo"         // PHOTO
-            };
-            
-            ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(),
-                android.R.layout.simple_spinner_item, typeNames);
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            typeSpinner.setAdapter(adapter);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            params.topMargin = 16;
+            removeButton.setLayoutParams(params);
+            addView(removeButton);
         }
         
         public void setOnRemoveListener(OnRemoveListener listener) {
@@ -212,38 +264,29 @@ public class CreateCollectorActivity extends AppCompatActivity {
                 return null;
             }
             
-            // Map user-friendly names back to enum values
-            String selectedType = (String) typeSpinner.getSelectedItem();
+            // Map spinner position to field type
             CollectorSchema.FieldDefinition.FieldType type;
-            
-            switch (selectedType) {
-                case "Text": type = CollectorSchema.FieldDefinition.FieldType.TEXT; break;
-                case "Number": type = CollectorSchema.FieldDefinition.FieldType.NUMBER; break;
-                case "Choice": type = CollectorSchema.FieldDefinition.FieldType.CHOICE; break;
-                case "Scale": type = CollectorSchema.FieldDefinition.FieldType.SCALE; break;
-                case "Yes/No": type = CollectorSchema.FieldDefinition.FieldType.BOOLEAN; break;
-                case "Time": type = CollectorSchema.FieldDefinition.FieldType.TIME; break;
-                case "Date": type = CollectorSchema.FieldDefinition.FieldType.DATE; break;
-                case "Duration": type = CollectorSchema.FieldDefinition.FieldType.DURATION; break;
-                case "Location": type = CollectorSchema.FieldDefinition.FieldType.LOCATION; break;
-                case "Photo": type = CollectorSchema.FieldDefinition.FieldType.PHOTO; break;
+            switch (typeSpinner.getSelectedItemPosition()) {
+                case 0: type = CollectorSchema.FieldDefinition.FieldType.TEXT; break;
+                case 1: type = CollectorSchema.FieldDefinition.FieldType.NUMBER; break;
+                case 2: type = CollectorSchema.FieldDefinition.FieldType.DECIMAL; break;
+                case 3: type = CollectorSchema.FieldDefinition.FieldType.BOOLEAN; break;
+                case 4: type = CollectorSchema.FieldDefinition.FieldType.CHOICE; break;
+                case 5: type = CollectorSchema.FieldDefinition.FieldType.SCALE; break;
+                case 6: type = CollectorSchema.FieldDefinition.FieldType.DATE; break;
+                case 7: type = CollectorSchema.FieldDefinition.FieldType.TIME; break;
                 default: type = CollectorSchema.FieldDefinition.FieldType.TEXT;
             }
             
             CollectorSchema.FieldDefinition field = new CollectorSchema.FieldDefinition(name, type);
             
-            if (requiredCheckbox.isChecked()) {
+            if (requiredCheck.isChecked()) {
                 field.required();
             }
             
             String unit = unitInput.getText().toString().trim();
             if (!unit.isEmpty()) {
                 field.withUnit(unit);
-            }
-            
-            // For scale type, set default range
-            if (type == CollectorSchema.FieldDefinition.FieldType.SCALE) {
-                field.withRange(1, 5); // Default 1-5 scale
             }
             
             return field;
