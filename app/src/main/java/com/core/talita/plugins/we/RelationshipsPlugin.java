@@ -2,14 +2,18 @@ package com.core.talita.plugins.we;
 
 import android.content.Context;
 import android.graphics.Color;
-import com.core.talita.collectors.DataCollector;
-import com.core.talita.collectors.SimpleDataCollector;
+import com.core.talita.api.DataCollector;
+import com.core.talita.api.SimpleDataCollector;
+import com.core.talita.api.QuickAddConfig;
+import com.core.talita.api.QuickAddStyle;
 import com.core.talita.plugins.DataCollectorPlugin;
 import com.core.talita.plugins.PluginCategories;
 
 /**
  * Relationships Plugin - "We" category
  * Tracks connections and interactions with others
+ * 
+ * File path: app/src/main/java/com/core/talita/plugins/we/RelationshipsPlugin.java
  */
 public class RelationshipsPlugin extends DataCollectorPlugin {
     
@@ -24,13 +28,13 @@ public class RelationshipsPlugin extends DataCollectorPlugin {
     }
     
     @Override
-    public String getPluginVersion() {
+    public String getVersion() {
         return "1.0.0";
     }
     
     @Override
     public String getAuthor() {
-        return "Talita Core Team";
+        return "Core Team";
     }
     
     @Override
@@ -80,7 +84,13 @@ public class RelationshipsPlugin extends DataCollectorPlugin {
     
     @Override
     public DataCollector createCollector(Context context) {
-        return new SimpleDataCollector("relationships", "Relationships", "💞");
+        return new SimpleDataCollector.Builder("relationships", "Relationships")
+            .description("Track meaningful connections and interactions")
+            .emoji("💞")
+            .category(PluginCategories.WE)
+            .inputHint("What connection did you make?")
+            .inputType(SimpleDataCollector.InputType.TEXT)
+            .build();
     }
     
     @Override

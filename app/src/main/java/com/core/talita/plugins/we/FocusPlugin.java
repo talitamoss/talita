@@ -1,12 +1,9 @@
-// This file should be placed at:
-// app/src/main/java/com/core/talita/plugins/we/FocusPlugin.java
-
 package com.core.talita.plugins.we;
 
 import android.content.Context;
 import android.graphics.Color;
-import com.core.talita.collectors.DataCollector;
-import com.core.talita.collectors.SimpleDataCollector;
+import com.core.talita.api.DataCollector;
+import com.core.talita.api.SimpleDataCollector;
 import com.core.talita.plugins.DataCollectorPlugin;
 import com.core.talita.plugins.PluginCategories;
 
@@ -27,13 +24,13 @@ public class FocusPlugin extends DataCollectorPlugin {
     }
     
     @Override
-    public String getPluginVersion() {
+    public String getVersion() {
         return "1.0.0";
     }
     
     @Override
     public String getAuthor() {
-        return "Talita Core Team";
+        return "Core Team";
     }
     
     @Override
@@ -83,7 +80,13 @@ public class FocusPlugin extends DataCollectorPlugin {
     
     @Override
     public DataCollector createCollector(Context context) {
-        return new SimpleDataCollector("focus", "Focus Session", "🎯");
+        return new SimpleDataCollector.Builder("focus", "Focus Session")
+            .description("Track focus and productivity sessions")
+            .emoji("🎯")
+            .category(PluginCategories.WE)
+            .inputHint("What are you focusing on?")
+            .inputType(SimpleDataCollector.InputType.TEXT)
+            .build();
     }
     
     @Override
@@ -94,15 +97,5 @@ public class FocusPlugin extends DataCollectorPlugin {
     @Override
     public void openSettings(Context context) {
         // TODO: Settings screen
-    }
-    
-    @Override
-    public QuickAddConfig getQuickAddConfig() {
-        return new QuickAddConfig(
-            "Focus",
-            "Start session",
-            QuickAddStyle.DURATION_TIMER,
-            true
-        );
     }
 }

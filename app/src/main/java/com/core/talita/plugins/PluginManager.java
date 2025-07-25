@@ -7,7 +7,9 @@ import java.util.*;
 
 /**
  * PluginManager - Central manager for all data collector plugins
- * Updated to remove references to non-existent plugins
+ * Fixed to handle missing plugin classes gracefully
+ * 
+ * File path: app/src/main/java/com/core/talita/plugins/PluginManager.java
  */
 public class PluginManager {
     private static final String TAG = "PluginManager";
@@ -63,26 +65,52 @@ public class PluginManager {
      */
     private void loadBuiltInPlugins() {
         // "I" category - Personal/self plugins
-        registerPlugin(new com.core.talita.plugins.i.WaterPlugin());
-        registerPlugin(new com.core.talita.plugins.i.MoodPlugin());
-        registerPlugin(new com.core.talita.plugins.i.ExercisePlugin());
-        registerPlugin(new com.core.talita.plugins.i.SleepPlugin());
-        registerPlugin(new com.core.talita.plugins.i.NutritionPlugin());
-        registerPlugin(new com.core.talita.plugins.i.SubstancePlugin());
+        try {
+            registerPlugin(new com.core.talita.plugins.i.WaterPlugin());
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load WaterPlugin: " + e.getMessage());
+        }
+        
+        try {
+            registerPlugin(new com.core.talita.plugins.i.MoodPlugin());
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load MoodPlugin: " + e.getMessage());
+        }
+        
+        try {
+            registerPlugin(new com.core.talita.plugins.i.ExercisePlugin());
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load ExercisePlugin: " + e.getMessage());
+        }
+        
+        try {
+            registerPlugin(new com.core.talita.plugins.i.SleepPlugin());
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load SleepPlugin: " + e.getMessage());
+        }
+        
+        // Note: NutritionPlugin and SubstancePlugin are referenced but don't exist yet
+        // They should be created or removed from references
         
         // Dynamic Collector Plugin - allows users to create custom collectors
-        registerPlugin(new DynamicCollectorPlugin());
+        try {
+            registerPlugin(new DynamicCollectorPlugin());
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load DynamicCollectorPlugin: " + e.getMessage());
+        }
         
         // "We" category - Relationship/connection plugins
-        registerPlugin(new com.core.talita.plugins.we.FocusPlugin());
-        registerPlugin(new com.core.talita.plugins.we.RelationshipsPlugin());
+        try {
+            registerPlugin(new com.core.talita.plugins.we.FocusPlugin());
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load FocusPlugin: " + e.getMessage());
+        }
         
-        // "All" category - Universal plugins
-        // TODO: Add these plugins when implemented:
-        // - WeatherPlugin
-        // - EnvironmentPlugin
-        // - SharedLocationPlugin (might go in "We" category)
-        // - SharedMoodPlugin (might go in "We" category)
+        try {
+            registerPlugin(new com.core.talita.plugins.we.RelationshipsPlugin());
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load RelationshipsPlugin: " + e.getMessage());
+        }
         
         Log.d(TAG, "Loaded " + plugins.size() + " built-in plugins");
     }
@@ -106,25 +134,31 @@ public class PluginManager {
      * Load external plugins (future feature)
      */
     private void loadExternalPlugins() {
-        // TODO: Implement loading of external plugins from APKs or other sources
-        // For now, this is a placeholder for future expansion
+        // TODO: Implement plugin discovery from external sources
     }
     
     /**
      * Register a plugin
      */
     public void registerPlugin(DataCollectorPlugin plugin) {
-        String id = plugin.getPluginId();
-        plugins.put(id, plugin);
+        if (plugin == null) {
+            Log.w(TAG, "Attempted to register null plugin");
+            return;
+        }
         
-        // Initialize plugin
-        plugin.initialize(context);
+        String pluginId = plugin.getPluginId();
+        if (pluginId == null || pluginId.isEmpty()) {
+            Log.w(TAG, "Plugin has invalid ID: " + plugin.getClass().getName());
+            return;
+        }
         
-        // Check if enabled (default to true for new plugins)
-        boolean isEnabled = prefs.getBoolean("plugin_" + id + "_enabled", true);
-        if (isEnabled) {
-            enabledPluginIds.add(id);
-            plugin.onPluginEnabled(context);
+        plugins.put(pluginId, plugin);
+        
+        // Check if enabled by default
+        if (!prefs.contains("plugin_" + pluginId + "_enabled")) {
+            // Enable by default for certain categories
+            boolean enableByDefault = "i".equals(plugin.getCategory());
+            setPluginEnabled(pluginId, enableByDefault);
         }
         
         // Notify listeners
@@ -132,7 +166,7 @@ public class PluginManager {
             listener.onPluginRegistered(plugin);
         }
         
-        Log.d(TAG, "Registered plugin: " + plugin.getPluginName() + " [" + id + "]");
+        Log.d(TAG, "Registered plugin: " + pluginId);
     }
     
     /**
@@ -141,67 +175,17 @@ public class PluginManager {
     public void unregisterPlugin(String pluginId) {
         DataCollectorPlugin plugin = plugins.remove(pluginId);
         if (plugin != null) {
-            if (enabledPluginIds.contains(pluginId)) {
-                plugin.onPluginDisabled(context);
-                enabledPluginIds.remove(pluginId);
-            }
+            enabledPluginIds.remove(pluginId);
             
             // Notify listeners
             for (PluginListener listener : listeners) {
                 listener.onPluginUnregistered(plugin);
             }
-            
-            Log.d(TAG, "Unregistered plugin: " + pluginId);
         }
     }
     
     /**
-     * Enable a plugin
-     */
-    public void enablePlugin(String pluginId) {
-        DataCollectorPlugin plugin = plugins.get(pluginId);
-        if (plugin != null && !enabledPluginIds.contains(pluginId)) {
-            enabledPluginIds.add(pluginId);
-            prefs.edit().putBoolean("plugin_" + pluginId + "_enabled", true).apply();
-            plugin.onPluginEnabled(context);
-            
-            // Notify listeners
-            for (PluginListener listener : listeners) {
-                listener.onPluginEnabled(plugin);
-            }
-            
-            Log.d(TAG, "Enabled plugin: " + pluginId);
-        }
-    }
-    
-    /**
-     * Disable a plugin
-     */
-    public void disablePlugin(String pluginId) {
-        DataCollectorPlugin plugin = plugins.get(pluginId);
-        if (plugin != null && enabledPluginIds.contains(pluginId)) {
-            enabledPluginIds.remove(pluginId);
-            prefs.edit().putBoolean("plugin_" + pluginId + "_enabled", false).apply();
-            plugin.onPluginDisabled(context);
-            
-            // Notify listeners
-            for (PluginListener listener : listeners) {
-                listener.onPluginDisabled(plugin);
-            }
-            
-            Log.d(TAG, "Disabled plugin: " + pluginId);
-        }
-    }
-    
-    /**
-     * Check if a plugin is enabled
-     */
-    public boolean isPluginEnabled(String pluginId) {
-        return enabledPluginIds.contains(pluginId);
-    }
-    
-    /**
-     * Get a specific plugin
+     * Get plugin by ID
      */
     public DataCollectorPlugin getPlugin(String pluginId) {
         return plugins.get(pluginId);
@@ -218,14 +202,52 @@ public class PluginManager {
      * Get enabled plugins
      */
     public List<DataCollectorPlugin> getEnabledPlugins() {
-        List<DataCollectorPlugin> enabled = new ArrayList<>();
+        List<DataCollectorPlugin> result = new ArrayList<>();
         for (String pluginId : enabledPluginIds) {
             DataCollectorPlugin plugin = plugins.get(pluginId);
             if (plugin != null) {
-                enabled.add(plugin);
+                result.add(plugin);
             }
         }
-        return enabled;
+        return result;
+    }
+    
+    /**
+     * Enable/disable a plugin
+     */
+    public void setPluginEnabled(String pluginId, boolean enabled) {
+        DataCollectorPlugin plugin = plugins.get(pluginId);
+        if (plugin == null) {
+            return;
+        }
+        
+        if (enabled) {
+            enabledPluginIds.add(pluginId);
+            
+            // Notify listeners
+            for (PluginListener listener : listeners) {
+                listener.onPluginEnabled(plugin);
+            }
+        } else {
+            enabledPluginIds.remove(pluginId);
+            
+            // Notify listeners
+            for (PluginListener listener : listeners) {
+                listener.onPluginDisabled(plugin);
+            }
+        }
+        
+        // Save to preferences
+        prefs.edit()
+            .putBoolean("plugin_" + pluginId + "_enabled", enabled)
+            .apply();
+    }
+    
+    /**
+     * Check if a plugin is enabled
+     */
+    public boolean isPluginEnabled(String pluginId) {
+        return enabledPluginIds.contains(pluginId);
     }
     
     /**
@@ -296,42 +318,11 @@ public class PluginManager {
             }
         }
         
-        for (String id : dynamicIds) {
-            unregisterPlugin(id);
+        for (String pluginId : dynamicIds) {
+            unregisterPlugin(pluginId);
         }
         
-        // Load fresh
+        // Reload
         loadDynamicCollectors();
-    }
-    
-    /**
-     * Get plugin statistics
-     */
-    public PluginStats getStats() {
-        int total = plugins.size();
-        int enabled = enabledPluginIds.size();
-        
-        Map<String, Integer> byCategory = new HashMap<>();
-        for (DataCollectorPlugin plugin : plugins.values()) {
-            String category = plugin.getCategory();
-            byCategory.put(category, byCategory.getOrDefault(category, 0) + 1);
-        }
-        
-        return new PluginStats(total, enabled, byCategory);
-    }
-    
-    /**
-     * Plugin statistics
-     */
-    public static class PluginStats {
-        public final int totalPlugins;
-        public final int enabledPlugins;
-        public final Map<String, Integer> pluginsByCategory;
-        
-        PluginStats(int total, int enabled, Map<String, Integer> byCategory) {
-            this.totalPlugins = total;
-            this.enabledPlugins = enabled;
-            this.pluginsByCategory = new HashMap<>(byCategory);
-        }
     }
 }

@@ -21,11 +21,6 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 import java.util.Calendar;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.UUID;
-import org.json.JSONObject;
-import com.core.talita.StepData;
 
 /**
  * Background Tracking Service - Runs in foreground to track location/activity
@@ -267,7 +262,8 @@ public class BackgroundTrackingService extends Service implements LocationListen
 
             // Save step data every 100 steps
             if (dailyStepCount % 100 == 0 && dailyStepCount > 0) {
-                StepData stepData = new StepData(dailyStepCount);
+                // Use the proper StepData constructor
+                StepData stepData = new StepData(dailyStepCount, 100);
                 dataService.captureData(stepData);
                 Log.d(TAG, "👣 Steps saved: " + dailyStepCount);
             }
@@ -336,67 +332,5 @@ public class BackgroundTrackingService extends Service implements LocationListen
         NotificationManager notificationManager =
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.notify(NOTIFICATION_ID, createNotification());
-    }
-}
-
-    @Override
-    public Map<String, Object> getMetadata() {
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("steps", steps);
-        return metadata;
-    }
-
-    @Override
-    public String getType() {
-        return "steps";
-    }
-
-    @Override
-    public String getId() {
-        return id;
-    }
-
-    @Override
-    public String toJson() {
-        try {
-            JSONObject json = new JSONObject();
-            json.put("id", id);
-            json.put("type", "steps");
-            json.put("steps", steps);
-            json.put("timestamp", timestamp);
-            return json.toString();
-        } catch (Exception e) {
-            return "{}";
-        }
-    }
-
-    @Override
-    public String getFilePath() {
-        return null;
-    }
-
-    @Override
-    public long getTimestamp() {
-        return timestamp;
-    }
-
-    @Override
-    public double getLatitude() {
-        return 0.0;
-    }
-
-    @Override
-    public double getLongitude() {
-        return 0.0;
-    }
-
-    @Override
-    public String getDisplayName() {
-        return steps + " steps";
-    }
-
-    @Override
-    public String getDisplaySummary() {
-        return getDisplayName();
     }
 }

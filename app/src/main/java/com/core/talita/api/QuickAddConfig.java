@@ -4,6 +4,8 @@ package com.core.talita.api;
  * QuickAddConfig - Configuration for quick add UI
  * 
  * Defines how a plugin appears in the quick add interface
+ * 
+ * File path: app/src/main/java/com/core/talita/api/QuickAddConfig.java
  */
 public class QuickAddConfig {
     
@@ -22,6 +24,24 @@ public class QuickAddConfig {
     private final boolean showInGrid;
     private final boolean requiresConfirmation;
     private final int gridPosition;
+    
+    /**
+     * Simple constructor for basic config
+     */
+    public QuickAddConfig(String title, String description, String style, boolean showInGrid) {
+        this.title = title;
+        this.description = description;
+        this.style = style;
+        this.iconUrl = null;
+        this.iconColor = 0xFF6366F1; // Default purple
+        this.showInGrid = showInGrid;
+        this.requiresConfirmation = false;
+        this.gridPosition = -1;
+        
+        // Set legacy fields
+        this.quickAddTitle = this.title;
+        this.quickAddDescription = this.description;
+    }
     
     private QuickAddConfig(Builder builder) {
         this.title = builder.title;
@@ -86,7 +106,7 @@ public class QuickAddConfig {
     public static class Builder {
         private String title = "";
         private String description = "";
-        private String style = "TILE"; // TILE, CARD, BUTTON
+        private String style = QuickAddStyle.TILE;
         private String iconUrl = null;
         private int iconColor = 0xFF6366F1; // Default purple
         private boolean showInGrid = true;
@@ -139,16 +159,5 @@ public class QuickAddConfig {
         public QuickAddConfig build() {
             return new QuickAddConfig(this);
         }
-    }
-    
-    /**
-     * Quick add UI styles
-     */
-    public static class QuickAddStyle {
-        public static final String TILE = "TILE";
-        public static final String CARD = "CARD";
-        public static final String BUTTON = "BUTTON";
-        public static final String COMPACT = "COMPACT";
-        public static final String EXPANDED = "EXPANDED";
     }
 }
