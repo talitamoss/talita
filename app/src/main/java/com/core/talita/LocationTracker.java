@@ -2,167 +2,239 @@ package com.core.talita;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.TextView;
-import android.widget.Toast;
-import android.content.pm.PackageManager;
-import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import java.util.concurrent.TimeUnit;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.osmdroid.util.GeoPoint;
-import org.osmdroid.views.MapView;
-import org.osmdroid.views.overlay.Marker;
-import org.osmdroid.views.overlay.Polyline;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import com.core.talita.LocationData;
-import com.core.talita.UniversalDataService;
-
+/**
+ * LocationTracker - Simple location tracking utility
+ * Used for one-time location captures
+ */
 public class LocationTracker implements LocationListener {
-
+    
     private static final String TAG = "LocationTracker";
-    private final LocationManager locationManager;
+    private static final long TIMEOUT_MS = 30000; // 30 seconds
+    private static final float MIN_ACCURACY = 50.0f; // 50 meters
+    
     private final Context context;
-    private final TextView locationTextView;
-    private final MapView mapView;
-    private final Polyline polyline;
-    private final ArrayList<GeoPoint> routePoints;
-    private final LocalDataManager dataManager;
-
-
-    // Constructor
-    public LocationTracker(Context context, TextView locationTextView, MapView mapView, Polyline polyline, ArrayList<GeoPoint> routePoints) {
+    private final LocationManager locationManager;
+    private LocationCallback callback;
+    private Location bestLocation;
+    private long startTime;
+    
+    public interface LocationCallback {
+        void onLocationReceived(Location location);
+        void onLocationError(String error);
+    }
+    
+    public LocationTracker(Context context) {
         this.context = context;
-        this.locationTextView = locationTextView;
-        this.mapView = mapView;
-        this.polyline = polyline;
-        this.routePoints = routePoints;
-        this.dataManager = new LocalDataManager(context); // ADD THIS LINE
-        locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-
-        // LOG THE STORAGE PATHS
-        logStoragePaths();
+        this.locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
     }
-
-    private void logStoragePaths() {
-        File filesDir = context.getFilesDir();
-        File locationFile = new File(filesDir, "location_data.txt");
-        File recordingsDir = new File(filesDir, "recordings");
-        File audioMetaFile = new File(filesDir, "audio_recordings.txt");
-
-        Log.d(TAG, "=== TALITA DATA STORAGE PATHS ===");
-        Log.d(TAG, "App files directory: " + filesDir.getAbsolutePath());
-        Log.d(TAG, "Location data file: " + locationFile.getAbsolutePath());
-        Log.d(TAG, "Audio recordings directory: " + recordingsDir.getAbsolutePath());
-        Log.d(TAG, "Audio metadata file: " + audioMetaFile.getAbsolutePath());
-        Log.d(TAG, "================================");
-
-        // Also show in UI for easy viewing
-        Toast.makeText(context, "Storage: " + filesDir.getAbsolutePath(), Toast.LENGTH_LONG).show();
-    }
-
-    // Start location tracking
-    public void startTracking() {
-        // Check for location permissions
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // If permission isn't granted, request it
-            Toast.makeText(context, "Location permission not granted", Toast.LENGTH_SHORT).show();
+    
+    /**
+     * Request current location
+     */
+    public void getCurrentLocation(LocationCallback callback) {
+        this.callback = callback;
+        this.startTime = System.currentTimeMillis();
+        this.bestLocation = null;
+        
+        // Check permissions
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            callback.onLocationError("Location permission not granted");
             return;
         }
-
-        // Request location updates using GPS
+        
+        // Check if location services are enabled
+        boolean gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+        boolean networkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+        
+        if (!gpsEnabled && !networkEnabled) {
+            callback.onLocationError("Location services disabled");
+            return;
+        }
+        
         try {
-            locationManager.requestLocationUpdates(
-                    LocationManager.GPS_PROVIDER, // GPS for high accuracy
-                    10000, // Update every 10 seconds
-                    10,    // Update every 10 meters
-                    this   // LocationListener
-            );
+            // Request updates from available providers
+            if (gpsEnabled) {
+                locationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    0, 0, this
+                );
+                
+                // Get last known location
+                Location lastGps = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                if (lastGps != null && isBetterLocation(lastGps, bestLocation)) {
+                    bestLocation = lastGps;
+                }
+            }
+            
+            if (networkEnabled) {
+                locationManager.requestLocationUpdates(
+                    LocationManager.NETWORK_PROVIDER,
+                    0, 0, this
+                );
+                
+                // Get last known location
+                Location lastNetwork = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                if (lastNetwork != null && isBetterLocation(lastNetwork, bestLocation)) {
+                    bestLocation = lastNetwork;
+                }
+            }
+            
+            // If we have a recent accurate location, use it immediately
+            if (bestLocation != null && 
+                bestLocation.getAccuracy() < MIN_ACCURACY &&
+                (System.currentTimeMillis() - bestLocation.getTime()) < TimeUnit.MINUTES.toMillis(5)) {
+                
+                stopTracking();
+                callback.onLocationReceived(bestLocation);
+                return;
+            }
+            
+            // Otherwise wait for updates with timeout
+            new Thread(() -> {
+                try {
+                    Thread.sleep(TIMEOUT_MS);
+                    stopTracking();
+                    
+                    if (bestLocation != null) {
+                        callback.onLocationReceived(bestLocation);
+                    } else {
+                        callback.onLocationError("Location timeout");
+                    }
+                } catch (InterruptedException e) {
+                    // Cancelled
+                }
+            }).start();
+            
         } catch (SecurityException e) {
-            e.printStackTrace();
+            callback.onLocationError("Security exception: " + e.getMessage());
+        } catch (Exception e) {
+            callback.onLocationError("Location error: " + e.getMessage());
         }
     }
-
-    // Stop location tracking
+    
+    /**
+     * Stop tracking
+     */
     public void stopTracking() {
-        locationManager.removeUpdates(this);
+        try {
+            locationManager.removeUpdates(this);
+        } catch (SecurityException e) {
+            Log.e(TAG, "Error stopping location updates", e);
+        }
     }
-
-    // This method is called when the location is updated
+    
     @Override
     public void onLocationChanged(Location location) {
-        // Get current location
-        double latitude = location.getLatitude();
-        double longitude = location.getLongitude();
-        GeoPoint geoPoint = new GeoPoint(latitude, longitude);
-
-        // Add to route points
-        routePoints.add(geoPoint);
-
-        // Update polyline
-        if (polyline != null) {
-            polyline.setPoints(routePoints);
-        }
-
-        // Add marker for the new point
-        if (mapView != null && mapView.getContext() != null) {
-            Marker marker = new Marker(mapView);
-            marker.setPosition(geoPoint);
-            marker.setTitle("Timestamp: " + System.currentTimeMillis());
-            mapView.getOverlays().add(marker);
-
-            mapView.getController().setCenter(geoPoint);
-            mapView.getController().setZoom(15);
-        }
-
-        if (locationTextView != null) {
-            locationTextView.setText("Lat: " + latitude + ", Lon: " + longitude);
-        }
-
-        long timestamp = System.currentTimeMillis();
-
-        saveLocationToDatabase(latitude, longitude, timestamp);
-    }
-
-    private void saveLocationToDatabase(double latitude, double longitude, long timestamp) {
-        try {
-            // Create LocationData using our new universal system
-            LocationData locationData = new LocationData(latitude, longitude, 10.0, "gps");
-
-            // Use UniversalDataService to handle everything automatically
-            UniversalDataService dataService = new UniversalDataService(context);
-            String dataId = dataService.capture(locationData);
-
-            if (dataId != null) {
-                Log.d(TAG, "Location saved via Universal Service with ID: " + dataId);
-                // Success toast is handled automatically by UniversalDataService
-            } else {
-                Log.e(TAG, "Failed to save location via Universal Service");
-                // Error toast is handled automatically by UniversalDataService
+        if (isBetterLocation(location, bestLocation)) {
+            bestLocation = location;
+            
+            // If accuracy is good enough, deliver immediately
+            if (location.getAccuracy() < MIN_ACCURACY) {
+                stopTracking();
+                if (callback != null) {
+                    callback.onLocationReceived(location);
+                    callback = null;
+                }
             }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            Log.e(TAG, "Error in universal location save: " + e.getMessage());
-            Toast.makeText(context, "Location save error", Toast.LENGTH_SHORT).show();
         }
     }
-
-    // These methods are required by the LocationListener interface, but we're not using them here
+    
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {}
-
+    
     @Override
     public void onProviderEnabled(String provider) {}
-
+    
     @Override
     public void onProviderDisabled(String provider) {}
+    
+    /**
+     * Determines whether one Location reading is better than the current Location fix
+     */
+    private boolean isBetterLocation(Location location, Location currentBestLocation) {
+        if (currentBestLocation == null) {
+            return true;
+        }
+        
+        // Check whether the new location fix is newer or older
+        long timeDelta = location.getTime() - currentBestLocation.getTime();
+        boolean isSignificantlyNewer = timeDelta > TimeUnit.MINUTES.toMillis(2);
+        boolean isSignificantlyOlder = timeDelta < -TimeUnit.MINUTES.toMillis(2);
+        boolean isNewer = timeDelta > 0;
+        
+        if (isSignificantlyNewer) {
+            return true;
+        } else if (isSignificantlyOlder) {
+            return false;
+        }
+        
+        // Check whether the new location fix is more or less accurate
+        int accuracyDelta = (int) (location.getAccuracy() - currentBestLocation.getAccuracy());
+        boolean isLessAccurate = accuracyDelta > 0;
+        boolean isMoreAccurate = accuracyDelta < 0;
+        boolean isSignificantlyLessAccurate = accuracyDelta > 200;
+        
+        // Check if the old and new location are from the same provider
+        boolean isFromSameProvider = isSameProvider(location.getProvider(),
+                currentBestLocation.getProvider());
+        
+        // Determine location quality using a combination of timeliness and accuracy
+        if (isMoreAccurate) {
+            return true;
+        } else if (isNewer && !isLessAccurate) {
+            return true;
+        } else if (isNewer && !isSignificantlyLessAccurate && isFromSameProvider) {
+            return true;
+        }
+        return false;
+    }
+    
+    private boolean isSameProvider(String provider1, String provider2) {
+        if (provider1 == null) {
+            return provider2 == null;
+        }
+        return provider1.equals(provider2);
+    }
+    
+    /**
+     * Quick method to save a location
+     */
+    public static void captureCurrentLocation(Context context) {
+        LocationTracker tracker = new LocationTracker(context);
+        tracker.getCurrentLocation(new LocationCallback() {
+            @Override
+            public void onLocationReceived(Location location) {
+                // Create LocationData using the Builder pattern
+                LocationData locationData = new LocationData.Builder(
+                    location.getLatitude(),
+                    location.getLongitude()
+                )
+                .accuracy(location.getAccuracy())
+                .provider(location.getProvider())
+                .speed(location.getSpeed())
+                .bearing(location.getBearing())
+                .build();
+                
+                UniversalDataService dataService = UniversalDataService.getInstance(context);
+                dataService.captureData(locationData);
+                
+                Log.d(TAG, "📍 Location captured: " + location.getLatitude() + ", " + location.getLongitude());
+            }
+            
+            @Override
+            public void onLocationError(String error) {
+                Log.e(TAG, "Failed to capture location: " + error);
+            }
+        });
+    }
 }

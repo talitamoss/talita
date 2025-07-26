@@ -1,208 +1,238 @@
 package com.core.talita;
 
+import android.content.Context;
 import android.util.Log;
-import org.json.JSONObject;
 import java.util.*;
 
 /**
- * InsightsEngine - Simple implementation that works with existing data structures
- * Fixed with proper Insight inner class
- * 
- * File path: app/src/main/java/com/core/talita/InsightsEngine.java
+ * InsightsEngine - Generates insights from personal data
+ * Analyzes patterns and provides meaningful feedback to users
  */
 public class InsightsEngine {
     private static final String TAG = "InsightsEngine";
-    private final LocalDataManager dataManager;
-
-    public InsightsEngine(LocalDataManager dataManager) {
-        this.dataManager = dataManager;
+    
+    private final Context context;
+    private final UniversalDataService dataService;
+    
+    public InsightsEngine(Context context) {
+        this.context = context;
+        this.dataService = UniversalDataService.getInstance(context);
     }
-
+    
     /**
-     * Insight data class
+     * Alternative constructor with LocalDataManager (for compatibility)
      */
-    public static class Insight {
-        public final String title;
-        public final String description;
-        public final String emoji;
-        public final double correlationStrength;
-        public final String category;
-        public final long timestamp;
-
-        public Insight(String title, String description, String emoji) {
-            this(title, description, emoji, 0.0, "General", System.currentTimeMillis());
-        }
-
-        public Insight(String title, String description, String emoji, 
-                      double correlationStrength, String category, long timestamp) {
-            this.title = title;
-            this.description = description;
-            this.emoji = emoji;
-            this.correlationStrength = correlationStrength;
-            this.category = category;
-            this.timestamp = timestamp;
-        }
-        
-        // Getters for backward compatibility
-        public String getDescription() {
-            return description;
-        }
-        
-        public double getCorrelationStrength() {
-            return correlationStrength;
-        }
-        
-        public String getCategory() {
-            return category;
-        }
-        
-        public long getDiscoveredTimestamp() {
-            return timestamp;
-        }
+    public InsightsEngine(LocalDataManager localDataManager) {
+        this.context = null;
+        this.dataService = null;
+        // This constructor is deprecated, use Context constructor
     }
-
+    
     /**
-     * Calculate Life Score based on available data
-     */
-    public int calculateLifeScore(long startTime, long endTime) {
-        try {
-            // Get data counts for different types
-            int waterCount = getDataCount("water", startTime, endTime);
-            int moodCount = getDataCount("mood", startTime, endTime);
-            int exerciseCount = getDataCount("exercise", startTime, endTime);
-            int sleepCount = getDataCount("sleep", startTime, endTime);
-            
-            // Simple scoring: more data = better score
-            int totalDataPoints = waterCount + moodCount + exerciseCount + sleepCount;
-            
-            // Base score on data frequency (assuming daily targets)
-            int dayCount = (int) ((endTime - startTime) / (24 * 60 * 60 * 1000)) + 1;
-            int expectedDataPoints = dayCount * 4; // Expecting 4 types per day
-            
-            int score = (int) ((totalDataPoints / (float) expectedDataPoints) * 100);
-            return Math.min(100, Math.max(0, score));
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error calculating life score: " + e.getMessage());
-            return 75; // Default score
-        }
-    }
-
-    /**
-     * Get details about the life score
-     */
-    public String getLifeScoreDetails(long startTime, long endTime) {
-        StringBuilder details = new StringBuilder("Data tracking:\n");
-        
-        try {
-            int waterCount = getDataCount("water", startTime, endTime);
-            int moodCount = getDataCount("mood", startTime, endTime);
-            
-            if (waterCount > 5) details.append("• Hydration ↑\n");
-            else details.append("• Hydration ↓\n");
-            
-            if (moodCount > 3) details.append("• Mood tracking ↑\n");
-            else details.append("• Mood tracking ↓\n");
-            
-        } catch (Exception e) {
-            details.append("• Keep logging data!");
-        }
-        
-        return details.toString().trim();
-    }
-
-    /**
-     * Generate simple insights from data patterns
+     * Generate insights for a time range
      */
     public List<Insight> generateInsights(long startTime, long endTime) {
         List<Insight> insights = new ArrayList<>();
         
         try {
-            // Check water intake frequency
-            int waterCount = getDataCount("water", startTime, endTime);
-            if (waterCount > 10) {
-                insights.add(new Insight(
-                    "Hydration Tracking",
-                    "Great job! You logged water " + waterCount + " times",
-                    "💧",
-                    0.9,
-                    "Wellness",
-                    System.currentTimeMillis()
-                ));
-            } else if (waterCount > 0) {
-                insights.add(new Insight(
-                    "Stay Hydrated",
-                    "You've logged water " + waterCount + " times. Try to log more regularly!",
-                    "💧",
-                    0.5,
-                    "Wellness",
-                    System.currentTimeMillis()
-                ));
-            }
+            // Get data for the time range
+            List<PersonalData> data = dataService.getDataForTimeRange(startTime, endTime);
             
-            // Check mood tracking
-            int moodCount = getDataCount("mood", startTime, endTime);
-            if (moodCount > 5) {
-                insights.add(new Insight(
-                    "Mood Awareness",
-                    "Consistent mood tracking helps identify patterns",
-                    "😊",
-                    0.8,
-                    "Mental Health",
-                    System.currentTimeMillis()
-                ));
-            }
+            // Analyze different data types
+            Map<String, List<PersonalData>> byType = groupByType(data);
             
-            // Check exercise
-            int exerciseCount = getDataCount("exercise", startTime, endTime);
-            if (exerciseCount > 3) {
-                insights.add(new Insight(
-                    "Active Lifestyle",
-                    "You've been active " + exerciseCount + " times. Keep it up!",
-                    "💪",
-                    0.85,
-                    "Fitness",
-                    System.currentTimeMillis()
-                ));
-            }
-            
-            // General encouragement
-            if (insights.isEmpty()) {
-                insights.add(new Insight(
-                    "Getting Started",
-                    "Keep logging data to discover your patterns!",
-                    "📊",
-                    1.0,
-                    "General",
-                    System.currentTimeMillis()
-                ));
+            // Generate insights for each type
+            for (Map.Entry<String, List<PersonalData>> entry : byType.entrySet()) {
+                String type = entry.getKey();
+                List<PersonalData> typeData = entry.getValue();
+                
+                // Basic frequency insight
+                if (typeData.size() > 0) {
+                    insights.add(new Insight(
+                        getEmojiForType(type),
+                        "You tracked " + type + " " + typeData.size() + " times",
+                        "Keep up the consistent tracking!",
+                        Insight.Type.FREQUENCY
+                    ));
+                }
+                
+                // Type-specific insights
+                switch (type) {
+                    case "water":
+                        insights.addAll(generateWaterInsights(typeData));
+                        break;
+                    case "exercise":
+                        insights.addAll(generateExerciseInsights(typeData));
+                        break;
+                    case "mood":
+                        insights.addAll(generateMoodInsights(typeData));
+                        break;
+                    case "sleep":
+                        insights.addAll(generateSleepInsights(typeData));
+                        break;
+                }
             }
             
         } catch (Exception e) {
-            Log.e(TAG, "Error generating insights: " + e.getMessage());
+            Log.e(TAG, "Error generating insights", e);
+        }
+        
+        return insights;
+    }
+    
+    private Map<String, List<PersonalData>> groupByType(List<PersonalData> data) {
+        Map<String, List<PersonalData>> grouped = new HashMap<>();
+        
+        for (PersonalData item : data) {
+            String type = item.getType();
+            if (!grouped.containsKey(type)) {
+                grouped.put(type, new ArrayList<>());
+            }
+            grouped.get(type).add(item);
+        }
+        
+        return grouped;
+    }
+    
+    private List<Insight> generateWaterInsights(List<PersonalData> waterData) {
+        List<Insight> insights = new ArrayList<>();
+        
+        // Calculate total water intake
+        int totalMl = 0;
+        for (PersonalData item : waterData) {
+            Map<String, Object> data = item.getData();
+            if (data.containsKey("volume_ml")) {
+                totalMl += (int) data.get("volume_ml");
+            }
+        }
+        
+        if (totalMl > 0) {
             insights.add(new Insight(
-                "Welcome",
-                "Start tracking your daily activities",
-                "👋"
+                "💧",
+                "Total water intake: " + (totalMl / 1000.0) + "L",
+                totalMl >= 2000 ? "Great hydration!" : "Try to drink more water",
+                Insight.Type.ACHIEVEMENT
             ));
         }
         
         return insights;
     }
     
-    /**
-     * Helper method to get data count by type
-     */
-    private int getDataCount(String type, long startTime, long endTime) {
-        try {
-            // Query the database directly
-            // This is a simplified version - in production, you'd use the actual LocalDataManager methods
-            // For now, return mock data based on time range
-            Random random = new Random(type.hashCode() + startTime);
-            int dayCount = (int) ((endTime - startTime) / (24 * 60 * 60 * 1000)) + 1;
-            return random.nextInt(Math.max(1, dayCount * 3));
-        } catch (Exception e) {
-            return 0;
+    private List<Insight> generateExerciseInsights(List<PersonalData> exerciseData) {
+        List<Insight> insights = new ArrayList<>();
+        
+        if (exerciseData.size() >= 3) {
+            insights.add(new Insight(
+                "💪",
+                "You exercised " + exerciseData.size() + " times",
+                "Consistent exercise routine!",
+                Insight.Type.ACHIEVEMENT
+            ));
         }
+        
+        return insights;
+    }
+    
+    private List<Insight> generateMoodInsights(List<PersonalData> moodData) {
+        List<Insight> insights = new ArrayList<>();
+        
+        // Calculate average mood
+        int totalRating = 0;
+        int count = 0;
+        
+        for (PersonalData item : moodData) {
+            Map<String, Object> data = item.getData();
+            if (data.containsKey("mood_rating")) {
+                totalRating += (int) data.get("mood_rating");
+                count++;
+            }
+        }
+        
+        if (count > 0) {
+            double avgMood = (double) totalRating / count;
+            insights.add(new Insight(
+                "😊",
+                String.format("Average mood: %.1f/5", avgMood),
+                avgMood >= 3.5 ? "You're doing well!" : "Take care of yourself",
+                Insight.Type.TREND
+            ));
+        }
+        
+        return insights;
+    }
+    
+    private List<Insight> generateSleepInsights(List<PersonalData> sleepData) {
+        List<Insight> insights = new ArrayList<>();
+        
+        // Calculate average sleep
+        double totalHours = 0;
+        int count = 0;
+        
+        for (PersonalData item : sleepData) {
+            Map<String, Object> data = item.getData();
+            if (data.containsKey("hours_slept")) {
+                totalHours += (double) data.get("hours_slept");
+                count++;
+            }
+        }
+        
+        if (count > 0) {
+            double avgSleep = totalHours / count;
+            insights.add(new Insight(
+                "😴",
+                String.format("Average sleep: %.1f hours", avgSleep),
+                avgSleep >= 7 ? "Good sleep pattern!" : "Try to get more rest",
+                Insight.Type.TREND
+            ));
+        }
+        
+        return insights;
+    }
+    
+    private String getEmojiForType(String type) {
+        switch (type) {
+            case "water": return "💧";
+            case "exercise": return "💪";
+            case "mood": return "😊";
+            case "sleep": return "😴";
+            case "nutrition": return "🥗";
+            case "focus": return "🎯";
+            case "relationships": return "💞";
+            default: return "📊";
+        }
+    }
+    
+    /**
+     * Insight data class
+     */
+    public static class Insight {
+        public enum Type {
+            FREQUENCY,
+            TREND,
+            ACHIEVEMENT,
+            WARNING,
+            SUGGESTION
+        }
+        
+        private final String emoji;
+        private final String title;
+        private final String description;
+        private final Type type;
+        private final long timestamp;
+        
+        public Insight(String emoji, String title, String description, Type type) {
+            this.emoji = emoji;
+            this.title = title;
+            this.description = description;
+            this.type = type;
+            this.timestamp = System.currentTimeMillis();
+        }
+        
+        // Getters
+        public String getEmoji() { return emoji; }
+        public String getTitle() { return title; }
+        public String getDescription() { return description; }
+        public Type getType() { return type; }
+        public long getTimestamp() { return timestamp; }
     }
 }

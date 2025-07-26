@@ -8,275 +8,190 @@ import android.view.ViewGroup;
 import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.viewpager2.widget.ViewPager2;
 import com.core.talita.plugins.DataCollectorPlugin;
 import com.core.talita.plugins.PluginCategories;
 import com.core.talita.plugins.PluginManager;
-import com.core.talita.plugins.loader.PluginLoader;
-import com.core.talita.plugins.loader.PluginSecurityManager;
-import com.core.talita.plugins.repository.PluginRepository;
-import com.google.android.material.tabs.TabLayout;
-import com.google.android.material.tabs.TabLayoutMediator;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * PluginManagementActivity - Main UI for plugin store
- * Shows installed plugins and coming soon features
+ * PluginManagementActivity - Manage data collector plugins
  */
 public class PluginManagementActivity extends AppCompatActivity {
+    
     private static final String TAG = "PluginManagement";
     
-    // UI Components
-    private TabLayout tabLayout;
-    private ViewPager2 viewPager;
-    private ProgressBar progressBar;
-    
-    // Core components
     private PluginManager pluginManager;
+    private RecyclerView pluginsRecycler;
+    private TextView activePluginsText;
+    private Spinner categoryFilter;
+    private PluginAdapter adapter;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_plugin_management);
         
-        // Initialize components
         pluginManager = PluginManager.getInstance(this);
         
-        setupUI();
+        initializeViews();
+        setupCategoryFilter();
+        loadPlugins("all");
     }
     
-    private void setupUI() {
-        // Back button
-        View backButton = findViewById(R.id.back_button);
-        if (backButton != null) {
-            backButton.setOnClickListener(v -> finish());
-        }
+    private void initializeViews() {
+        Button backButton = findViewById(R.id.back_button);
+        backButton.setOnClickListener(v -> finish());
         
-        // Hide search for now (coming soon)
-        View searchView = findViewById(R.id.search_view);
-        if (searchView != null) {
-            searchView.setVisibility(View.GONE);
-        }
+        pluginsRecycler = findViewById(R.id.plugins_recycler);
+        activePluginsText = findViewById(R.id.active_plugins_text);
+        categoryFilter = findViewById(R.id.category_filter);
         
-        // Settings button - show coming soon dialog
-        View settingsButton = findViewById(R.id.settings_button);
-        if (settingsButton != null) {
-            settingsButton.setOnClickListener(v -> showComingSoonDialog());
-        }
+        pluginsRecycler.setLayoutManager(new LinearLayoutManager(this));
         
-        // Tabs and ViewPager
-        tabLayout = findViewById(R.id.tab_layout);
-        viewPager = findViewById(R.id.view_pager);
-        progressBar = findViewById(R.id.progress_bar);
+        // Quick actions
+        findViewById(R.id.enable_all_button).setOnClickListener(v -> enableAllPlugins());
+        findViewById(R.id.disable_all_button).setOnClickListener(v -> disableAllPlugins());
+        findViewById(R.id.reload_plugins_button).setOnClickListener(v -> reloadPlugins());
+    }
+    
+    private void setupCategoryFilter() {
+        String[] categories = new String[] {
+            "All Categories",
+            "I - Personal",
+            "It - Environment", 
+            "We - Social",
+            "Custom"
+        };
         
-        // Setup ViewPager with only installed plugins for now
-        PluginPagerAdapter adapter = new PluginPagerAdapter(this);
-        viewPager.setAdapter(adapter);
+        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(
+            this,
+            android.R.layout.simple_spinner_item,
+            categories
+        );
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        categoryFilter.setAdapter(spinnerAdapter);
         
-        // Connect tabs to ViewPager
-        new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
-            switch (position) {
-                case 0:
-                    tab.setText("Installed");
-                    break;
-                case 1:
-                    tab.setText("Coming Soon");
-                    break;
+        categoryFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String filter = position == 0 ? "all" : getCategoryFromPosition(position);
+                loadPlugins(filter);
             }
-        }).attach();
+            
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
     }
     
-    private void showComingSoonDialog() {
+    private String getCategoryFromPosition(int position) {
+        switch (position) {
+            case 1: return PluginCategories.I;
+            case 2: return PluginCategories.IT;
+            case 3: return PluginCategories.WE;
+            case 4: return "custom";
+            default: return "all";
+        }
+    }
+    
+    private void loadPlugins(String categoryFilter) {
+        List<DataCollectorPlugin> plugins;
+        
+        if ("all".equals(categoryFilter)) {
+            plugins = pluginManager.getAllPlugins();
+        } else {
+            plugins = new ArrayList<>();
+            for (DataCollectorPlugin plugin : pluginManager.getAllPlugins()) {
+                if (categoryFilter.equals(plugin.getCategory())) {
+                    plugins.add(plugin);
+                }
+            }
+        }
+        
+        // Sort by priority
+        Collections.sort(plugins, (a, b) -> Integer.compare(b.getPriority(), a.getPriority()));
+        
+        adapter = new PluginAdapter(plugins);
+        pluginsRecycler.setAdapter(adapter);
+        
+        updateStats();
+    }
+    
+    private void updateStats() {
+        int total = pluginManager.getAllPlugins().size();
+        int enabled = pluginManager.getEnabledPlugins().size();
+        activePluginsText.setText(enabled + " of " + total + " plugins active");
+    }
+    
+    private void enableAllPlugins() {
+        for (DataCollectorPlugin plugin : pluginManager.getAllPlugins()) {
+            plugin.setEnabled(true);
+        }
+        adapter.notifyDataSetChanged();
+        updateStats();
+        Toast.makeText(this, "All plugins enabled", Toast.LENGTH_SHORT).show();
+    }
+    
+    private void disableAllPlugins() {
+        for (DataCollectorPlugin plugin : pluginManager.getAllPlugins()) {
+            plugin.setEnabled(false);
+        }
+        adapter.notifyDataSetChanged();
+        updateStats();
+        Toast.makeText(this, "All plugins disabled", Toast.LENGTH_SHORT).show();
+    }
+    
+    private void reloadPlugins() {
+        pluginManager.reloadPlugins();
+        loadPlugins("all");
+        Toast.makeText(this, "Plugins reloaded", Toast.LENGTH_SHORT).show();
+    }
+    
+    private void showPluginInfo(DataCollectorPlugin plugin) {
+        String message = "Version: " + plugin.getVersion() + "\n" +
+                        "Author: " + plugin.getAuthor() + "\n" +
+                        "Category: " + plugin.getCategory() + "\n" +
+                        "Priority: " + plugin.getPriority() + "\n\n" +
+                        "Features:\n" +
+                        "• Quick Add: " + (plugin.supportsQuickAdd() ? "Yes" : "No") + "\n" +
+                        "• Scheduling: " + (plugin.supportsScheduling() ? "Yes" : "No") + "\n" +
+                        "• Background: " + (plugin.requiresBackgroundTracking() ? "Yes" : "No");
+        
         new AlertDialog.Builder(this)
-            .setTitle("🚀 Coming Soon!")
-            .setMessage("Developer features coming soon:\n\n" +
-                       "• Submit your own plugins\n" +
-                       "• Plugin development SDK\n" +
-                       "• Community marketplace\n" +
-                       "• Revenue sharing\n\n" +
-                       "Stay tuned!")
-            .setPositiveButton("OK", null)
-            .show();
-    }
-    
-    /**
-     * Simplified ViewPager adapter
-     */
-    private static class PluginPagerAdapter extends androidx.viewpager2.adapter.FragmentStateAdapter {
-        PluginPagerAdapter(AppCompatActivity activity) {
-            super(activity);
-        }
-        
-        @Override
-        public int getItemCount() {
-            return 2; // Installed + Coming Soon
-        }
-        
-        @Override
-        public androidx.fragment.app.Fragment createFragment(int position) {
-            switch (position) {
-                case 0:
-                    return new InstalledPluginsFragment();
-                case 1:
-                    return new ComingSoonFragment();
-                default:
-                    return new InstalledPluginsFragment();
-            }
-        }
-    }
-    
-    /**
-     * Fragment for installed plugins
-     */
-    public static class InstalledPluginsFragment extends androidx.fragment.app.Fragment {
-        private RecyclerView recyclerView;
-        private InstalledPluginsAdapter adapter;
-        private TextView emptyText;
-        private PluginManager pluginManager;
-        
-        @Override
-        public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-            View view = inflater.inflate(R.layout.fragment_installed_plugins, container, false);
-            
-            pluginManager = PluginManager.getInstance(getContext());
-            
-            recyclerView = view.findViewById(R.id.recycler_view);
-            emptyText = view.findViewById(R.id.empty_text);
-            
-            recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-            
-            loadInstalledPlugins();
-            
-            return view;
-        }
-        
-        private void loadInstalledPlugins() {
-            List<DataCollectorPlugin> plugins = pluginManager.getAllPlugins();
-            
-            if (plugins.isEmpty()) {
-                recyclerView.setVisibility(View.GONE);
-                emptyText.setVisibility(View.VISIBLE);
-            } else {
-                recyclerView.setVisibility(View.VISIBLE);
-                emptyText.setVisibility(View.GONE);
-                
-                adapter = new InstalledPluginsAdapter(plugins, this::showPluginDetails);
-                recyclerView.setAdapter(adapter);
-            }
-        }
-        
-        private void showPluginDetails(DataCollectorPlugin plugin) {
-            boolean isEnabled = pluginManager.isPluginEnabled(plugin.getPluginId());
-            
-            new AlertDialog.Builder(getContext())
                 .setTitle(plugin.getPluginName())
-                .setMessage("Version: " + plugin.getPluginVersion() + "\n" +
-                           "Author: " + plugin.getAuthor() + "\n" +
-                           "Category: " + plugin.getCategory() + "\n\n" +
-                           "Status: " + (isEnabled ? "Enabled" : "Disabled"))
-                .setPositiveButton(isEnabled ? "Disable" : "Enable", (dialog, which) -> {
-                    pluginManager.setPluginEnabled(plugin.getPluginId(), !isEnabled);
-                    loadInstalledPlugins();
-                    Toast.makeText(getContext(), 
-                        plugin.getPluginName() + (isEnabled ? " disabled" : " enabled"), 
-                        Toast.LENGTH_SHORT).show();
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Settings", (dialog, which) -> {
+                    if (plugin.hasSettings()) {
+                        plugin.openSettings(this);
+                    } else {
+                        Toast.makeText(this, "No settings available", Toast.LENGTH_SHORT).show();
+                    }
                 })
-                .setNegativeButton("Close", null)
                 .show();
-        }
     }
     
     /**
-     * Coming Soon Fragment
+     * Plugin Adapter
      */
-    public static class ComingSoonFragment extends androidx.fragment.app.Fragment {
-        @Override
-        public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-            View view = inflater.inflate(R.layout.fragment_coming_soon, container, false);
-            
-            // No need to setup cards manually - they're already in the layout
-            // Just set click listeners for each card
-            
-            CardView marketplaceCard = view.findViewById(R.id.card_marketplace);
-            if (marketplaceCard != null) {
-                marketplaceCard.setOnClickListener(v -> 
-                    Toast.makeText(getContext(), "Plugin Marketplace coming soon!", Toast.LENGTH_SHORT).show());
-            }
-            
-            CardView developerCard = view.findViewById(R.id.card_developer);
-            if (developerCard != null) {
-                developerCard.setOnClickListener(v -> 
-                    Toast.makeText(getContext(), "Developer Portal coming soon!", Toast.LENGTH_SHORT).show());
-            }
-            
-            CardView sdkCard = view.findViewById(R.id.card_sdk);
-            if (sdkCard != null) {
-                sdkCard.setOnClickListener(v -> 
-                    Toast.makeText(getContext(), "Plugin SDK coming soon!", Toast.LENGTH_SHORT).show());
-            }
-            
-            CardView revenueCard = view.findViewById(R.id.card_revenue);
-            if (revenueCard != null) {
-                revenueCard.setOnClickListener(v -> 
-                    Toast.makeText(getContext(), "Revenue Sharing coming soon!", Toast.LENGTH_SHORT).show());
-            }
-            
-            return view;
-        }
-    }
-    
-    /**
-     * Adapter for installed plugins
-     */
-    private static class InstalledPluginsAdapter extends RecyclerView.Adapter<InstalledPluginsAdapter.ViewHolder> {
+    private class PluginAdapter extends RecyclerView.Adapter<PluginAdapter.ViewHolder> {
         private final List<DataCollectorPlugin> plugins;
-        private final OnPluginClickListener listener;
         
-        interface OnPluginClickListener {
-            void onPluginClick(DataCollectorPlugin plugin);
-        }
-        
-        InstalledPluginsAdapter(List<DataCollectorPlugin> plugins, OnPluginClickListener listener) {
+        PluginAdapter(List<DataCollectorPlugin> plugins) {
             this.plugins = plugins;
-            this.listener = listener;
         }
         
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_installed_plugin, parent, false);
+                    .inflate(R.layout.item_plugin, parent, false);
             return new ViewHolder(view);
         }
         
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
-            DataCollectorPlugin plugin = plugins.get(position);
-            PluginManager pluginManager = PluginManager.getInstance(holder.itemView.getContext());
-            
-            // Set plugin info
-            holder.emoji.setText(plugin.getEmoji());
-            holder.name.setText(plugin.getPluginName());
-            holder.version.setText("v" + plugin.getPluginVersion());
-            holder.author.setText("by " + plugin.getAuthor());
-            
-            // Category with color
-            holder.category.setText(plugin.getCategory());
-            int categoryColor = PluginCategories.getCategoryColor(plugin.getCategory());
-            holder.category.setTextColor(categoryColor);
-            
-            // Status
-            boolean isEnabled = pluginManager.isPluginEnabled(plugin.getPluginId());
-            holder.status.setText(isEnabled ? "Enabled" : "Disabled");
-            holder.status.setTextColor(isEnabled ? 0xFF4CAF50 : 0xFF757575);
-            
-            // Click listener
-            holder.itemView.setOnClickListener(v -> listener.onPluginClick(plugin));
+            holder.bind(plugins.get(position));
         }
         
         @Override
@@ -284,17 +199,39 @@ public class PluginManagementActivity extends AppCompatActivity {
             return plugins.size();
         }
         
-        static class ViewHolder extends RecyclerView.ViewHolder {
-            TextView emoji, name, version, author, category, status;
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView emoji;
+            TextView name;
+            TextView description;
+            TextView version;
+            Switch enableSwitch;
+            ImageButton infoButton;
             
-            ViewHolder(View view) {
-                super(view);
-                emoji = view.findViewById(R.id.plugin_emoji);
-                name = view.findViewById(R.id.plugin_name);
-                version = view.findViewById(R.id.plugin_version);
-                author = view.findViewById(R.id.plugin_author);
-                category = view.findViewById(R.id.plugin_category);
-                status = view.findViewById(R.id.plugin_status);
+            ViewHolder(View itemView) {
+                super(itemView);
+                emoji = itemView.findViewById(R.id.plugin_emoji);
+                name = itemView.findViewById(R.id.plugin_name);
+                description = itemView.findViewById(R.id.plugin_description);
+                version = itemView.findViewById(R.id.plugin_version);
+                enableSwitch = itemView.findViewById(R.id.plugin_enable_switch);
+                infoButton = itemView.findViewById(R.id.plugin_info_button);
+            }
+            
+            void bind(DataCollectorPlugin plugin) {
+                emoji.setText(plugin.getEmoji());
+                name.setText(plugin.getPluginName());
+                description.setText(plugin.getPluginId());
+                version.setText("v" + plugin.getVersion());
+                
+                enableSwitch.setChecked(plugin.isEnabled());
+                enableSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                    plugin.setEnabled(isChecked);
+                    updateStats();
+                });
+                
+                infoButton.setOnClickListener(v -> showPluginInfo(plugin));
+                
+                itemView.setOnClickListener(v -> showPluginInfo(plugin));
             }
         }
     }

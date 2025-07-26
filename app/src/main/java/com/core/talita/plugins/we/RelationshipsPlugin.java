@@ -5,15 +5,12 @@ import android.graphics.Color;
 import com.core.talita.api.DataCollector;
 import com.core.talita.api.SimpleDataCollector;
 import com.core.talita.api.QuickAddConfig;
-import com.core.talita.api.QuickAddStyle;
 import com.core.talita.plugins.DataCollectorPlugin;
 import com.core.talita.plugins.PluginCategories;
 
 /**
  * Relationships Plugin - "We" category
  * Tracks connections and interactions with others
- * 
- * File path: app/src/main/java/com/core/talita/plugins/we/RelationshipsPlugin.java
  */
 public class RelationshipsPlugin extends DataCollectorPlugin {
     
@@ -85,12 +82,12 @@ public class RelationshipsPlugin extends DataCollectorPlugin {
     @Override
     public DataCollector createCollector(Context context) {
         return new SimpleDataCollector.Builder("relationships", "Relationships")
-            .description("Track meaningful connections and interactions")
-            .emoji("💞")
-            .category(PluginCategories.WE)
-            .inputHint("What connection did you make?")
-            .inputType(SimpleDataCollector.InputType.TEXT)
-            .build();
+                .description("Track meaningful connections and interactions")
+                .emoji("💞")
+                .category(PluginCategories.WE)
+                .inputHint("Who did you connect with?")
+                .inputType(SimpleDataCollector.InputType.TEXT)
+                .build();
     }
     
     @Override
@@ -101,15 +98,5 @@ public class RelationshipsPlugin extends DataCollectorPlugin {
     @Override
     public void openSettings(Context context) {
         // TODO: Settings screen
-    }
-    
-    @Override
-    public QuickAddConfig getQuickAddConfig() {
-        return new QuickAddConfig(
-            "Connection",
-            "Log meaningful interaction",
-            QuickAddStyle.TEXT_NOTE,
-            true
-        );
     }
 }

@@ -1,396 +1,374 @@
 package com.core.talita;
 
+import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
+import com.google.android.material.tabs.TabLayout;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
- * Data Summary Activity - Overview of collected data
- * Updated to use plugin system instead of hardcoded collectors
+ * DataSummaryActivity - Overview of all collected data
  */
 public class DataSummaryActivity extends AppCompatActivity {
+    
     private static final String TAG = "DataSummaryActivity";
-
-    // UI Components
-    private TextView totalDataPointsText;
-    private TextView todayStatsText;
-    private TextView weekStatsText;
-    private RecyclerView recentActivityRecycler;
+    
+    // Views
+    private TabLayout timeRangeTabs;
+    private TextView summaryText;
+    private TextView todayCountText;
+    private TextView weekCountText;
+    private RecyclerView recentDataRecycler;
     private RecyclerView dataTypesRecycler;
     
-    // Services
+    // Data
     private UniversalDataService dataService;
-    private LocalDataManager dataManager;
-    
-    // Adapters
     private RecentSummaryAdapter recentAdapter;
-    private DataTypeStatsAdapter dataTypeAdapter;
-
+    private DataTypeStatsAdapter statsAdapter;
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_data_summary);
-
-        // Initialize services
+        
         dataService = UniversalDataService.getInstance(this);
-        dataManager = new LocalDataManager(this);
-
-        // Setup UI
+        
         initializeViews();
-        loadDataStats();
-        loadTodayStats();
-        loadWeekStats();
-        loadRecentActivity();
-        loadDataTypeStats();
+        setupRecyclers();
+        loadSummaryData();
     }
-
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadSummaryData();
+    }
+    
     private void initializeViews() {
-        // Back button
         Button backButton = findViewById(R.id.back_button);
         backButton.setOnClickListener(v -> finish());
-
-        // Stats text views
-        totalDataPointsText = findViewById(R.id.total_data_points);
-        todayStatsText = findViewById(R.id.today_stats);
-        weekStatsText = findViewById(R.id.week_stats);
-
-        // Recent activity recycler
-        recentActivityRecycler = findViewById(R.id.recent_activity_recycler);
-        recentActivityRecycler.setLayoutManager(new LinearLayoutManager(this));
-        recentAdapter = new RecentSummaryAdapter();
-        recentActivityRecycler.setAdapter(recentAdapter);
-
-        // Data types recycler
+        
+        summaryText = findViewById(R.id.summary_text);
+        todayCountText = findViewById(R.id.today_count);
+        weekCountText = findViewById(R.id.week_count);
+        recentDataRecycler = findViewById(R.id.recent_data_recycler);
         dataTypesRecycler = findViewById(R.id.data_types_recycler);
-        dataTypesRecycler.setLayoutManager(new LinearLayoutManager(this, 
-            LinearLayoutManager.HORIZONTAL, false));
-        dataTypeAdapter = new DataTypeStatsAdapter();
-        dataTypesRecycler.setAdapter(dataTypeAdapter);
+        
+        // View all button
+        findViewById(R.id.view_all_button).setOnClickListener(v -> {
+            startActivity(new Intent(this, DataViewActivity.class));
+        });
     }
-
-    private void loadDataStats() {
-        try {
-            UniversalDataService.DataStats stats = dataService.getDataStats();
-            totalDataPointsText.setText(String.format("%,d", stats.totalCount));
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading data stats", e);
-            totalDataPointsText.setText("0");
-        }
+    
+    private void setupRecyclers() {
+        // Recent data - horizontal
+        recentAdapter = new RecentSummaryAdapter();
+        recentDataRecycler.setLayoutManager(
+                new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        recentDataRecycler.setAdapter(recentAdapter);
+        
+        // Data types - grid
+        statsAdapter = new DataTypeStatsAdapter();
+        dataTypesRecycler.setLayoutManager(new GridLayoutManager(this, 2));
+        dataTypesRecycler.setAdapter(statsAdapter);
     }
-
-    private void loadTodayStats() {
-        try {
-            // Get today's data
-            Calendar cal = Calendar.getInstance();
-            cal.set(Calendar.HOUR_OF_DAY, 0);
-            cal.set(Calendar.MINUTE, 0);
-            cal.set(Calendar.SECOND, 0);
-            long startOfDay = cal.getTimeInMillis();
-            long now = System.currentTimeMillis();
-
-            List<PersonalData> todayData = dataService.getDataInRange(startOfDay, now);
-            
-            // Count by type
-            Map<String, Integer> typeCounts = new HashMap<>();
-            int waterToday = 0;
-            
-            for (PersonalData data : todayData) {
-                String type = data.getType();
-                typeCounts.put(type, typeCounts.getOrDefault(type, 0) + 1);
+    
+    private void loadSummaryData() {
+        new Thread(() -> {
+            try {
+                // Time ranges
+                long now = System.currentTimeMillis();
+                long todayStart = getStartOfDay(now);
+                long weekStart = now - (7L * 24 * 60 * 60 * 1000);
                 
-                // Sum water intake
-                if ("water".equals(type)) {
-                    Object amount = data.getValue("amount");
-                    if (amount instanceof Number) {
-                        waterToday += ((Number) amount).intValue();
-                    }
+                // Get data
+                List<PersonalData> allData = dataService.getAllData();
+                List<PersonalData> todayData = dataService.getDataForTimeRange(todayStart, now);
+                List<PersonalData> weekData = dataService.getDataForTimeRange(weekStart, now);
+                
+                // Calculate stats
+                Map<String, Integer> typeStats = calculateTypeStats(allData);
+                List<DataTypeStat> statsList = new ArrayList<>();
+                
+                for (Map.Entry<String, Integer> entry : typeStats.entrySet()) {
+                    statsList.add(new DataTypeStat(
+                            entry.getKey(),
+                            getDisplayNameForType(entry.getKey()),
+                            getEmojiForType(entry.getKey()),
+                            entry.getValue()
+                    ));
                 }
-            }
-
-            // Format today's date
-            SimpleDateFormat dateFormat = new SimpleDateFormat("MMMM d", Locale.getDefault());
-            String todayDate = dateFormat.format(new Date());
-
-            // Count today's activities
-            int activitiesToday = todayData.size();
-
-            String todayStats = String.format(
-                    "%s\n💧 %dml water • 📊 %d activities logged",
-                    todayDate, waterToday, activitiesToday
-            );
-
-            todayStatsText.setText(todayStats);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading today stats: " + e.getMessage());
-            todayStatsText.setText("Today's data loading...");
-        }
-    }
-
-    private void loadWeekStats() {
-        try {
-            // Get this week's data
-            Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.DAY_OF_YEAR, -7);
-            long weekAgo = cal.getTimeInMillis();
-            long now = System.currentTimeMillis();
-
-            List<PersonalData> weekData = dataService.getDataInRange(weekAgo, now);
-            
-            // Calculate stats
-            Set<String> activeDays = new HashSet<>();
-            for (PersonalData data : weekData) {
-                cal.setTimeInMillis(data.getTimestamp());
-                String day = String.format("%d-%d-%d", 
-                    cal.get(Calendar.YEAR),
-                    cal.get(Calendar.MONTH),
-                    cal.get(Calendar.DAY_OF_MONTH));
-                activeDays.add(day);
-            }
-
-            String weekStats = String.format(
-                    "This Week\n📈 %d total activities • 🗓️ %d active days",
-                    weekData.size(), activeDays.size()
-            );
-
-            weekStatsText.setText(weekStats);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading week stats: " + e.getMessage());
-            weekStatsText.setText("Week's data loading...");
-        }
-    }
-
-    private void loadRecentActivity() {
-        try {
-            List<PersonalData> recentData = dataService.getRecentData(10);
-            List<RecentSummaryItem> recentItems = new ArrayList<>();
-            
-            SimpleDateFormat timeFormat = new SimpleDateFormat("h:mm a", Locale.getDefault());
-            
-            for (PersonalData data : recentData) {
-                String emoji = getEmojiForType(data.getType());
-                String title = getTitleForType(data.getType());
-                String summary = createSummaryForData(data);
-                String time = getRelativeTime(data.getTimestamp());
                 
-                recentItems.add(new RecentSummaryItem(emoji, title, summary, time));
-            }
-
-            recentAdapter.updateItems(recentItems);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading recent activity: " + e.getMessage());
-        }
-    }
-
-    private void loadDataTypeStats() {
-        try {
-            UniversalDataService.DataStats stats = dataService.getDataStats();
-            List<DataTypeStatItem> dataTypeStats = new ArrayList<>();
-
-            for (Map.Entry<String, Long> entry : stats.countByType.entrySet()) {
-                String type = entry.getKey();
-                long count = entry.getValue();
-                String emoji = getEmojiForType(type);
-                String displayName = getTitleForType(type);
+                // Sort by count
+                Collections.sort(statsList, (a, b) -> Integer.compare(b.count, a.count));
                 
-                dataTypeStats.add(new DataTypeStatItem(emoji, displayName, count));
+                // Get recent items (last 10)
+                List<PersonalData> recentItems = new ArrayList<>();
+                if (allData.size() > 0) {
+                    Collections.sort(allData, (a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
+                    int limit = Math.min(10, allData.size());
+                    recentItems = allData.subList(0, limit);
+                }
+                
+                // Update UI
+                runOnUiThread(() -> {
+                    summaryText.setText(allData.size() + " total data points");
+                    todayCountText.setText(String.valueOf(todayData.size()));
+                    weekCountText.setText(String.valueOf(weekData.size()));
+                    
+                    recentAdapter.updateData(recentItems);
+                    statsAdapter.updateStats(statsList);
+                });
+                
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-
-            // Sort by count descending
-            dataTypeStats.sort((a, b) -> Long.compare(b.count, a.count));
-            
-            dataTypeAdapter.updateItems(dataTypeStats);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading data type stats: " + e.getMessage());
-        }
+        }).start();
     }
-
-    private String getEmojiForType(String type) {
-        switch (type) {
-            case "water": return "💧";
-            case "mood": return "😊";
-            case "exercise": return "💪";
-            case "location": return "📍";
-            case "sleep": return "😴";
-            case "nutrition": return "🍎";
-            case "audio": return "🎤";
-            default: return "📊";
-        }
+    
+    private long getStartOfDay(long timestamp) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(timestamp);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
     }
-
-    private String getTitleForType(String type) {
+    
+    private Map<String, Integer> calculateTypeStats(List<PersonalData> data) {
+        Map<String, Integer> stats = new HashMap<>();
+        
+        for (PersonalData item : data) {
+            String type = item.getType();
+            stats.put(type, stats.getOrDefault(type, 0) + 1);
+        }
+        
+        return stats;
+    }
+    
+    private String getDisplayNameForType(String type) {
+        // Convert type to display name
         switch (type) {
             case "water": return "Water";
-            case "mood": return "Mood";
             case "exercise": return "Exercise";
-            case "location": return "Location";
+            case "mood": return "Mood";
             case "sleep": return "Sleep";
+            case "location": return "Location";
+            case "audio": return "Audio";
+            case "steps": return "Steps";
             case "nutrition": return "Nutrition";
-            case "audio": return "Audio Note";
+            case "focus": return "Focus";
+            case "relationships": return "Relationships";
             default: return type.substring(0, 1).toUpperCase() + type.substring(1);
         }
     }
-
-    private String createSummaryForData(PersonalData data) {
-        switch (data.getType()) {
-            case "water":
-                Object amount = data.getValue("amount");
-                return amount != null ? amount + "ml" : "Water logged";
-                
-            case "mood":
-                Object mood = data.getValue("mood");
-                return mood != null ? mood.toString() : "Mood logged";
-                
-            case "exercise":
-                Object activity = data.getValue("activity");
-                return activity != null ? activity.toString() : "Exercise logged";
-                
-            default:
-                return data.getType() + " recorded";
+    
+    private String getEmojiForType(String type) {
+        switch (type) {
+            case "water": return "💧";
+            case "exercise": return "💪";
+            case "mood": return "😊";
+            case "sleep": return "😴";
+            case "location": return "📍";
+            case "audio": return "🎙️";
+            case "steps": return "👣";
+            case "nutrition": return "🥗";
+            case "focus": return "🎯";
+            case "relationships": return "💞";
+            default: return "📊";
         }
     }
-
-    private String getRelativeTime(long timestamp) {
-        long diff = System.currentTimeMillis() - timestamp;
-        
-        if (diff < 60000) { // Less than 1 minute
-            return "Just now";
-        } else if (diff < 3600000) { // Less than 1 hour
-            return (diff / 60000) + " minutes ago";
-        } else if (diff < 86400000) { // Less than 1 day
-            return (diff / 3600000) + " hours ago";
-        } else if (diff < 172800000) { // Less than 2 days
-            return "Yesterday";
-        } else {
-            return (diff / 86400000) + " days ago";
-        }
-    }
-
-    // Data classes for adapters
-    static class RecentSummaryItem {
-        final String emoji;
-        final String title;
+    
+    /**
+     * Recent data item
+     */
+    private static class RecentSummary {
+        final String type;
         final String summary;
-        final String time;
-
-        RecentSummaryItem(String emoji, String title, String summary, String time) {
-            this.emoji = emoji;
-            this.title = title;
-            this.summary = summary;
-            this.time = time;
+        final long timestamp;
+        final String emoji;
+        
+        RecentSummary(PersonalData data) {
+            this.type = data.getType();
+            this.timestamp = data.getTimestamp();
+            this.emoji = getEmojiForType(data.getType());
+            
+            // Create summary based on type
+            Map<String, Object> dataMap = data.getData();
+            switch (type) {
+                case "water":
+                    int ml = (int) dataMap.getOrDefault("volume_ml", 0);
+                    this.summary = ml + "ml";
+                    break;
+                case "exercise":
+                    String exerciseType = (String) dataMap.getOrDefault("exercise_type", "Exercise");
+                    this.summary = exerciseType;
+                    break;
+                case "mood":
+                    int rating = (int) dataMap.getOrDefault("mood_rating", 3);
+                    this.summary = "Mood: " + rating + "/5";
+                    break;
+                case "sleep":
+                    double hours = (double) dataMap.getOrDefault("hours_slept", 0.0);
+                    this.summary = String.format("%.1fh sleep", hours);
+                    break;
+                default:
+                    this.summary = type;
+            }
+        }
+        
+        private static String getEmojiForType(String type) {
+            switch (type) {
+                case "water": return "💧";
+                case "exercise": return "💪";
+                case "mood": return "😊";
+                case "sleep": return "😴";
+                case "location": return "📍";
+                case "audio": return "🎙️";
+                case "steps": return "👣";
+                default: return "📊";
+            }
         }
     }
-
-    static class DataTypeStatItem {
+    
+    /**
+     * Data type statistics
+     */
+    private static class DataTypeStat {
+        final String type;
+        final String displayName;
         final String emoji;
-        final String name;
-        final long count;
-
-        DataTypeStatItem(String emoji, String name, long count) {
+        final int count;
+        
+        DataTypeStat(String type, String displayName, String emoji, int count) {
+            this.type = type;
+            this.displayName = displayName;
             this.emoji = emoji;
-            this.name = name;
             this.count = count;
         }
     }
-
-    // Simple adapter implementations
-    private static class RecentSummaryAdapter extends RecyclerView.Adapter<RecentSummaryAdapter.ViewHolder> {
-        private List<RecentSummaryItem> items = new ArrayList<>();
-
-        void updateItems(List<RecentSummaryItem> newItems) {
-            this.items = newItems;
+    
+    /**
+     * Recent summary adapter
+     */
+    private class RecentSummaryAdapter extends RecyclerView.Adapter<RecentSummaryAdapter.ViewHolder> {
+        private List<RecentSummary> items = new ArrayList<>();
+        
+        void updateData(List<PersonalData> data) {
+            items.clear();
+            for (PersonalData pd : data) {
+                items.add(new RecentSummary(pd));
+            }
             notifyDataSetChanged();
         }
-
+        
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view = android.view.LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_recent_summary, parent, false);
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_recent_data, parent, false);
             return new ViewHolder(view);
         }
-
+        
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
-            RecentSummaryItem item = items.get(position);
-            holder.bind(item);
+            holder.bind(items.get(position));
         }
-
+        
         @Override
         public int getItemCount() {
             return items.size();
         }
-
-        static class ViewHolder extends RecyclerView.ViewHolder {
-            TextView emojiText, titleText, summaryText, timeText;
-
+        
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView emojiText;
+            TextView typeText;
+            TextView summaryText;
+            TextView timeText;
+            
             ViewHolder(View itemView) {
                 super(itemView);
-                emojiText = itemView.findViewById(R.id.emoji_text);
-                titleText = itemView.findViewById(R.id.title_text);
-                summaryText = itemView.findViewById(R.id.summary_text);
-                timeText = itemView.findViewById(R.id.time_text);
+                emojiText = itemView.findViewById(R.id.emoji);
+                typeText = itemView.findViewById(R.id.type_text);
+                summaryText = itemView.findViewById(R.id.value_text);
+                timeText = itemView.findViewById(R.id.timestamp_text);
             }
-
-            void bind(RecentSummaryItem item) {
+            
+            void bind(RecentSummary item) {
                 emojiText.setText(item.emoji);
-                titleText.setText(item.title);
+                typeText.setText(item.type);
                 summaryText.setText(item.summary);
-                timeText.setText(item.time);
+                
+                SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.getDefault());
+                timeText.setText(sdf.format(new Date(item.timestamp)));
+                
+                itemView.setOnClickListener(v -> {
+                    // TODO: Open detail view
+                });
             }
         }
     }
-
-    private static class DataTypeStatsAdapter extends RecyclerView.Adapter<DataTypeStatsAdapter.ViewHolder> {
-        private List<DataTypeStatItem> items = new ArrayList<>();
-
-        void updateItems(List<DataTypeStatItem> newItems) {
-            this.items = newItems;
+    
+    /**
+     * Data type stats adapter
+     */
+    private class DataTypeStatsAdapter extends RecyclerView.Adapter<DataTypeStatsAdapter.ViewHolder> {
+        private List<DataTypeStat> stats = new ArrayList<>();
+        
+        void updateStats(List<DataTypeStat> newStats) {
+            this.stats = newStats;
             notifyDataSetChanged();
         }
-
+        
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view = android.view.LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_data_type_stat, parent, false);
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_data_type_card, parent, false);
             return new ViewHolder(view);
         }
-
+        
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
-            DataTypeStatItem item = items.get(position);
-            holder.bind(item);
+            holder.bind(stats.get(position));
         }
-
+        
         @Override
         public int getItemCount() {
-            return items.size();
+            return stats.size();
         }
-
-        static class ViewHolder extends RecyclerView.ViewHolder {
-            TextView emojiText, nameText, countText;
-
+        
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView emojiText;
+            TextView nameText;
+            TextView countText;
+            
             ViewHolder(View itemView) {
                 super(itemView);
-                emojiText = itemView.findViewById(R.id.emoji_text);
-                nameText = itemView.findViewById(R.id.name_text);
-                countText = itemView.findViewById(R.id.count_text);
+                emojiText = itemView.findViewById(R.id.type_emoji);
+                nameText = itemView.findViewById(R.id.type_name);
+                countText = itemView.findViewById(R.id.entry_count);
             }
-
-            void bind(DataTypeStatItem item) {
-                emojiText.setText(item.emoji);
-                nameText.setText(item.name);
-                countText.setText(String.valueOf(item.count));
+            
+            void bind(DataTypeStat stat) {
+                emojiText.setText(stat.emoji);
+                nameText.setText(stat.displayName);
+                countText.setText(stat.count + " entries");
+                
+                itemView.setOnClickListener(v -> {
+                    // Open filtered view for this type
+                    Intent intent = new Intent(DataSummaryActivity.this, DataViewActivity.class);
+                    intent.putExtra("filter_type", stat.type);
+                    startActivity(intent);
+                });
             }
         }
     }

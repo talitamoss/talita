@@ -1,167 +1,157 @@
 package com.core.talita;
 
-import org.json.JSONException;
-import org.json.JSONObject;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 /**
- * UniversalPersonalData - Universal format for all personal data
- * 
- * This is the standardized format that all data types convert to
- * before encryption and storage.
+ * UniversalPersonalData - Internal representation for data processing
+ * Used by UniversalDataService for data transformation
  */
-public class UniversalPersonalData implements PersonalDataInterface {
-    private final String type;
-    private final Map<String, Object> data;
-    private final long timestamp;
+public class UniversalPersonalData {
+    
+    private String type;
+    private Map<String, Object> data;
+    private Map<String, Object> metadata;
+    private long timestamp;
+    private String filePath;
+    private double latitude = 0.0;
+    private double longitude = 0.0;
     
     /**
-     * Create new universal data
+     * Default constructor
      */
-    public UniversalPersonalData(String type, Map<String, Object> data) {
-        this.type = type;
-        this.data = new HashMap<>(data);
-        this.timestamp = data.containsKey("timestamp") ? 
-            ((Number) data.get("timestamp")).longValue() : 
-            System.currentTimeMillis();
+    public UniversalPersonalData() {
+        this.data = new HashMap<>();
+        this.metadata = new HashMap<>();
+        this.timestamp = System.currentTimeMillis();
     }
     
     /**
-     * Create with explicit timestamp
+     * Constructor with type and data
+     */
+    public UniversalPersonalData(String type, Map<String, Object> data) {
+        this();
+        this.type = type;
+        this.data = data != null ? data : new HashMap<>();
+    }
+    
+    /**
+     * Constructor with type, data, and timestamp
      */
     public UniversalPersonalData(String type, Map<String, Object> data, long timestamp) {
-        this.type = type;
-        this.data = new HashMap<>(data);
+        this(type, data);
         this.timestamp = timestamp;
     }
     
-    @Override
+    // Getters
+    
     public String getType() {
         return type;
     }
     
-    @Override
     public Map<String, Object> getData() {
-        return new HashMap<>(data);
+        return data;
     }
     
-    @Override
     public Map<String, Object> getMetadata() {
-        // Extract metadata from data if present
-        if (data.containsKey("metadata") && data.get("metadata") instanceof Map) {
-            return new HashMap<>((Map<String, Object>) data.get("metadata"));
-        }
-        return new HashMap<>();
+        return metadata;
     }
     
-    @Override
     public long getTimestamp() {
         return timestamp;
     }
     
-    /**
-     * Get data type - alias for getType()
-     */
-    public String getDataType() {
-        return type;
+    public String getFilePath() {
+        return filePath;
+    }
+    
+    public double getLatitude() {
+        return latitude;
+    }
+    
+    public double getLongitude() {
+        return longitude;
+    }
+    
+    // Setters
+    
+    public void setType(String type) {
+        this.type = type;
+    }
+    
+    public void setData(Map<String, Object> data) {
+        this.data = data;
+    }
+    
+    public void setMetadata(Map<String, Object> metadata) {
+        this.metadata = metadata;
+    }
+    
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+    
+    public void setFilePath(String filePath) {
+        this.filePath = filePath;
+    }
+    
+    public void setLatitude(double latitude) {
+        this.latitude = latitude;
+    }
+    
+    public void setLongitude(double longitude) {
+        this.longitude = longitude;
     }
     
     /**
-     * Convert to JSON
+     * Convert to JSON string
      */
-    public String toJson() throws JSONException {
-        JSONObject json = new JSONObject();
-        json.put("type", type);
-        json.put("timestamp", timestamp);
-        
-        // Put all data
-        JSONObject dataJson = new JSONObject(data);
-        json.put("data", dataJson);
-        
-        return json.toString();
-    }
-    
-    /**
-     * Create from JSON
-     */
-    public static UniversalPersonalData fromJson(String jsonString) throws JSONException {
-        JSONObject json = new JSONObject(jsonString);
-        
-        String type = json.getString("type");
-        long timestamp = json.getLong("timestamp");
-        
-        // Parse data
-        Map<String, Object> data = new HashMap<>();
-        JSONObject dataJson = json.getJSONObject("data");
-        Iterator<String> keys = dataJson.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            data.put(key, dataJson.get(key));
-        }
-        
-        return new UniversalPersonalData(type, data, timestamp);
-    }
-    
-    /**
-     * Get a specific value from data
-     */
-    public Object getValue(String key) {
-        return data.get(key);
-    }
-    
-    /**
-     * Check if data contains a key
-     */
-    public boolean hasValue(String key) {
-        return data.containsKey(key);
-    }
-    
-    /**
-     * Create a summary string
-     */
-    public String createSummary() {
-        // Type-specific summaries
-        switch (type) {
-            case "water":
-                Object amount = getValue("amount");
-                return amount != null ? amount + "ml" : "Water logged";
-                
-            case "mood":
-                Object mood = getValue("mood");
-                Object score = getValue("score");
-                if (mood != null && score != null) {
-                    return mood + " (" + score + "/5)";
-                }
-                return "Mood logged";
-                
-            case "exercise":
-                Object activity = getValue("activity");
-                Object duration = getValue("duration");
-                if (activity != null) {
-                    return activity + (duration != null ? " - " + duration + " min" : "");
-                }
-                return "Exercise logged";
-                
-            default:
-                // Try to create a generic summary
-                if (data.containsKey("summary")) {
-                    return String.valueOf(data.get("summary"));
-                }
-                if (data.containsKey("display_name")) {
-                    return String.valueOf(data.get("display_name"));
-                }
-                return type + " recorded";
+    public String toJson() {
+        try {
+            Map<String, Object> json = new HashMap<>();
+            json.put("type", type);
+            json.put("timestamp", timestamp);
+            json.put("data", data);
+            json.put("metadata", metadata);
+            
+            if (filePath != null) {
+                json.put("filePath", filePath);
+            }
+            
+            if (latitude != 0.0 || longitude != 0.0) {
+                Map<String, Double> location = new HashMap<>();
+                location.put("latitude", latitude);
+                location.put("longitude", longitude);
+                json.put("location", location);
+            }
+            
+            // Simple JSON serialization
+            return serializeMap(json);
+        } catch (Exception e) {
+            return "{}";
         }
     }
     
-    @Override
-    public String toString() {
-        return "UniversalPersonalData{" +
-                "type='" + type + '\'' +
-                ", timestamp=" + timestamp +
-                ", dataSize=" + data.size() +
-                '}';
+    private String serializeMap(Map<String, Object> map) {
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            if (!first) sb.append(",");
+            sb.append("\"").append(entry.getKey()).append("\":");
+            
+            Object value = entry.getValue();
+            if (value instanceof String) {
+                sb.append("\"").append(value).append("\"");
+            } else if (value instanceof Map) {
+                sb.append(serializeMap((Map<String, Object>) value));
+            } else {
+                sb.append(value);
+            }
+            first = false;
+        }
+        
+        sb.append("}");
+        return sb.toString();
     }
 }

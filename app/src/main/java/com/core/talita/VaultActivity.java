@@ -1,303 +1,314 @@
 package com.core.talita;
 
+import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.view.View;
-import android.widget.*;
-import androidx.appcompat.app.AlertDialog;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
+import androidx.core.content.FileProvider;
 import java.io.File;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import androidx.core.content.FileProvider;
-import android.app.ProgressDialog;
+import java.util.*;
 
 /**
- * Vault Activity - User's data sovereignty center
- * Import, export, and manage data privacy
+ * VaultActivity - Data management and export
  */
 public class VaultActivity extends AppCompatActivity {
+    
     private static final String TAG = "VaultActivity";
-    private static final int PICK_FILE_REQUEST = 1001;
     
-    // UI Components
-    private TextView storageUsedText;
-    private ProgressBar storageProgressBar;
-    private CardView exportJsonCard;
-    private CardView exportCsvCard;
-    private CardView exportArchiveCard;
-    private CardView importDataCard;
-    private Switch encryptionSwitch;
-    private TextView encryptionStatusText;
-    private TextView lastBackupText;
-    private Button clearDataButton;
-    private BottomNavigationView bottomNav;
-    
-    // Services
     private UniversalDataService dataService;
     private LocalDataManager localDataManager;
+    private TextView totalDataItemsText;
+    private TextView databaseSizeText;
+    private TextView oldestDataText;
+    private TextView exportStatusText;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_vault);
         
-        dataService = new UniversalDataService(this);
+        dataService = UniversalDataService.getInstance(this);
         localDataManager = new LocalDataManager(this);
         
-        setupViews();
-        updateStorageInfo();
-        NavigationHelper.setupBottomNavigation(this, bottomNav, R.id.nav_vault);
+        initializeViews();
+        setupExportOptions();
+        updateDataStats();
     }
     
-    private void setupViews() {
-        // Find views
-        storageUsedText = findViewById(R.id.storage_used_text);
-        storageProgressBar = findViewById(R.id.storage_progress);
-        exportJsonCard = findViewById(R.id.export_json_card);
-        exportCsvCard = findViewById(R.id.export_csv_card);
-        exportArchiveCard = findViewById(R.id.export_archive_card);
-        importDataCard = findViewById(R.id.import_data_card);
-        encryptionSwitch = findViewById(R.id.encryption_switch);
-        encryptionStatusText = findViewById(R.id.encryption_status_text);
-        lastBackupText = findViewById(R.id.last_backup_text);
-        clearDataButton = findViewById(R.id.clear_data_button);
-        bottomNav = findViewById(R.id.bottom_navigation);
-        
-        // Set click listeners
-        exportJsonCard.setOnClickListener(v -> exportData("json"));
-        exportCsvCard.setOnClickListener(v -> exportData("csv"));
-        exportArchiveCard.setOnClickListener(v -> exportData("archive"));
-        importDataCard.setOnClickListener(v -> importData());
-        clearDataButton.setOnClickListener(v -> showClearDataDialog());
-        
-        // Encryption is always on
-        encryptionSwitch.setChecked(true);
-        encryptionSwitch.setEnabled(false);
-        encryptionStatusText.setText("AES-256-GCM • Hardware-backed");
-        
-        // Update last backup time
-        updateLastBackupTime();
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateDataStats();
     }
     
-    private void updateStorageInfo() {
-        // Calculate storage used
-        long totalSize = localDataManager.getDatabaseSize();
-        String sizeText = formatFileSize(totalSize);
+    private void initializeViews() {
+        Button backButton = findViewById(R.id.back_button);
+        backButton.setOnClickListener(v -> finish());
         
-        storageUsedText.setText(sizeText + " encrypted");
-        
-        // Update progress bar (assume 100MB limit for now)
-        long maxSize = 100 * 1024 * 1024; // 100MB
-        int progress = (int) ((totalSize * 100) / maxSize);
-        storageProgressBar.setProgress(Math.min(progress, 100));
+        totalDataItemsText = findViewById(R.id.total_data_items_text);
+        databaseSizeText = findViewById(R.id.database_size_text);
+        oldestDataText = findViewById(R.id.oldest_data_text);
+        exportStatusText = findViewById(R.id.export_status_text);
     }
     
-    private void exportData(String format) {
-        // Show export dialog
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Export Data");
+    private void setupExportOptions() {
+        // Export as CSV
+        CardView exportCsvCard = findViewById(R.id.export_csv_card);
+        exportCsvCard.setOnClickListener(v -> showExportDialog("csv"));
         
-        View dialogView = getLayoutInflater().inflate(R.layout.dialog_export_options, null);
-        CheckBox includeLocationCheck = dialogView.findViewById(R.id.include_location_check);
-        CheckBox includeAudioCheck = dialogView.findViewById(R.id.include_audio_check);
-        Spinner dateRangeSpinner = dialogView.findViewById(R.id.date_range_spinner);
+        // Export as JSON
+        CardView exportJsonCard = findViewById(R.id.export_json_card);
+        exportJsonCard.setOnClickListener(v -> showExportDialog("json"));
         
-        // Setup date range options
-        String[] dateRanges = {"All time", "Last 30 days", "Last 7 days", "Today"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, 
-            android.R.layout.simple_spinner_dropdown_item, dateRanges);
-        dateRangeSpinner.setAdapter(adapter);
+        // Export encrypted archive
+        CardView exportArchiveCard = findViewById(R.id.export_archive_card);
+        exportArchiveCard.setOnClickListener(v -> showExportDialog("archive"));
         
-        builder.setView(dialogView);
-        builder.setPositiveButton("Export", (dialog, which) -> {
-            boolean includeLocation = includeLocationCheck.isChecked();
-            boolean includeAudio = includeAudioCheck.isChecked();
-            String dateRange = (String) dateRangeSpinner.getSelectedItem();
-            
-            performExport(format, includeLocation, includeAudio, dateRange);
-        });
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
+        // Clear all data
+        CardView clearDataCard = findViewById(R.id.clear_data_card);
+        clearDataCard.setOnClickListener(v -> showClearDataDialog());
+        
+        // Import data
+        CardView importDataCard = findViewById(R.id.import_data_card);
+        importDataCard.setOnClickListener(v -> showImportDialog());
     }
     
-    private void performExport(String format, boolean includeLocation, 
-                              boolean includeAudio, String dateRange) {
-        // Show progress
-        ProgressDialog progressDialog = new ProgressDialog(this);
-        progressDialog.setMessage("Exporting data...");
-        progressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        progressDialog.show();
-        
-        // Export in background
+    private void updateDataStats() {
         new Thread(() -> {
             try {
-                // Create export file
-                String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", 
-                    Locale.getDefault()).format(new Date());
-                String fileName = "data_export_" + timestamp;
-                
-                File exportDir = new File(Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS), "YourApp");
-                if (!exportDir.exists()) {
-                    exportDir.mkdirs();
+                // Get stats
+                Map<String, Integer> stats = dataService.getDataStats();
+                int totalItems = 0;
+                for (int count : stats.values()) {
+                    totalItems += count;
                 }
                 
-                File exportFile = null;
-                switch (format) {
-                    case "json":
-                        exportFile = new File(exportDir, fileName + ".json");
-                        ExportManager.exportToJson(this, exportFile, dateRange, 
-                            includeLocation, includeAudio, progressDialog);
-                        break;
-                    case "csv":
-                        exportFile = new File(exportDir, fileName + ".csv");
-                        ExportManager.exportToCsv(this, exportFile, dateRange, 
-                            includeLocation, includeAudio, progressDialog);
-                        break;
-                    case "archive":
-                        exportFile = new File(exportDir, fileName + ".zip");
-                        ExportManager.exportToArchive(this, exportFile, dateRange, 
-                            includeLocation, includeAudio, progressDialog);
-                        break;
+                // Database size
+                File dbFile = getDatabasePath(AppConstants.DATABASE_NAME);
+                long dbSize = dbFile.exists() ? dbFile.length() : 0;
+                String sizeStr = formatFileSize(dbSize);
+                
+                // Oldest data
+                List<PersonalData> allData = dataService.getAllData();
+                String oldestStr = "No data";
+                if (!allData.isEmpty()) {
+                    // Sort by timestamp
+                    Collections.sort(allData, (a, b) -> Long.compare(a.getTimestamp(), b.getTimestamp()));
+                    PersonalData oldest = allData.get(0);
+                    SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy", Locale.getDefault());
+                    oldestStr = sdf.format(new Date(oldest.getTimestamp()));
                 }
                 
-                File finalExportFile = exportFile;
+                final int items = totalItems;
+                final String size = sizeStr;
+                final String oldest = oldestStr;
+                
                 runOnUiThread(() -> {
-                    progressDialog.dismiss();
-                    showExportSuccess(finalExportFile);
+                    totalDataItemsText.setText(items + " items");
+                    databaseSizeText.setText(size);
+                    oldestDataText.setText(oldest);
                 });
                 
             } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+    
+    private String formatFileSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        int exp = (int) (Math.log(bytes) / Math.log(1024));
+        String pre = "KMGTPE".charAt(exp-1) + "";
+        return String.format("%.1f %sB", bytes / Math.pow(1024, exp), pre);
+    }
+    
+    private void showExportDialog(String format) {
+        String[] options = {"All Time", "Last 7 Days", "Last 30 Days", "Custom Range"};
+        
+        new AlertDialog.Builder(this)
+                .setTitle("Select Export Range")
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0:
+                            exportData(format, "all", true, true);
+                            break;
+                        case 1:
+                            exportData(format, "week", true, true);
+                            break;
+                        case 2:
+                            exportData(format, "month", true, true);
+                            break;
+                        case 3:
+                            // TODO: Show date picker dialog
+                            Toast.makeText(this, "Custom range coming soon", Toast.LENGTH_SHORT).show();
+                            break;
+                    }
+                })
+                .show();
+    }
+    
+    private void exportData(String format, String range, boolean includeLocation, boolean includeMedia) {
+        ProgressDialog progress = new ProgressDialog(this);
+        progress.setMessage("Exporting data...");
+        progress.show();
+        
+        new Thread(() -> {
+            try {
+                // Create export directory
+                File exportDir = new File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "exports");
+                exportDir.mkdirs();
+                
+                // Generate filename
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
+                String timestamp = sdf.format(new Date());
+                String filename = "data_export_" + timestamp + "." + format;
+                File exportFile = new File(exportDir, filename);
+                
+                // Get data based on range
+                List<PersonalData> dataToExport;
+                if ("all".equals(range)) {
+                    dataToExport = dataService.getAllData();
+                } else {
+                    long endTime = System.currentTimeMillis();
+                    long startTime = endTime;
+                    
+                    switch (range) {
+                        case "week":
+                            startTime = endTime - (7L * 24 * 60 * 60 * 1000);
+                            break;
+                        case "month":
+                            startTime = endTime - (30L * 24 * 60 * 60 * 1000);
+                            break;
+                    }
+                    
+                    dataToExport = dataService.getDataForTimeRange(startTime, endTime);
+                }
+                
+                // Export based on format
+                boolean success = false;
+                switch (format) {
+                    case "csv":
+                        success = ExportManager.exportToCsv(this, dataToExport, exportFile.getAbsolutePath());
+                        break;
+                    case "json":
+                        success = ExportManager.exportToJson(this, dataToExport, exportFile.getAbsolutePath());
+                        break;
+                    case "archive":
+                        Map<String, List<PersonalData>> exportMap = dataService.exportAllData();
+                        success = ExportManager.exportToArchive(this, exportMap, includeMedia);
+                        break;
+                }
+                
+                final boolean exportSuccess = success;
+                final File finalFile = exportFile;
+                
                 runOnUiThread(() -> {
-                    progressDialog.dismiss();
-                    Toast.makeText(this, "Export failed: " + e.getMessage(), 
-                        Toast.LENGTH_LONG).show();
+                    progress.dismiss();
+                    
+                    if (exportSuccess) {
+                        exportStatusText.setText("Last export: " + new SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(new Date()));
+                        
+                        // Offer to share
+                        new AlertDialog.Builder(this)
+                                .setTitle("Export Complete")
+                                .setMessage("Data exported to:\n" + finalFile.getName())
+                                .setPositiveButton("Share", (d, w) -> shareFile(finalFile))
+                                .setNegativeButton("OK", null)
+                                .show();
+                    } else {
+                        Toast.makeText(this, "Export failed", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> {
+                    progress.dismiss();
+                    Toast.makeText(this, "Export error: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
             }
         }).start();
     }
     
-    private void showExportSuccess(File exportFile) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Export Complete");
-        builder.setMessage("Data exported to:\n" + exportFile.getPath());
-        builder.setPositiveButton("Share", (dialog, which) -> {
-            shareFile(exportFile);
-        });
-        builder.setNegativeButton("OK", null);
-        builder.show();
-    }
-    
     private void shareFile(File file) {
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        Uri fileUri = FileProvider.getUriForFile(this, 
-            getPackageName() + ".fileprovider", file);
-        shareIntent.setType("*/*");
-        shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(shareIntent, "Share export"));
-    }
-    
-    private void importData() {
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("*/*");
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(
-            Intent.createChooser(intent, "Select file to import"), 
-            PICK_FILE_REQUEST
-        );
-    }
-    
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
+        Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
         
-        if (requestCode == PICK_FILE_REQUEST && resultCode == RESULT_OK && data != null) {
-            Uri fileUri = data.getData();
-            if (fileUri != null) {
-                performImport(fileUri);
-            }
-        }
-    }
-    
-    private void performImport(Uri fileUri) {
-        // Show import options dialog
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Import Options");
-        builder.setMessage("How would you like to import this data?");
-        builder.setPositiveButton("Merge", (dialog, which) -> {
-            ImportManager.importData(this, fileUri, false);
-        });
-        builder.setNeutralButton("Replace", (dialog, which) -> {
-            showReplaceWarning(fileUri);
-        });
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
-    }
-    
-    private void showReplaceWarning(Uri fileUri) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("⚠️ Warning");
-        builder.setMessage("This will DELETE all existing data and replace it with the imported data. This cannot be undone!");
-        builder.setPositiveButton("Replace All", (dialog, which) -> {
-            ImportManager.importData(this, fileUri, true);
-        });
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("*/*");
+        shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        
+        startActivity(Intent.createChooser(shareIntent, "Share Export"));
     }
     
     private void showClearDataDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Clear All Data");
-        builder.setMessage("Are you sure? This will permanently delete all your data. This cannot be undone!");
-        builder.setPositiveButton("Clear All", (dialog, which) -> {
-            // Double confirmation
-            AlertDialog.Builder confirmBuilder = new AlertDialog.Builder(this);
-            confirmBuilder.setTitle("Final Confirmation");
-            confirmBuilder.setMessage("Type 'DELETE' to confirm");
-            
-            EditText input = new EditText(this);
-            confirmBuilder.setView(input);
-            
-            confirmBuilder.setPositiveButton("Confirm", (d, w) -> {
-                if ("DELETE".equals(input.getText().toString())) {
-                    clearAllData();
-                } else {
-                    Toast.makeText(this, "Confirmation failed", Toast.LENGTH_SHORT).show();
-                }
-            });
-            confirmBuilder.setNegativeButton("Cancel", null);
-            confirmBuilder.show();
-        });
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
+        new AlertDialog.Builder(this)
+                .setTitle("⚠️ Clear All Data")
+                .setMessage("This will permanently delete all your data. This cannot be undone.\n\nAre you sure?")
+                .setPositiveButton("Clear All", (dialog, which) -> {
+                    // Double confirmation
+                    new AlertDialog.Builder(this)
+                            .setTitle("Final Confirmation")
+                            .setMessage("This is your last chance. Delete everything?")
+                            .setPositiveButton("Yes, Delete All", (d, w) -> clearAllData())
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
     
     private void clearAllData() {
-        localDataManager.clearAllData();
-        updateStorageInfo();
-        Toast.makeText(this, "All data cleared", Toast.LENGTH_SHORT).show();
+        ProgressDialog progress = new ProgressDialog(this);
+        progress.setMessage("Clearing data...");
+        progress.show();
+        
+        new Thread(() -> {
+            try {
+                // Clear database
+                localDataManager.deleteDatabase();
+                
+                // Clear encrypted files
+                File encryptedDir = new File(getFilesDir(), "encrypted");
+                if (encryptedDir.exists()) {
+                    deleteRecursive(encryptedDir);
+                }
+                
+                runOnUiThread(() -> {
+                    progress.dismiss();
+                    Toast.makeText(this, "All data cleared", Toast.LENGTH_SHORT).show();
+                    updateDataStats();
+                });
+                
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> {
+                    progress.dismiss();
+                    Toast.makeText(this, "Error clearing data", Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
     }
     
-    private void updateLastBackupTime() {
-        // TODO: Get actual last backup time
-        lastBackupText.setText("Never backed up");
+    private void deleteRecursive(File fileOrDirectory) {
+        if (fileOrDirectory.isDirectory()) {
+            for (File child : fileOrDirectory.listFiles()) {
+                deleteRecursive(child);
+            }
+        }
+        fileOrDirectory.delete();
     }
     
-    private String formatFileSize(long size) {
-        if (size <= 0) return "0 B";
-        
-        final String[] units = {"B", "KB", "MB", "GB"};
-        int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
-        
-        return String.format("%.1f %s", 
-            size / Math.pow(1024, digitGroups), 
-            units[digitGroups]);
+    private void showImportDialog() {
+        Toast.makeText(this, "Import feature coming soon", Toast.LENGTH_SHORT).show();
+        // TODO: Implement import functionality
     }
 }

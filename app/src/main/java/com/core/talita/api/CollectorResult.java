@@ -1,58 +1,84 @@
 package com.core.talita.api;
 
+import java.util.Map;
+
 /**
- * Result of a data collection operation
+ * CollectorResult - Result of a data collection operation
  * 
- * File path: app/src/main/java/com/core/talita/api/CollectorResult.java
+ * Represents the outcome of attempting to collect data,
+ * including success/failure status and any collected data.
  */
 public class CollectorResult {
     
     public enum Status {
-        SUCCESS,
-        FAILURE,
-        PENDING,
-        CANCELLED
+        SUCCESS,    // Data collected successfully
+        FAILURE,    // Collection failed
+        PENDING,    // Collection in progress (e.g., user input dialog shown)
+        CANCELLED   // User cancelled the collection
     }
     
     private final Status status;
-    private final String type;
-    private final String message;
-    private final Object data;
+    private final String dataType;
+    private final Map<String, Object> data;
+    private final String errorMessage;
+    private final long timestamp;
     
-    private CollectorResult(Status status, String type, String message, Object data) {
+    private CollectorResult(Status status, String dataType, Map<String, Object> data, String errorMessage) {
         this.status = status;
-        this.type = type;
-        this.message = message;
+        this.dataType = dataType;
         this.data = data;
+        this.errorMessage = errorMessage;
+        this.timestamp = System.currentTimeMillis();
     }
     
-    // Static factory methods
-    
-    public static CollectorResult success() {
-        return new CollectorResult(Status.SUCCESS, null, null, null);
+    /**
+     * Create a successful result with data
+     */
+    public static CollectorResult success(String dataType, Map<String, Object> data) {
+        return new CollectorResult(Status.SUCCESS, dataType, data, null);
     }
     
-    public static CollectorResult success(String type, Object data) {
-        return new CollectorResult(Status.SUCCESS, type, null, data);
+    /**
+     * Create a failure result with error message
+     */
+    public static CollectorResult failure(String dataType, String errorMessage) {
+        return new CollectorResult(Status.FAILURE, dataType, null, errorMessage);
     }
     
-    public static CollectorResult failure(String type, String message) {
-        return new CollectorResult(Status.FAILURE, type, message, null);
+    /**
+     * Create a pending result (collection in progress)
+     */
+    public static CollectorResult pending(String dataType) {
+        return new CollectorResult(Status.PENDING, dataType, null, null);
     }
     
-    public static CollectorResult pending(String type) {
-        return new CollectorResult(Status.PENDING, type, "Operation pending", null);
-    }
-    
-    public static CollectorResult pending(String type, String message) {
-        return new CollectorResult(Status.PENDING, type, message, null);
-    }
-    
-    public static CollectorResult cancelled(String type) {
-        return new CollectorResult(Status.CANCELLED, type, "Operation cancelled", null);
+    /**
+     * Create a cancelled result
+     */
+    public static CollectorResult cancelled(String dataType) {
+        return new CollectorResult(Status.CANCELLED, dataType, null, "Collection cancelled by user");
     }
     
     // Getters
+    public Status getStatus() {
+        return status;
+    }
+    
+    public String getDataType() {
+        return dataType;
+    }
+    
+    public Map<String, Object> getData() {
+        return data;
+    }
+    
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+    
+    public long getTimestamp() {
+        return timestamp;
+    }
     
     public boolean isSuccess() {
         return status == Status.SUCCESS;
@@ -68,25 +94,5 @@ public class CollectorResult {
     
     public boolean isCancelled() {
         return status == Status.CANCELLED;
-    }
-    
-    public Status getStatus() {
-        return status;
-    }
-    
-    public String getType() {
-        return type;
-    }
-    
-    public String getMessage() {
-        return message;
-    }
-    
-    public String getErrorMessage() {
-        return message; // For backward compatibility
-    }
-    
-    public Object getData() {
-        return data;
     }
 }

@@ -1,27 +1,26 @@
-package com.core.talita.plugins.we;
+package com.core.talita.plugins.i;
 
 import android.content.Context;
 import android.graphics.Color;
 import com.core.talita.api.DataCollector;
 import com.core.talita.api.SimpleDataCollector;
-import com.core.talita.api.QuickAddConfig;
 import com.core.talita.plugins.DataCollectorPlugin;
 import com.core.talita.plugins.PluginCategories;
 
 /**
- * Focus Plugin - "We" category
- * Tracks shared focus sessions (work, study, collaboration)
+ * Substance Plugin - "I" category
+ * Tracks substance intake (caffeine, medication, supplements, etc.)
  */
-public class FocusPlugin extends DataCollectorPlugin {
+public class SubstancePlugin extends DataCollectorPlugin {
     
     @Override
     public String getPluginId() {
-        return "we.focus";
+        return "i.substance";
     }
     
     @Override
     public String getPluginName() {
-        return "Focus Sessions";
+        return "Substances";
     }
     
     @Override
@@ -36,22 +35,22 @@ public class FocusPlugin extends DataCollectorPlugin {
     
     @Override
     public String getCategory() {
-        return PluginCategories.WE;
+        return PluginCategories.I;
     }
     
     @Override
     public int getPriority() {
-        return 60;
+        return 50;
     }
     
     @Override
     public String getEmoji() {
-        return "🎯";
+        return "💊";
     }
     
     @Override
     public int getAccentColor() {
-        return Color.parseColor("#00BCD4");
+        return Color.parseColor("#9C27B0");
     }
     
     @Override
@@ -81,22 +80,22 @@ public class FocusPlugin extends DataCollectorPlugin {
     
     @Override
     public DataCollector createCollector(Context context) {
-        return new SimpleDataCollector.Builder("focus", "Focus Session")
-                .description("Track focus and concentration sessions")
-                .emoji("🎯")
-                .category(PluginCategories.WE)
-                .inputHint("What are you focusing on?")
+        return new SimpleDataCollector.Builder("substance", "Substance")
+                .description("Track medication, supplements, caffeine, etc.")
+                .emoji("💊")
+                .category(PluginCategories.I)
+                .inputHint("What substance? (e.g., Coffee, Vitamin D)")
                 .inputType(SimpleDataCollector.InputType.TEXT)
                 .build();
     }
     
     @Override
     public boolean hasSettings() {
-        return false;
+        return true;
     }
     
     @Override
     public void openSettings(Context context) {
-        // TODO: Settings screen
+        // TODO: Settings for reminders, dosage tracking, etc.
     }
 }

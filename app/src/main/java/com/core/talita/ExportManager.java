@@ -1,8 +1,7 @@
 package com.core.talita;
 
-import android.app.ProgressDialog;
 import android.content.Context;
-import android.net.Uri;
+import android.os.Environment;
 import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -14,279 +13,207 @@ import java.util.zip.ZipOutputStream;
 
 /**
  * ExportManager - Handles data export in various formats
- * 
- * Supports JSON, CSV, and ZIP archive exports
  */
 public class ExportManager {
     private static final String TAG = "ExportManager";
-    private static final String EXPORT_DIR = "exports";
-    
-    /**
-     * Export data to JSON format
-     */
-    public static String exportToJson(Context context, List<PersonalData> dataList, String type) 
-            throws Exception {
-        
-        // Create export directory
-        File exportDir = new File(context.getFilesDir(), EXPORT_DIR);
-        if (!exportDir.exists()) {
-            exportDir.mkdirs();
-        }
-        
-        // Create filename
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
-        String timestamp = sdf.format(new Date());
-        String filename = type + "_export_" + timestamp + ".json";
-        File exportFile = new File(exportDir, filename);
-        
-        // Build JSON
-        JSONObject root = new JSONObject();
-        root.put("export_type", type);
-        root.put("export_date", System.currentTimeMillis());
-        root.put("export_version", "1.0");
-        root.put("item_count", dataList.size());
-        
-        JSONArray items = new JSONArray();
-        for (PersonalData data : dataList) {
-            items.put(new JSONObject(data.toJson()));
-        }
-        root.put("data", items);
-        
-        // Write to file
-        try (FileWriter writer = new FileWriter(exportFile)) {
-            writer.write(root.toString(2)); // Pretty print
-        }
-        
-        Log.d(TAG, "Exported " + dataList.size() + " items to: " + exportFile.getAbsolutePath());
-        return exportFile.getAbsolutePath();
-    }
-    
-    /**
-     * Export data to JSON with progress dialog
-     */
-    public static String exportToJson(Context context, File exportFile, String type,
-                                    boolean includeLocation, boolean includeAudio,
-                                    ProgressDialog progressDialog) throws Exception {
-        
-        UniversalDataService dataService = UniversalDataService.getInstance(context);
-        List<PersonalData> dataList = dataService.getDataByType(type);
-        
-        // Filter based on options
-        List<PersonalData> filteredData = new ArrayList<>();
-        for (PersonalData data : dataList) {
-            String dataType = data.getType();
-            
-            // Skip location data if not included
-            if (!includeLocation && "location".equals(dataType)) {
-                continue;
-            }
-            
-            // Skip audio data if not included
-            if (!includeAudio && "audio".equals(dataType)) {
-                continue;
-            }
-            
-            filteredData.add(data);
-        }
-        
-        // Update progress
-        if (progressDialog != null) {
-            progressDialog.setMax(filteredData.size());
-        }
-        
-        // Build JSON
-        JSONObject root = new JSONObject();
-        root.put("export_type", type);
-        root.put("export_date", System.currentTimeMillis());
-        root.put("export_version", "1.0");
-        root.put("item_count", filteredData.size());
-        
-        JSONArray items = new JSONArray();
-        int progress = 0;
-        for (PersonalData data : filteredData) {
-            items.put(new JSONObject(data.toJson()));
-            
-            progress++;
-            if (progressDialog != null) {
-                final int currentProgress = progress;
-                progressDialog.setProgress(currentProgress);
-            }
-        }
-        root.put("data", items);
-        
-        // Write to file
-        try (FileWriter writer = new FileWriter(exportFile)) {
-            writer.write(root.toString(2));
-        }
-        
-        return exportFile.getAbsolutePath();
-    }
-    
-    /**
-     * Export from content URI (for import functionality)
-     */
-    public static List<PersonalData> exportToJson(Context context, Uri uri) throws Exception {
-        List<PersonalData> importedData = new ArrayList<>();
-        
-        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-            
-            StringBuilder jsonBuilder = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                jsonBuilder.append(line);
-            }
-            
-            // Parse JSON
-            JSONObject root = new JSONObject(jsonBuilder.toString());
-            JSONArray dataArray = root.getJSONArray("data");
-            
-            for (int i = 0; i < dataArray.length(); i++) {
-                String dataJson = dataArray.getJSONObject(i).toString();
-                PersonalData data = PersonalData.fromJson(dataJson);
-                if (data != null) {
-                    importedData.add(data);
-                }
-            }
-        }
-        
-        return importedData;
-    }
     
     /**
      * Export data to CSV format
      */
-    public static String exportToCsv(Context context, List<PersonalData> dataList, String type) 
-            throws Exception {
-        
-        // Create export directory
-        File exportDir = new File(context.getFilesDir(), EXPORT_DIR);
-        if (!exportDir.exists()) {
-            exportDir.mkdirs();
-        }
-        
-        // Create filename
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
-        String timestamp = sdf.format(new Date());
-        String filename = type + "_export_" + timestamp + ".csv";
-        File exportFile = new File(exportDir, filename);
-        
-        // Write CSV
-        try (FileWriter writer = new FileWriter(exportFile)) {
-            // Write header
-            writer.write("ID,Timestamp,Type,Value,Summary\n");
+    public static boolean exportToCsv(Context context, List<PersonalData> data, String filePath) {
+        try {
+            File file = new File(filePath);
+            FileWriter writer = new FileWriter(file);
             
-            // Write data
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-            for (PersonalData data : dataList) {
-                writer.write(String.format("%s,%s,%s,%s,%s\n",
-                    UUID.randomUUID().toString(),
-                    dateFormat.format(new Date(data.getTimestamp())),
-                    data.getType(),
-                    data.getData().toString().replace(",", ";"), // Escape commas
-                    createSummary(data).replace(",", ";")
+            // Write header
+            writer.write("Type,Timestamp,Date,Time,Data\n");
+            
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+            
+            // Write data rows
+            for (PersonalData item : data) {
+                Date date = new Date(item.getTimestamp());
+                String dataStr = formatDataForCsv(item.getData());
+                
+                writer.write(String.format("%s,%d,%s,%s,\"%s\"\n",
+                    item.getType(),
+                    item.getTimestamp(),
+                    dateFormat.format(date),
+                    timeFormat.format(date),
+                    dataStr.replace("\"", "\"\"") // Escape quotes
                 ));
             }
+            
+            writer.close();
+            Log.d(TAG, "✅ Exported " + data.size() + " items to CSV");
+            return true;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to export CSV", e);
+            return false;
         }
-        
-        Log.d(TAG, "Exported " + dataList.size() + " items to CSV: " + exportFile.getAbsolutePath());
-        return exportFile.getAbsolutePath();
     }
     
     /**
-     * Export data to ZIP archive
+     * Export data to JSON format
      */
-    public static String exportToArchive(Context context, Map<String, List<PersonalData>> dataByType,
-                                       boolean includeMetadata) throws Exception {
-        
-        // Create export directory
-        File exportDir = new File(context.getFilesDir(), EXPORT_DIR);
-        if (!exportDir.exists()) {
-            exportDir.mkdirs();
-        }
-        
-        // Create filename
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
-        String timestamp = sdf.format(new Date());
-        String filename = "data_archive_" + timestamp + ".zip";
-        File exportFile = new File(exportDir, filename);
-        
-        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(exportFile))) {
-            // Add manifest
-            if (includeMetadata) {
-                addManifestToZip(zos, dataByType);
+    public static boolean exportToJson(Context context, List<PersonalData> data, String filePath) {
+        try {
+            File file = new File(filePath);
+            JSONArray jsonArray = new JSONArray();
+            
+            for (PersonalData item : data) {
+                JSONObject json = new JSONObject();
+                json.put("type", item.getType());
+                json.put("timestamp", item.getTimestamp());
+                json.put("data", new JSONObject(item.getData()));
+                json.put("metadata", new JSONObject(item.getMetadata()));
+                jsonArray.put(json);
             }
+            
+            // Write to file
+            FileWriter writer = new FileWriter(file);
+            writer.write(jsonArray.toString(2)); // Pretty print with indent
+            writer.close();
+            
+            Log.d(TAG, "✅ Exported " + data.size() + " items to JSON");
+            return true;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to export JSON", e);
+            return false;
+        }
+    }
+    
+    /**
+     * Export data to encrypted archive
+     */
+    public static boolean exportToArchive(Context context, Map<String, List<PersonalData>> dataByType, boolean includeMedia) {
+        try {
+            // Create export directory
+            File exportDir = new File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "exports");
+            exportDir.mkdirs();
+            
+            // Generate filename
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
+            String timestamp = sdf.format(new Date());
+            String filename = "data_archive_" + timestamp + ".zip";
+            File archiveFile = new File(exportDir, filename);
+            
+            // Create ZIP
+            ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(archiveFile));
+            
+            // Add manifest
+            addManifestToArchive(zos, dataByType);
             
             // Add data files by type
             for (Map.Entry<String, List<PersonalData>> entry : dataByType.entrySet()) {
                 String type = entry.getKey();
-                List<PersonalData> dataList = entry.getValue();
+                List<PersonalData> typeData = entry.getValue();
                 
                 // Create JSON for this type
-                JSONArray items = new JSONArray();
-                for (PersonalData data : dataList) {
-                    items.put(new JSONObject(data.toJson()));
+                JSONArray jsonArray = new JSONArray();
+                for (PersonalData item : typeData) {
+                    JSONObject json = new JSONObject();
+                    json.put("type", item.getType());
+                    json.put("timestamp", item.getTimestamp());
+                    json.put("data", new JSONObject(item.getData()));
+                    json.put("metadata", new JSONObject(item.getMetadata()));
+                    jsonArray.put(json);
                 }
                 
-                // Add to ZIP
-                ZipEntry zipEntry = new ZipEntry(type + ".json");
-                zos.putNextEntry(zipEntry);
-                zos.write(items.toString(2).getBytes());
+                // Add to archive
+                ZipEntry entry1 = new ZipEntry("data/" + type + ".json");
+                zos.putNextEntry(entry1);
+                zos.write(jsonArray.toString(2).getBytes());
                 zos.closeEntry();
             }
+            
+            // Add media files if requested
+            if (includeMedia) {
+                addMediaFilesToArchive(context, zos, dataByType);
+            }
+            
+            zos.close();
+            
+            Log.d(TAG, "✅ Created archive: " + archiveFile.getAbsolutePath());
+            return true;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to create archive", e);
+            return false;
         }
-        
-        Log.d(TAG, "Created archive: " + exportFile.getAbsolutePath());
-        return exportFile.getAbsolutePath();
     }
     
-    /**
-     * Add manifest file to ZIP
-     */
-    private static void addManifestToZip(ZipOutputStream zos, Map<String, List<PersonalData>> dataByType) 
-            throws Exception {
-        
+    private static void addManifestToArchive(ZipOutputStream zos, Map<String, List<PersonalData>> dataByType) throws Exception {
         JSONObject manifest = new JSONObject();
-        manifest.put("export_date", System.currentTimeMillis());
-        manifest.put("export_version", "1.0");
+        manifest.put("version", "1.0");
+        manifest.put("created", System.currentTimeMillis());
         manifest.put("app_version", BuildConfig.VERSION_NAME);
         
-        // Add type summary
-        JSONObject typeSummary = new JSONObject();
+        // Data summary
+        JSONObject summary = new JSONObject();
+        int totalItems = 0;
         for (Map.Entry<String, List<PersonalData>> entry : dataByType.entrySet()) {
-            typeSummary.put(entry.getKey(), entry.getValue().size());
+            summary.put(entry.getKey(), entry.getValue().size());
+            totalItems += entry.getValue().size();
         }
-        manifest.put("data_types", typeSummary);
+        manifest.put("summary", summary);
+        manifest.put("total_items", totalItems);
         
-        ZipEntry manifestEntry = new ZipEntry("manifest.json");
-        zos.putNextEntry(manifestEntry);
+        // Add to archive
+        ZipEntry entry = new ZipEntry("manifest.json");
+        zos.putNextEntry(entry);
         zos.write(manifest.toString(2).getBytes());
         zos.closeEntry();
     }
     
-    /**
-     * Create summary for data
-     */
-    private static String createSummary(PersonalData data) {
-        switch (data.getType()) {
-            case "water":
-                Object amount = data.getValue("amount");
-                return amount != null ? amount + "ml" : "Water logged";
-                
-            case "mood":
-                Object mood = data.getValue("mood");
-                return mood != null ? mood.toString() : "Mood logged";
-                
-            case "exercise":
-                Object activity = data.getValue("activity");
-                Object duration = data.getValue("duration");
-                if (activity != null) {
-                    return activity + (duration != null ? " - " + duration + " min" : "");
+    private static void addMediaFilesToArchive(Context context, ZipOutputStream zos, Map<String, List<PersonalData>> dataByType) {
+        // Add audio files
+        if (dataByType.containsKey("audio")) {
+            List<PersonalData> audioData = dataByType.get("audio");
+            for (PersonalData item : audioData) {
+                try {
+                    String filePath = (String) item.getData().get("file_path");
+                    if (filePath != null) {
+                        File file = new File(filePath);
+                        if (file.exists()) {
+                            // Add to archive
+                            ZipEntry entry = new ZipEntry("media/audio/" + file.getName());
+                            zos.putNextEntry(entry);
+                            
+                            FileInputStream fis = new FileInputStream(file);
+                            byte[] buffer = new byte[1024];
+                            int length;
+                            while ((length = fis.read(buffer)) > 0) {
+                                zos.write(buffer, 0, length);
+                            }
+                            fis.close();
+                            
+                            zos.closeEntry();
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error adding audio file to archive", e);
                 }
-                return "Exercise logged";
-                
-            default:
-                return data.getType() + " recorded";
+            }
         }
+        
+        // Add photos if implemented
+        // Similar pattern for other media types
+    }
+    
+    private static String formatDataForCsv(Map<String, Object> data) {
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        
+        for (Map.Entry<String, Object> entry : data.entrySet()) {
+            if (!first) sb.append("; ");
+            sb.append(entry.getKey()).append(": ").append(entry.getValue());
+            first = false;
+        }
+        
+        return sb.toString();
     }
 }

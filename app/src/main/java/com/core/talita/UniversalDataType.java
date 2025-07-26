@@ -1,72 +1,51 @@
 package com.core.talita;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
- * UniversalDataType - Represents encrypted data stored in the database
- * 
- * This is what gets stored in SQLite after encryption
+ * UniversalDataType - Interface for all data types in the system
+ * Provides a common contract for data handling
  */
-public class UniversalDataType {
-    private long id;
-    private final String type;
-    private final String encryptedData;
-    private final long timestamp;
-    private final String summary;
+public interface UniversalDataType {
     
     /**
-     * Constructor for new data (no ID yet)
+     * Get the data type identifier
      */
-    public UniversalDataType(String type, String encryptedData, long timestamp, String summary) {
-        this.type = type;
-        this.encryptedData = encryptedData;
-        this.timestamp = timestamp;
-        this.summary = summary;
-    }
+    String getType();
     
     /**
-     * Constructor for data loaded from database (has ID)
+     * Get the unique ID
      */
-    public UniversalDataType(long id, String type, String encryptedData, long timestamp, String summary) {
-        this.id = id;
-        this.type = type;
-        this.encryptedData = encryptedData;
-        this.timestamp = timestamp;
-        this.summary = summary;
-    }
+    String getId();
     
-    // Getters
-    public long getId() {
-        return id;
-    }
+    /**
+     * Get the timestamp
+     */
+    long getTimestamp();
     
-    public String getType() {
-        return type;
-    }
+    /**
+     * Get metadata
+     */
+    Map<String, Object> getMetadata();
     
-    public String getEncryptedData() {
-        return encryptedData;
-    }
+    /**
+     * Get display name for UI
+     */
+    String getDisplayName();
     
-    public long getTimestamp() {
-        return timestamp;
-    }
+    /**
+     * Get display summary for UI
+     */
+    String getDisplaySummary();
     
-    public String getSummary() {
-        return summary;
-    }
+    /**
+     * Get latitude (0.0 if not location data)
+     */
+    double getLatitude();
     
-    // Setter for ID (set after database insert)
-    public void setId(long id) {
-        this.id = id;
-    }
-    
-    @Override
-    public String toString() {
-        return "UniversalDataType{" +
-                "id=" + id +
-                ", type='" + type + '\'' +
-                ", timestamp=" + timestamp +
-                ", summary='" + summary + '\'' +
-                ", dataLength=" + (encryptedData != null ? encryptedData.length() : 0) +
-                '}';
-    }
+    /**
+     * Get longitude (0.0 if not location data)
+     */
+    double getLongitude();
 }

@@ -39,66 +39,62 @@ public class AppConstants {
     // Tracking Service
     public static final int TRACKING_NOTIFICATION_ID = 1001;
     public static final long LOCATION_UPDATE_INTERVAL = 2 * 60 * 1000; // 2 minutes
-    public static final long LOCATION_FASTEST_INTERVAL = 30 * 1000; // 30 seconds
-    public static final float LOCATION_MIN_DISTANCE = 10.0f; // 10 meters
+    public static final long LOCATION_UPDATE_FASTEST = 30 * 1000; // 30 seconds
+    public static final float LOCATION_UPDATE_DISTANCE = 50f; // 50 meters
     
-    // Backup Service
-    public static final int BACKUP_NOTIFICATION_ID = 1002;
-    public static final long BACKUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
-    public static final int BACKUP_RETRY_COUNT = 3;
+    // Notification Channels
+    public static final String NOTIFICATION_CHANNEL_TRACKING = "tracking_channel";
+    public static final String NOTIFICATION_CHANNEL_REMINDERS = "reminders_channel";
+    public static final String NOTIFICATION_CHANNEL_BACKUP = "backup_channel";
     
-    // UI Constants
-    public static final int ANIMATION_DURATION = 300; // milliseconds
-    public static final int QUICK_ADD_COLUMNS = 3;
-    public static final int MAX_RECENT_ITEMS = 50;
+    // Permission Request Codes
+    public static final int PERMISSION_LOCATION = 100;
+    public static final int PERMISSION_AUDIO = 101;
+    public static final int PERMISSION_CAMERA = 102;
+    public static final int PERMISSION_STORAGE = 103;
+    public static final int PERMISSION_ACTIVITY_RECOGNITION = 104;
+    public static final int PERMISSION_BACKGROUND_LOCATION = 105;
     
-    // Plugin System
-    public static final String PLUGIN_MANIFEST_FILE = "plugin.json";
-    public static final String PLUGIN_API_VERSION = "1.0.0";
-    public static final String[] PLUGIN_CATEGORIES = {"I", "We", "All"};
+    // Activity Request Codes
+    public static final int REQUEST_ENABLE_BLUETOOTH = 200;
+    public static final int REQUEST_ENABLE_LOCATION = 201;
+    public static final int REQUEST_PICK_FILE = 202;
+    public static final int REQUEST_QR_SCAN = 203;
     
-    // Data Limits
-    public static final int MAX_AUDIO_DURATION = 5 * 60; // 5 minutes in seconds
-    public static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+    // Data Types
+    public static final String TYPE_LOCATION = "location";
+    public static final String TYPE_AUDIO = "audio";
+    public static final String TYPE_PHOTO = "photo";
+    public static final String TYPE_NOTE = "note";
+    public static final String TYPE_ACTIVITY = "activity";
+    public static final String TYPE_HEALTH = "health";
+    public static final String TYPE_MOOD = "mood";
+    public static final String TYPE_CUSTOM = "custom";
+    
+    // Time Constants
+    public static final long MINUTE_MILLIS = 60 * 1000;
+    public static final long HOUR_MILLIS = 60 * MINUTE_MILLIS;
+    public static final long DAY_MILLIS = 24 * HOUR_MILLIS;
+    public static final long WEEK_MILLIS = 7 * DAY_MILLIS;
+    public static final long MONTH_MILLIS = 30 * DAY_MILLIS;
+    
+    // Limits
+    public static final int MAX_AUDIO_DURATION_MINUTES = 30;
+    public static final int MAX_PHOTO_SIZE_MB = 10;
     public static final int MAX_EXPORT_ITEMS = 10000;
+    public static final int MAX_PLUGIN_COUNT = 50;
     
-    // Time Formats
-    public static final String DATE_FORMAT = "yyyy-MM-dd";
-    public static final String TIME_FORMAT = "HH:mm:ss";
-    public static final String DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
-    public static final String DISPLAY_DATE_FORMAT = "MMM dd, yyyy";
-    public static final String DISPLAY_TIME_FORMAT = "h:mm a";
+    // Debug
+    public static final boolean DEBUG_LOGGING = false; // Set to true for debug builds
+    public static final boolean ENABLE_CRASH_REPORTING = true;
+    public static final boolean ENABLE_ANALYTICS = false;
     
-    // Intent Extras
-    public static final String EXTRA_DATA_TYPE = "data_type";
-    public static final String EXTRA_DATA_ID = "data_id";
-    public static final String EXTRA_PLUGIN_ID = "plugin_id";
-    public static final String EXTRA_TIME_PERIOD = "time_period";
-    
-    // Request Codes
-    public static final int REQUEST_LOCATION_PERMISSION = 100;
-    public static final int REQUEST_AUDIO_PERMISSION = 101;
-    public static final int REQUEST_CAMERA_PERMISSION = 102;
-    public static final int REQUEST_ACTIVITY_RECOGNITION = 103;
-    public static final int REQUEST_NOTIFICATION_PERMISSION = 104;
-    public static final int REQUEST_BACKGROUND_LOCATION = 105;
-    
-    // Result Codes
-    public static final int RESULT_DATA_COLLECTED = 200;
-    public static final int RESULT_PLUGIN_INSTALLED = 201;
-    public static final int RESULT_EXPORT_COMPLETE = 202;
-    
-    // Debug Mode
-    public static final boolean DEBUG_LOGGING = BuildConfig.DEBUG;
-    public static final boolean DEBUG_ENCRYPTION = false; // Set to true to disable encryption for debugging
-    
-    // Cloud Providers
-    public static final String PROVIDER_GOOGLE_DRIVE = "google_drive";
-    public static final String PROVIDER_DROPBOX = "dropbox";
-    public static final String PROVIDER_SOLID_POD = "solid_pod";
+    // Features
+    public static final boolean FEATURE_CLOUD_BACKUP = true;
+    public static final boolean FEATURE_P2P_SYNC = false;
+    public static final boolean FEATURE_BLOCKCHAIN = false;
+    public static final boolean FEATURE_SOLID_POD = false;
     
     // Private constructor to prevent instantiation
-    private AppConstants() {
-        throw new AssertionError("AppConstants should not be instantiated");
-    }
+    private AppConstants() {}
 }

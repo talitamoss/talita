@@ -1,27 +1,26 @@
-package com.core.talita.plugins.we;
+package com.core.talita.plugins.i;
 
 import android.content.Context;
 import android.graphics.Color;
 import com.core.talita.api.DataCollector;
 import com.core.talita.api.SimpleDataCollector;
-import com.core.talita.api.QuickAddConfig;
 import com.core.talita.plugins.DataCollectorPlugin;
 import com.core.talita.plugins.PluginCategories;
 
 /**
- * Focus Plugin - "We" category
- * Tracks shared focus sessions (work, study, collaboration)
+ * Nutrition Plugin - "I" category
+ * Tracks food intake and nutrition
  */
-public class FocusPlugin extends DataCollectorPlugin {
+public class NutritionPlugin extends DataCollectorPlugin {
     
     @Override
     public String getPluginId() {
-        return "we.focus";
+        return "i.nutrition";
     }
     
     @Override
     public String getPluginName() {
-        return "Focus Sessions";
+        return "Nutrition";
     }
     
     @Override
@@ -36,22 +35,22 @@ public class FocusPlugin extends DataCollectorPlugin {
     
     @Override
     public String getCategory() {
-        return PluginCategories.WE;
+        return PluginCategories.I;
     }
     
     @Override
     public int getPriority() {
-        return 60;
+        return 70;
     }
     
     @Override
     public String getEmoji() {
-        return "🎯";
+        return "🥗";
     }
     
     @Override
     public int getAccentColor() {
-        return Color.parseColor("#00BCD4");
+        return Color.parseColor("#8BC34A");
     }
     
     @Override
@@ -81,11 +80,11 @@ public class FocusPlugin extends DataCollectorPlugin {
     
     @Override
     public DataCollector createCollector(Context context) {
-        return new SimpleDataCollector.Builder("focus", "Focus Session")
-                .description("Track focus and concentration sessions")
-                .emoji("🎯")
-                .category(PluginCategories.WE)
-                .inputHint("What are you focusing on?")
+        return new SimpleDataCollector.Builder("nutrition", "Nutrition")
+                .description("Track meals and nutrition")
+                .emoji("🥗")
+                .category(PluginCategories.I)
+                .inputHint("What did you eat?")
                 .inputType(SimpleDataCollector.InputType.TEXT)
                 .build();
     }
@@ -97,6 +96,6 @@ public class FocusPlugin extends DataCollectorPlugin {
     
     @Override
     public void openSettings(Context context) {
-        // TODO: Settings screen
+        // TODO: Settings screen for meal reminders, calorie goals, etc.
     }
 }
