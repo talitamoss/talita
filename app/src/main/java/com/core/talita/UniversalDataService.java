@@ -159,6 +159,48 @@ public class UniversalDataService {
     }
     
     /**
+     * Process data - alias for saveData for compatibility
+     */
+    public void processData(PersonalData data) {
+        saveData(data);
+    }
+    
+    /**
+     * Save PersonalData directly
+     */
+    public void saveData(PersonalData data) {
+        if (data == null) {
+            Log.e(TAG, "Cannot save null data");
+            return;
+        }
+        
+        // Convert PersonalData to PersonalDataInterface and capture it
+        PersonalDataInterface pdi = new PersonalDataInterface() {
+            @Override
+            public String getType() {
+                return data.getType();
+            }
+            
+            @Override
+            public Map<String, Object> getData() {
+                return data.getData();
+            }
+            
+            @Override
+            public Map<String, Object> getMetadata() {
+                return data.getMetadata();
+            }
+            
+            @Override
+            public long getTimestamp() {
+                return data.getTimestamp();
+            }
+        };
+        
+        capture(pdi);
+    }
+    
+    /**
      * Convert any PersonalDataInterface to UniversalPersonalData
      */
     private UniversalPersonalData convertToUniversal(PersonalDataInterface data) {
@@ -271,19 +313,52 @@ public class UniversalDataService {
     }
     
     /**
+     * Get data in range - alias for getDataForTimeRange
+     */
+    public List<PersonalData> getDataInRange(long startTime, long endTime) {
+        return getDataForTimeRange(startTime, endTime);
+    }
+    
+    /**
+     * Get today's data
+     */
+    public List<PersonalData> getTodaysData() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        
+        long startOfDay = cal.getTimeInMillis();
+        long endOfDay = System.currentTimeMillis();
+        
+        return getDataInRange(startOfDay, endOfDay);
+    }
+    
+    /**
+     * Get decrypted data by type
+     * Returns the raw DecryptedDataItem objects (still encrypted)
+     */
+    public List<DecryptedDataItem> getDecryptedDataByType(String type) {
+        return localDataManager.getDataByType(type, encryptionService);
+    }
+    
+    /**
      * Delete data item
      */
     public boolean deleteData(String dataId) {
         try {
             // Delete from local storage
-            boolean deleted = localDataManager.deleteDataItem(dataId);
+            boolean deleted = localDataManager.deleteData(dataId);
             
-            // Remove from cloud backup queue if present
-            if (cloudBackupManager.isEnabled()) {
+            if (deleted) {
+                // Remove from backup queue if present
                 cloudBackupManager.removeFromQueue(dataId);
+                Log.d(TAG, "🗑️ Deleted data: " + dataId);
             }
             
             return deleted;
+            
         } catch (Exception e) {
             Log.e(TAG, "Error deleting data", e);
             return false;
@@ -291,55 +366,65 @@ public class UniversalDataService {
     }
     
     /**
-     * Get data statistics
+     * Get data count by type
      */
-    public Map<String, Integer> getDataStats() {
-        Map<String, Integer> stats = new HashMap<>();
-        
-        try {
-            List<DecryptedDataItem> items = localDataManager.getAllDecryptedData(encryptionService);
-            
-            for (DecryptedDataItem item : items) {
-                String type = item.getType();
-                stats.put(type, stats.getOrDefault(type, 0) + 1);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting stats", e);
-        }
-        
-        return stats;
+    public Map<String, Integer> getDataCountByType() {
+        return localDataManager.getDataCountByType();
     }
     
     /**
-     * Export all data
+     * Get total data count
      */
-    public Map<String, List<PersonalData>> exportAllData() {
-        Map<String, List<PersonalData>> exportData = new HashMap<>();
-        
+    public int getTotalDataCount() {
+        return localDataManager.getTotalDataCount();
+    }
+    
+    /**
+     * Get database size in bytes
+     */
+    public long getDatabaseSize() {
+        return localDataManager.getDatabaseSize();
+    }
+    
+    /**
+     * Export all data to JSON
+     */
+    public String exportAllDataToJson() {
         try {
-            List<DecryptedDataItem> items = localDataManager.getAllDecryptedData(encryptionService);
+            List<PersonalData> allData = getAllData();
+            JSONObject export = new JSONObject();
+            export.put("export_date", System.currentTimeMillis());
+            export.put("data_count", allData.size());
             
-            for (DecryptedDataItem item : items) {
-                try {
-                    String decryptedJson = encryptionService.decryptData(item.getEncryptedData());
-                    if (decryptedJson != null) {
-                        PersonalData pd = PersonalData.fromJson(decryptedJson);
-                        if (pd != null) {
-                            String type = pd.getType();
-                            if (!exportData.containsKey(type)) {
-                                exportData.put(type, new ArrayList<>());
-                            }
-                            exportData.get(type).add(pd);
-                        }
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error decrypting item for export", e);
-                }
+            // Convert data to JSON array
+            List<JSONObject> dataArray = new ArrayList<>();
+            for (PersonalData pd : allData) {
+                dataArray.add(new JSONObject(pd.toJson()));
             }
+            export.put("data", dataArray);
+            
+            return export.toString(2); // Pretty print with 2-space indent
+            
         } catch (Exception e) {
             Log.e(TAG, "Error exporting data", e);
+            return null;
         }
-        
-        return exportData;
+    }
+    
+    /**
+     * Clear all data (use with caution!)
+     */
+    public boolean clearAllData() {
+        try {
+            boolean cleared = localDataManager.clearAllData();
+            if (cleared) {
+                cloudBackupManager.clearQueue();
+                Log.w(TAG, "⚠️ All data cleared!");
+            }
+            return cleared;
+        } catch (Exception e) {
+            Log.e(TAG, "Error clearing data", e);
+            return false;
+        }
     }
 }

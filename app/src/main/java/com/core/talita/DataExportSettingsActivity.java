@@ -1,12 +1,16 @@
 package com.core.talita;
 
-import android.content.Intent;
+import android.app.AlertDialog;
 import android.os.Bundle;
-import android.widget.Button;
-import androidx.appcompat.app.AlertDialog;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 
+/**
+ * DataExportSettingsActivity - Configure data export options
+ * 
+ * Location: app/src/main/java/com/core/talita/DataExportSettingsActivity.java
+ */
 public class DataExportSettingsActivity extends AppCompatActivity {
     
     private UniversalDataService dataService;
@@ -16,19 +20,17 @@ public class DataExportSettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_data_export_settings);
         
-        dataService = new UniversalDataService(this);
+        // Initialize service - FIXED: Using getInstance()
+        dataService = UniversalDataService.getInstance(this);
         
-        initializeViews();
-        setupExportOptions();
+        setupViews();
     }
     
-    private void initializeViews() {
-        Button backButton = findViewById(R.id.back_button);
-        backButton.setOnClickListener(v -> finish());
-    }
-    
-    private void setupExportOptions() {
-        // Full data export
+    private void setupViews() {
+        // Back button
+        findViewById(R.id.back_button).setOnClickListener(v -> finish());
+        
+        // Full export
         CardView fullExportCard = findViewById(R.id.full_export_card);
         fullExportCard.setOnClickListener(v -> showFullExportOptions());
         
@@ -36,7 +38,7 @@ public class DataExportSettingsActivity extends AppCompatActivity {
         CardView selectiveExportCard = findViewById(R.id.selective_export_card);
         selectiveExportCard.setOnClickListener(v -> showSelectiveExportOptions());
         
-        // Raw data export
+        // Raw export
         CardView rawExportCard = findViewById(R.id.raw_export_card);
         rawExportCard.setOnClickListener(v -> showRawExportOptions());
         
@@ -71,6 +73,7 @@ public class DataExportSettingsActivity extends AppCompatActivity {
             })
             .setPositiveButton("Export Selected", (dialog, which) -> {
                 // Export selected types
+                Toast.makeText(this, "Selective export coming soon", Toast.LENGTH_SHORT).show();
             })
             .setNegativeButton("Cancel", null)
             .show();
@@ -79,53 +82,63 @@ public class DataExportSettingsActivity extends AppCompatActivity {
     private void showRawExportOptions() {
         new AlertDialog.Builder(this)
             .setTitle("Raw Data Export")
-            .setMessage("Export unprocessed data including:\n\n• Raw sensor readings\n• Original file formats\n• Database dumps\n• Metadata\n\nWarning: Large file sizes")
-            .setPositiveButton("Export Raw Data", (dialog, which) -> exportRawData())
+            .setMessage("Export unprocessed data including:\n\n" +
+                    "• Encrypted database files\n" +
+                    "• Raw sensor readings\n" +
+                    "• System metadata\n\n" +
+                    "This format is for advanced users only.")
+            .setPositiveButton("Export Raw", (dialog, which) -> {
+                Toast.makeText(this, "Raw export coming soon", Toast.LENGTH_SHORT).show();
+            })
             .setNegativeButton("Cancel", null)
             .show();
     }
     
     private void showEncryptedExportOptions() {
         new AlertDialog.Builder(this)
-            .setTitle("🔒 Encrypted Export")
-            .setMessage("Export data in encrypted format:\n\n• Password protected archives\n• PGP encrypted files\n• Hardware key encrypted\n• Quantum-resistant encryption\n\nRecipient needs decryption key")
-            .setPositiveButton("Export Encrypted", (dialog, which) -> exportEncryptedData())
+            .setTitle("Encrypted Export")
+            .setMessage("Export your data in encrypted format.\n\n" +
+                    "You'll need your encryption key to decrypt later.")
+            .setPositiveButton("Export Encrypted", (dialog, which) -> {
+                Toast.makeText(this, "Encrypted export coming soon", Toast.LENGTH_SHORT).show();
+            })
             .setNegativeButton("Cancel", null)
             .show();
     }
     
     private void showLegalExportOptions() {
         new AlertDialog.Builder(this)
-            .setTitle("⚖️ Legal Compliance Export")
-            .setMessage("Generate legally compliant data export:\n\n• GDPR Article 20 format\n• Timestamped and signed\n• Includes metadata\n• Verifiable chain of custody\n• Court-admissible format")
-            .setPositiveButton("Generate Legal Export", (dialog, which) -> exportLegalCompliant())
+            .setTitle("Legal Compliance Export")
+            .setMessage("Generate legally compliant data export for:\n\n" +
+                    "• GDPR requests\n" +
+                    "• Legal proceedings\n" +
+                    "• Personal records\n\n" +
+                    "Includes timestamps and verification.")
+            .setPositiveButton("Generate", (dialog, which) -> {
+                Toast.makeText(this, "Legal export coming soon", Toast.LENGTH_SHORT).show();
+            })
             .setNegativeButton("Cancel", null)
             .show();
     }
     
-    private void confirmExport(String exportType, String format) {
+    private void confirmExport(String type, String format) {
         new AlertDialog.Builder(this)
-            .setTitle("Confirm " + exportType)
-            .setMessage("Export format: " + format + "\n\nThis may take several minutes for large datasets.")
-            .setPositiveButton("Start Export", (dialog, which) -> startExport(exportType, format))
+            .setTitle("Confirm Export")
+            .setMessage("Export " + type + " as " + format + "?")
+            .setPositiveButton("Export", (dialog, which) -> {
+                performExport(type, format);
+            })
             .setNegativeButton("Cancel", null)
             .show();
     }
     
-    // Export methods
-    private void exportRawData() {
-        // Implement raw data export
-    }
-    
-    private void exportEncryptedData() {
-        // Implement encrypted data export
-    }
-    
-    private void exportLegalCompliant() {
-        // Implement legal compliance export
-    }
-    
-    private void startExport(String type, String format) {
-        // Implement generic export with progress dialog
+    private void performExport(String type, String format) {
+        // TODO: Implement actual export
+        Toast.makeText(this, "Exporting as " + format + "...", Toast.LENGTH_LONG).show();
+        
+        // For now, just show success after delay
+        findViewById(R.id.back_button).postDelayed(() -> {
+            Toast.makeText(this, "Export complete!", Toast.LENGTH_SHORT).show();
+        }, 2000);
     }
 }

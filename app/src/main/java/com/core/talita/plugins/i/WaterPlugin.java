@@ -3,11 +3,16 @@ package com.core.talita.plugins.i;
 import android.content.Context;
 import android.graphics.Color;
 import com.core.talita.api.DataCollector;
-import com.core.talita.plugins.base.SimpleDataCollector;
+import com.core.talita.api.SimpleDataCollector;
+import com.core.talita.api.QuickAddConfig;
 import com.core.talita.plugins.DataCollectorPlugin;
+import com.core.talita.plugins.PluginCategories;
 
 /**
- * Water tracking plugin - uses SimpleDataCollector for easy implementation
+ * Water Plugin - "I" category
+ * Tracks water intake throughout the day
+ * 
+ * Location: app/src/main/java/com/core/talita/plugins/i/WaterPlugin.java
  */
 public class WaterPlugin extends DataCollectorPlugin {
     
@@ -22,7 +27,12 @@ public class WaterPlugin extends DataCollectorPlugin {
     }
     
     @Override
-    public String getPluginVersion() {
+    public String getDescription() {
+        return "Track your daily water consumption";
+    }
+    
+    @Override
+    public String getVersion() {
         return "1.0.0";
     }
     
@@ -33,12 +43,12 @@ public class WaterPlugin extends DataCollectorPlugin {
     
     @Override
     public String getCategory() {
-        return "i"; // Personal category
+        return PluginCategories.I;
     }
     
     @Override
     public int getPriority() {
-        return 100; // High priority
+        return 90; // High priority - commonly used
     }
     
     @Override
@@ -46,45 +56,39 @@ public class WaterPlugin extends DataCollectorPlugin {
         return "💧";
     }
     
-    @Override
     public int getAccentColor() {
-        return Color.parseColor("#3B82F6"); // Blue
+        return Color.parseColor("#2196F3");
     }
     
-    @Override
     public int getIconResource() {
-        return 0; // Use emoji
+        return 0; // Return actual resource ID if available
     }
     
-    @Override
     public String[] getRequiredPermissions() {
-        return new String[0];
+        return new String[0]; // No special permissions needed
     }
     
-    @Override
     public boolean requiresBackgroundTracking() {
         return false;
     }
     
-    @Override
     public boolean supportsQuickAdd() {
         return true;
     }
     
-    @Override
     public boolean supportsScheduling() {
-        return true; // For reminders
+        return true; // Can set reminders
     }
     
     @Override
     public DataCollector createCollector(Context context) {
         return new SimpleDataCollector.Builder("water", "Water Intake")
-            .description("Track your daily water consumption")
-            .emoji("💧")
-            .category("i")
-            .inputHint("Amount in ml")
-            .inputType(SimpleDataCollector.InputType.NUMBER)
-            .build();
+                .description("Track water consumption in ml")
+                .emoji("💧")
+                .category(PluginCategories.I)
+                .inputHint("Amount in ml")
+                .inputType(SimpleDataCollector.InputType.NUMBER)
+                .build();
     }
     
     @Override
@@ -94,16 +98,17 @@ public class WaterPlugin extends DataCollectorPlugin {
     
     @Override
     public void openSettings(Context context) {
-        // TODO: Open water settings (daily goal, reminders, etc.)
+        // TODO: Open water settings activity
     }
     
     @Override
     public QuickAddConfig getQuickAddConfig() {
-        return new QuickAddConfig(
-            "Water",
-            "Track hydration",
-            QuickAddConfig.QuickAddStyle.GRID,
-            true
-        );
+        return new QuickAddConfig.Builder()
+                .setTitle("Water")
+                .setDescription("Log water intake")
+                .setStyle("NUMERIC_INPUT")
+                .defaultValue(250)
+                .range(50, 1000)
+                .build();
     }
 }

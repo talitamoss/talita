@@ -1,221 +1,326 @@
 package com.core.talita;
 
-import android.animation.ObjectAnimator;
-import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
 import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.cardview.widget.CardView;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
- * Today Screen - The new home screen for Talita
- * Shows a breathing visualization of today's data
+ * TodayActivity - Shows today's data summary
+ * 
+ * Location: app/src/main/java/com/core/talita/TodayActivity.java
  */
 public class TodayActivity extends AppCompatActivity {
-    private static final String TAG = "TodayActivity";
     
-    // UI Components
-    private TextView dateText;
-    private TextView trackingStatusText;
-    private DataVisualizationView dataViz;
-    private BottomNavigationView bottomNav;
-    private FloatingActionButton quickAddFab;
-    private FloatingActionButton nowViewFab;
-    private FloatingActionButton moreOptionsFab;
-    private View fabOverlay;
-    
-    // Managers
-    private TrackingManager trackingManager;
     private DataCollectorManager collectorManager;
     private UniversalDataService dataService;
     
-    // Animation
-    private Handler animationHandler = new Handler();
-    private boolean isBreathing = true;
+    private TextView dateText;
+    private TextView summaryText;
+    private RecyclerView todayDataRecycler;
+    private RecyclerView quickAddRecycler;
+    private LinearLayout emptyView;
+    
+    private TodayDataAdapter dataAdapter;
+    private QuickAddAdapter quickAddAdapter;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_today);
         
-        // Initialize services
-        trackingManager = new TrackingManager(this);
-        collectorManager = new DataCollectorManager(this);
-        dataService = new UniversalDataService(this);
+        // Initialize services - FIXED: Using getInstance()
+        collectorManager = DataCollectorManager.getInstance(this);
+        dataService = UniversalDataService.getInstance(this);
         
-        setupViews();
-        setupBottomNavigation();
-        setupFloatingActions();
-        updateVisualization();
-        startBreathingAnimation();
-    }
-    
-    private void setupViews() {
-        dateText = findViewById(R.id.date_text);
-        trackingStatusText = findViewById(R.id.tracking_status);
-        dataViz = findViewById(R.id.data_visualization);
-        bottomNav = findViewById(R.id.bottom_navigation);
-        quickAddFab = findViewById(R.id.fab_quick_add);
-        nowViewFab = findViewById(R.id.fab_now_view);
-        moreOptionsFab = findViewById(R.id.fab_more);
-        fabOverlay = findViewById(R.id.fab_overlay);
-        
-        // Set today's date
-        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault());
-        dateText.setText(dateFormat.format(new Date()));
-        
-        // Update tracking status
-        updateTrackingStatus();
-    }
-    
-    private void setupBottomNavigation() {
-        bottomNav.setOnItemSelectedListener(item -> {
-            int itemId = item.getItemId();
-            
-            if (itemId == R.id.nav_today) {
-                // Already on Today screen
-                return true;
-            } else if (itemId == R.id.nav_capture) {
-                startActivity(new Intent(this, LogActivity.class));
-                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-                return true;
-            } else if (itemId == R.id.nav_my_data) {
-                startActivity(new Intent(this, MyDataActivity.class));
-                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-                return true;
-            } else if (itemId == R.id.nav_connect) {
-                startActivity(new Intent(this, ConnectActivity.class));
-                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-                return true;
-            } else if (itemId == R.id.nav_settings) {
-                startActivity(new Intent(this, SettingsActivity.class));
-                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-                return true;
-            }
-            
-            return false;
-        });
-        
-        // Set Today as selected
-        bottomNav.setSelectedItemId(R.id.nav_today);
-    }
-    
-    private void setupFloatingActions() {
-        quickAddFab.setOnClickListener(v -> {
-            toggleFabMenu();
-        });
-        
-        nowViewFab.setOnClickListener(v -> {
-            // Show current location/activity
-            showComingSoon("now view");
-        });
-        
-        moreOptionsFab.setOnClickListener(v -> {
-            showMoreOptions();
-        });
-        
-        fabOverlay.setOnClickListener(v -> {
-            if (fabOverlay.getVisibility() == View.VISIBLE) {
-                toggleFabMenu();
-            }
-        });
-    }
-    
-    private void toggleFabMenu() {
-        if (nowViewFab.getVisibility() == View.GONE) {
-            // Show menu
-            fabOverlay.setVisibility(View.VISIBLE);
-            fabOverlay.animate().alpha(1f).setDuration(200);
-            
-            nowViewFab.setVisibility(View.VISIBLE);
-            nowViewFab.animate().scaleX(1f).scaleY(1f).setDuration(200);
-            
-            moreOptionsFab.setVisibility(View.VISIBLE);
-            moreOptionsFab.animate().scaleX(1f).scaleY(1f).setDuration(200).setStartDelay(50);
-            
-            // Rotate main FAB
-            quickAddFab.animate().rotation(45f).setDuration(200);
-        } else {
-            // Hide menu
-            fabOverlay.animate().alpha(0f).setDuration(200).withEndAction(() -> 
-                fabOverlay.setVisibility(View.GONE));
-            
-            nowViewFab.animate().scaleX(0f).scaleY(0f).setDuration(200).withEndAction(() ->
-                nowViewFab.setVisibility(View.GONE));
-            
-            moreOptionsFab.animate().scaleX(0f).scaleY(0f).setDuration(200).withEndAction(() ->
-                moreOptionsFab.setVisibility(View.GONE));
-            
-            // Reset rotation
-            quickAddFab.animate().rotation(0f).setDuration(200);
-        }
-    }
-    
-    private void updateTrackingStatus() {
-        if (trackingManager != null && trackingManager.isTrackingEnabled()) {
-            trackingStatusText.setText("📍 Tracking Active");
-        } else {
-            trackingStatusText.setText("📍 Tracking Paused");
-        }
-    }
-    
-    private void updateVisualization() {
-        // Get today's data
-        List<PersonalData> todaysData = dataService.getTodaysData();
-        
-        // Update the visualization
-        dataViz.setData(todaysData);
-        
-        // Update breathing animation based on data density
-        if (todaysData.size() > 10) {
-            dataViz.setBreathingSpeed(3000); // Slower when more data
-        } else {
-            dataViz.setBreathingSpeed(2000); // Faster when less data
-        }
-    }
-    
-    private void startBreathingAnimation() {
-        animationHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (isBreathing) {
-                    dataViz.breathe();
-                    animationHandler.postDelayed(this, 2000);
-                }
-            }
-        }, 500);
-    }
-    
-    private void showMoreOptions() {
-        // Create bottom sheet with more options
-        MoreOptionsBottomSheet bottomSheet = new MoreOptionsBottomSheet();
-        bottomSheet.show(getSupportFragmentManager(), "more_options");
-    }
-    
-    private void showComingSoon(String feature) {
-        Intent intent = new Intent(this, ComingSoonActivity.class);
-        intent.putExtra("feature", feature);
-        startActivity(intent);
-        overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+        initializeViews();
+        loadTodayData();
+        setupQuickAdd();
     }
     
     @Override
     protected void onResume() {
         super.onResume();
-        updateVisualization();
-        updateTrackingStatus();
-        isBreathing = true;
+        loadTodayData(); // Refresh when returning
     }
     
-    @Override
-    protected void onPause() {
-        super.onPause();
-        isBreathing = false;
+    private void initializeViews() {
+        findViewById(R.id.back_button).setOnClickListener(v -> finish());
+        
+        dateText = findViewById(R.id.date_text);
+        summaryText = findViewById(R.id.summary_text);
+        todayDataRecycler = findViewById(R.id.today_data_recycler);
+        quickAddRecycler = findViewById(R.id.quick_add_recycler);
+        emptyView = findViewById(R.id.empty_view);
+        
+        // Set today's date
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault());
+        dateText.setText(dateFormat.format(new Date()));
+        
+        // Setup recyclers
+        dataAdapter = new TodayDataAdapter();
+        todayDataRecycler.setLayoutManager(new LinearLayoutManager(this));
+        todayDataRecycler.setAdapter(dataAdapter);
+        
+        quickAddAdapter = new QuickAddAdapter();
+        quickAddRecycler.setLayoutManager(new GridLayoutManager(this, 3));
+        quickAddRecycler.setAdapter(quickAddAdapter);
+        
+        // View all button
+        findViewById(R.id.view_all_button).setOnClickListener(v -> {
+            startActivity(new Intent(this, DataSummaryActivity.class));
+        });
+    }
+    
+    private void loadTodayData() {
+        new Thread(() -> {
+            try {
+                // Get today's data
+                List<PersonalData> todaysData = dataService.getTodaysData();
+                
+                // Group by type
+                Map<String, Integer> counts = new HashMap<>();
+                Map<String, String> lastValues = new HashMap<>();
+                
+                for (PersonalData data : todaysData) {
+                    String type = data.getType();
+                    counts.put(type, counts.getOrDefault(type, 0) + 1);
+                    
+                    // Store last value for display
+                    if (data.getData().containsKey("value")) {
+                        lastValues.put(type, data.getData().get("value").toString());
+                    }
+                }
+                
+                runOnUiThread(() -> {
+                    updateSummary(todaysData.size(), counts);
+                    dataAdapter.setData(buildSummaryItems(counts, lastValues));
+                    emptyView.setVisibility(todaysData.isEmpty() ? View.VISIBLE : View.GONE);
+                });
+                
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    summaryText.setText("Error loading data");
+                });
+            }
+        }).start();
+    }
+    
+    private void updateSummary(int totalEntries, Map<String, Integer> counts) {
+        if (totalEntries == 0) {
+            summaryText.setText("No data collected today");
+        } else {
+            StringBuilder summary = new StringBuilder();
+            summary.append(totalEntries).append(" entries today\n");
+            
+            // Highlight top categories
+            List<Map.Entry<String, Integer>> sorted = new ArrayList<>(counts.entrySet());
+            sorted.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+            
+            for (int i = 0; i < Math.min(3, sorted.size()); i++) {
+                Map.Entry<String, Integer> entry = sorted.get(i);
+                summary.append(getEmojiForType(entry.getKey()));
+                summary.append(" ").append(entry.getValue()).append(" ");
+            }
+            
+            summaryText.setText(summary.toString());
+        }
+    }
+    
+    private List<SummaryItem> buildSummaryItems(Map<String, Integer> counts, Map<String, String> lastValues) {
+        List<SummaryItem> items = new ArrayList<>();
+        
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            SummaryItem item = new SummaryItem();
+            item.type = entry.getKey();
+            item.count = entry.getValue();
+            item.lastValue = lastValues.get(entry.getKey());
+            item.emoji = getEmojiForType(entry.getKey());
+            items.add(item);
+        }
+        
+        // Sort by count
+        items.sort((a, b) -> b.count.compareTo(a.count));
+        
+        return items;
+    }
+    
+    private void setupQuickAdd() {
+        // Get collectors that support quick add
+        List<QuickAddItem> quickAddItems = new ArrayList<>();
+        
+        // Add common collectors
+        quickAddItems.add(new QuickAddItem("water", "Water", "💧"));
+        quickAddItems.add(new QuickAddItem("mood", "Mood", "😊"));
+        quickAddItems.add(new QuickAddItem("exercise", "Exercise", "💪"));
+        
+        quickAddAdapter.setItems(quickAddItems);
+    }
+    
+    private String getEmojiForType(String type) {
+        switch (type) {
+            case "water": return "💧";
+            case "mood": return "😊";
+            case "exercise": return "💪";
+            case "sleep": return "😴";
+            case "food": return "🍽️";
+            case "location": return "📍";
+            default: return "📝";
+        }
+    }
+    
+    // Data classes
+    
+    static class SummaryItem {
+        String type;
+        String emoji;
+        Integer count;
+        String lastValue;
+    }
+    
+    static class QuickAddItem {
+        String type;
+        String name;
+        String emoji;
+        
+        QuickAddItem(String type, String name, String emoji) {
+            this.type = type;
+            this.name = name;
+            this.emoji = emoji;
+        }
+    }
+    
+    // Adapters
+    
+    class TodayDataAdapter extends RecyclerView.Adapter<TodayDataAdapter.ViewHolder> {
+        private List<SummaryItem> items = new ArrayList<>();
+        
+        void setData(List<SummaryItem> items) {
+            this.items = items;
+            notifyDataSetChanged();
+        }
+        
+        @Override
+        public ViewHolder onCreateViewHolder(android.view.ViewGroup parent, int viewType) {
+            CardView card = new CardView(parent.getContext());
+            card.setLayoutParams(new RecyclerView.LayoutParams(
+                RecyclerView.LayoutParams.MATCH_PARENT,
+                RecyclerView.LayoutParams.WRAP_CONTENT));
+            card.setCardBackgroundColor(0xFF2A2A2A);
+            card.setRadius(8);
+            card.setContentPadding(16, 16, 16, 16);
+            card.setUseCompatPadding(true);
+            
+            return new ViewHolder(card);
+        }
+        
+        @Override
+        public void onBindViewHolder(ViewHolder holder, int position) {
+            holder.bind(items.get(position));
+        }
+        
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+        
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView textView;
+            
+            ViewHolder(View itemView) {
+                super(itemView);
+                textView = new TextView(itemView.getContext());
+                textView.setTextColor(0xFFFFFFFF);
+                ((CardView) itemView).addView(textView);
+            }
+            
+            void bind(SummaryItem item) {
+                String text = item.emoji + " " + item.type + ": " + item.count + " entries";
+                if (item.lastValue != null) {
+                    text += "\nLast: " + item.lastValue;
+                }
+                textView.setText(text);
+            }
+        }
+    }
+    
+    class QuickAddAdapter extends RecyclerView.Adapter<QuickAddAdapter.ViewHolder> {
+        private List<QuickAddItem> items = new ArrayList<>();
+        
+        void setItems(List<QuickAddItem> items) {
+            this.items = items;
+            notifyDataSetChanged();
+        }
+        
+        @Override
+        public ViewHolder onCreateViewHolder(android.view.ViewGroup parent, int viewType) {
+            CardView card = new CardView(parent.getContext());
+            GridLayoutManager.LayoutParams params = new GridLayoutManager.LayoutParams(
+                GridLayoutManager.LayoutParams.MATCH_PARENT,
+                200);
+            params.setMargins(8, 8, 8, 8);
+            card.setLayoutParams(params);
+            card.setCardBackgroundColor(0xFF3C3C3C);
+            card.setRadius(8);
+            card.setClickable(true);
+            card.setFocusable(true);
+            
+            return new ViewHolder(card);
+        }
+        
+        @Override
+        public void onBindViewHolder(ViewHolder holder, int position) {
+            holder.bind(items.get(position));
+        }
+        
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+        
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView emojiText;
+            TextView nameText;
+            
+            ViewHolder(View itemView) {
+                super(itemView);
+                
+                LinearLayout layout = new LinearLayout(itemView.getContext());
+                layout.setOrientation(LinearLayout.VERTICAL);
+                layout.setGravity(android.view.Gravity.CENTER);
+                layout.setPadding(16, 16, 16, 16);
+                
+                emojiText = new TextView(itemView.getContext());
+                emojiText.setTextSize(32);
+                emojiText.setGravity(android.view.Gravity.CENTER);
+                layout.addView(emojiText);
+                
+                nameText = new TextView(itemView.getContext());
+                nameText.setTextColor(0xFFFFFFFF);
+                nameText.setGravity(android.view.Gravity.CENTER);
+                layout.addView(nameText);
+                
+                ((CardView) itemView).addView(layout);
+            }
+            
+            void bind(QuickAddItem item) {
+                emojiText.setText(item.emoji);
+                nameText.setText(item.name);
+                
+                itemView.setOnClickListener(v -> {
+                    // TODO: Trigger collection for this type
+                    android.widget.Toast.makeText(v.getContext(), 
+                        "Add " + item.name, android.widget.Toast.LENGTH_SHORT).show();
+                });
+            }
+        }
     }
 }

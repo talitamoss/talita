@@ -25,6 +25,11 @@ public class RelationshipsPlugin extends DataCollectorPlugin {
     }
     
     @Override
+    public String getDescription() {
+        return "Track meaningful connections and interactions with others";
+    }
+    
+    @Override
     public String getVersion() {
         return "1.0.0";
     }
@@ -49,32 +54,26 @@ public class RelationshipsPlugin extends DataCollectorPlugin {
         return "💞";
     }
     
-    @Override
     public int getAccentColor() {
         return Color.parseColor("#E91E63");
     }
     
-    @Override
     public int getIconResource() {
         return 0;
     }
     
-    @Override
     public String[] getRequiredPermissions() {
         return new String[0];
     }
     
-    @Override
     public boolean requiresBackgroundTracking() {
         return false;
     }
     
-    @Override
     public boolean supportsQuickAdd() {
         return true;
     }
     
-    @Override
     public boolean supportsScheduling() {
         return false;
     }
@@ -90,12 +89,10 @@ public class RelationshipsPlugin extends DataCollectorPlugin {
                 .build();
     }
     
-    @Override
     public boolean hasSettings() {
         return false;
     }
     
-    @Override
     public void openSettings(Context context) {
         // TODO: Settings screen
     }

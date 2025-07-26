@@ -1,771 +1,590 @@
 package com.core.talita;
 
-import android.animation.ValueAnimator;
-import android.content.Context;
-import android.graphics.*;
+import android.graphics.Color;
 import android.os.Bundle;
-import android.util.AttributeSet;
-import android.view.LayoutInflater;
+import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.TextView;
+import android.widget.*;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.viewpager2.widget.ViewPager2;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.android.material.chip.Chip;
-import com.google.android.material.chip.ChipGroup;
-import com.google.android.material.tabs.TabLayout;
-import com.google.android.material.tabs.TabLayoutMediator;
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.charts.PieChart;
+import com.github.mikephil.charting.charts.RadarChart;
+import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.data.*;
+import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
- * Patterns Activity - Where users discover connections in their data
- * Three views: Timeline, Grid, Flow
+ * PatternsActivity - Advanced data visualization and pattern analysis
+ * 
+ * Location: app/src/main/java/com/core/talita/PatternsActivity.java
  */
 public class PatternsActivity extends AppCompatActivity {
     private static final String TAG = "PatternsActivity";
     
+    // Time range constants
+    private static final long DAY_MS = 24 * 60 * 60 * 1000;
+    private static final long WEEK_MS = 7 * DAY_MS;
+    private static final long MONTH_MS = 30 * DAY_MS;
+    
     // UI Components
-    private TabLayout viewModeTabs;
-    private ViewPager2 viewPager;
-    private ChipGroup timeRangeChips;
-    private RecyclerView insightsRecycler;
-    private BottomNavigationView bottomNav;
+    private Spinner timeRangeSpinner;
+    private Spinner patternTypeSpinner;
+    private LinearLayout chartsContainer;
+    private TextView insightsText;
+    private ProgressBar loadingProgress;
     
     // Data
     private UniversalDataService dataService;
-    private PatternAnalyzer patternAnalyzer;
-    private List<PatternInsight> insights;
+    private PatternAnalyzer analyzer;
     
-    // Time ranges
-    private enum TimeRange {
-        DAY("Today", 1),
-        WEEK("Week", 7),
-        MONTH("Month", 30),
-        YEAR("Year", 365);
-        
-        final String label;
-        final int days;
-        
-        TimeRange(String label, int days) {
-            this.label = label;
-            this.days = days;
-        }
-    }
+    // Charts
+    private LineChart timelineChart;
+    private PieChart distributionChart;
+    private RadarChart correlationChart;
     
-    private TimeRange currentTimeRange = TimeRange.WEEK;
+    // Current state
+    private long currentStartTime;
+    private long currentEndTime;
+    private String currentPatternType = "overview";
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_patterns);
         
-        dataService = new UniversalDataService(this);
-        patternAnalyzer = new PatternAnalyzer(this);
+        // Initialize services - FIXED: Using getInstance()
+        dataService = UniversalDataService.getInstance(this);
+        analyzer = new PatternAnalyzer();
         
-        setupViews();
-        setupViewPager();
-        setupTimeRangeSelector();
-        setupBottomNavigation();
-        
-        loadPatterns();
+        initializeViews();
+        setupSpinners();
+        loadInitialData();
     }
     
-    private void setupViews() {
-        viewModeTabs = findViewById(R.id.view_mode_tabs);
-        viewPager = findViewById(R.id.view_pager);
-        timeRangeChips = findViewById(R.id.time_range_chips);
-        insightsRecycler = findViewById(R.id.insights_recycler);
-        bottomNav = findViewById(R.id.bottom_navigation);
+    private void initializeViews() {
+        // Navigation
+        findViewById(R.id.back_button).setOnClickListener(v -> finish());
         
-        // Setup insights recycler
-        insightsRecycler.setLayoutManager(new LinearLayoutManager(this));
+        // Spinners
+        timeRangeSpinner = findViewById(R.id.time_range_spinner);
+        patternTypeSpinner = findViewById(R.id.pattern_type_spinner);
+        
+        // Containers
+        chartsContainer = findViewById(R.id.charts_container);
+        insightsText = findViewById(R.id.insights_text);
+        loadingProgress = findViewById(R.id.loading_progress);
+        
+        // Action buttons
+        findViewById(R.id.refresh_button).setOnClickListener(v -> refreshData());
+        findViewById(R.id.export_button).setOnClickListener(v -> exportPatterns());
+        findViewById(R.id.share_button).setOnClickListener(v -> shareInsights());
     }
     
-    private void setupViewPager() {
-        PatternsPagerAdapter adapter = new PatternsPagerAdapter(this);
-        viewPager.setAdapter(adapter);
+    private void setupSpinners() {
+        // Time range options
+        ArrayAdapter<String> timeAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item,
+                new String[]{"Last 24 Hours", "Last Week", "Last Month", "All Time"});
+        timeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        timeRangeSpinner.setAdapter(timeAdapter);
         
-        // Connect tabs to ViewPager
-        new TabLayoutMediator(viewModeTabs, viewPager,
-            (tab, position) -> {
-                switch (position) {
-                    case 0: tab.setText("Timeline"); break;
-                    case 1: tab.setText("Grid"); break;
-                    case 2: tab.setText("Flow"); break;
-                }
-            }
-        ).attach();
-        
-        // Update insights when page changes
-        viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+        timeRangeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
-            public void onPageSelected(int position) {
-                updateInsights();
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                updateTimeRange(position);
+                refreshData();
             }
+            
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        
+        // Pattern type options
+        ArrayAdapter<String> patternAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item,
+                new String[]{"Overview", "Correlations", "Trends", "Anomalies", "Predictions"});
+        patternAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        patternTypeSpinner.setAdapter(patternAdapter);
+        
+        patternTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                updatePatternType(position);
+                refreshData();
+            }
+            
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
         });
     }
     
-    private void setupTimeRangeSelector() {
-        for (TimeRange range : TimeRange.values()) {
-            Chip chip = new Chip(this);
-            chip.setText(range.label);
-            chip.setCheckable(true);
-            chip.setChecked(range == currentTimeRange);
+    private void updateTimeRange(int position) {
+        long now = System.currentTimeMillis();
+        switch (position) {
+            case 0: // Last 24 hours
+                currentStartTime = now - DAY_MS;
+                break;
+            case 1: // Last week
+                currentStartTime = now - WEEK_MS;
+                break;
+            case 2: // Last month
+                currentStartTime = now - MONTH_MS;
+                break;
+            case 3: // All time
+                currentStartTime = 0;
+                break;
+        }
+        currentEndTime = now;
+    }
+    
+    private void updatePatternType(int position) {
+        String[] types = {"overview", "correlations", "trends", "anomalies", "predictions"};
+        currentPatternType = types[position];
+    }
+    
+    private void loadInitialData() {
+        // Set default time range
+        updateTimeRange(1); // Last week
+        refreshData();
+    }
+    
+    private void refreshData() {
+        showLoading(true);
+        
+        // Load data in background
+        new Thread(() -> {
+            try {
+                // Get data for time range
+                List<PersonalData> data = dataService.getDataInRange(currentStartTime, currentEndTime);
+                
+                // Analyze patterns
+                PatternAnalyzer.AnalysisResult result = analyzer.analyze(data, currentPatternType);
+                
+                // Update UI on main thread
+                runOnUiThread(() -> {
+                    displayResults(result);
+                    showLoading(false);
+                });
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Error analyzing patterns", e);
+                runOnUiThread(() -> {
+                    showError("Failed to analyze patterns: " + e.getMessage());
+                    showLoading(false);
+                });
+            }
+        }).start();
+    }
+    
+    private void displayResults(PatternAnalyzer.AnalysisResult result) {
+        // Clear previous charts
+        chartsContainer.removeAllViews();
+        
+        // Display based on pattern type
+        switch (currentPatternType) {
+            case "overview":
+                displayOverview(result);
+                break;
+            case "correlations":
+                displayCorrelations(result);
+                break;
+            case "trends":
+                displayTrends(result);
+                break;
+            case "anomalies":
+                displayAnomalies(result);
+                break;
+            case "predictions":
+                displayPredictions(result);
+                break;
+        }
+        
+        // Update insights
+        displayInsights(result.getInsights());
+    }
+    
+    private void displayOverview(PatternAnalyzer.AnalysisResult result) {
+        // Create timeline chart
+        createTimelineChart(result.getTimelineData());
+        
+        // Create distribution pie chart
+        createDistributionChart(result.getDistributionData());
+        
+        // Add summary cards
+        createSummaryCards(result.getSummaryStats());
+    }
+    
+    private void createTimelineChart(Map<String, List<PatternAnalyzer.TimePoint>> timelineData) {
+        // Create chart view
+        timelineChart = new LineChart(this);
+        timelineChart.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 600));
+        
+        // Configure chart
+        timelineChart.getDescription().setEnabled(false);
+        timelineChart.setTouchEnabled(true);
+        timelineChart.setDragEnabled(true);
+        timelineChart.setScaleEnabled(true);
+        timelineChart.setPinchZoom(true);
+        timelineChart.setBackgroundColor(Color.parseColor("#1A1A1A"));
+        timelineChart.setGridBackgroundColor(Color.parseColor("#1A1A1A"));
+        
+        // Prepare data sets
+        List<ILineDataSet> dataSets = new ArrayList<>();
+        int colorIndex = 0;
+        int[] colors = {Color.CYAN, Color.MAGENTA, Color.YELLOW, Color.GREEN, Color.RED};
+        
+        for (Map.Entry<String, List<PatternAnalyzer.TimePoint>> entry : timelineData.entrySet()) {
+            List<Entry> entries = new ArrayList<>();
+            List<PatternAnalyzer.TimePoint> points = entry.getValue();
             
-            chip.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                if (isChecked) {
-                    currentTimeRange = range;
-                    loadPatterns();
+            for (int i = 0; i < points.size(); i++) {
+                entries.add(new Entry(i, points.get(i).getValue()));
+            }
+            
+            LineDataSet dataSet = new LineDataSet(entries, entry.getKey());
+            dataSet.setColor(colors[colorIndex % colors.length]);
+            dataSet.setCircleColor(colors[colorIndex % colors.length]);
+            dataSet.setLineWidth(2f);
+            dataSet.setCircleRadius(3f);
+            dataSet.setDrawCircleHole(false);
+            dataSet.setValueTextSize(9f);
+            dataSet.setValueTextColor(Color.WHITE);
+            dataSet.setDrawFilled(true);
+            dataSet.setFillAlpha(50);
+            dataSet.setFillColor(colors[colorIndex % colors.length]);
+            
+            dataSets.add(dataSet);
+            colorIndex++;
+        }
+        
+        // Set data
+        LineData lineData = new LineData(dataSets);
+        timelineChart.setData(lineData);
+        
+        // Configure axes
+        XAxis xAxis = timelineChart.getXAxis();
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xAxis.setTextColor(Color.WHITE);
+        xAxis.setDrawGridLines(false);
+        
+        timelineChart.getAxisLeft().setTextColor(Color.WHITE);
+        timelineChart.getAxisRight().setEnabled(false);
+        timelineChart.getLegend().setTextColor(Color.WHITE);
+        
+        // Add to container
+        CardView card = createChartCard("Activity Timeline");
+        ((LinearLayout) card.findViewById(R.id.chart_container)).addView(timelineChart);
+        chartsContainer.addView(card);
+        
+        timelineChart.animateX(1000);
+    }
+    
+    private void createDistributionChart(Map<String, Float> distributionData) {
+        // Create chart view
+        distributionChart = new PieChart(this);
+        distributionChart.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 500));
+        
+        // Configure chart
+        distributionChart.getDescription().setEnabled(false);
+        distributionChart.setUsePercentValues(true);
+        distributionChart.setExtraOffsets(5, 10, 5, 5);
+        distributionChart.setDragDecelerationFrictionCoef(0.95f);
+        distributionChart.setDrawHoleEnabled(true);
+        distributionChart.setHoleColor(Color.parseColor("#1A1A1A"));
+        distributionChart.setTransparentCircleRadius(61f);
+        distributionChart.setHoleRadius(58f);
+        distributionChart.setRotationAngle(0);
+        distributionChart.setRotationEnabled(true);
+        distributionChart.setHighlightPerTapEnabled(true);
+        
+        // Prepare data
+        List<PieEntry> entries = new ArrayList<>();
+        for (Map.Entry<String, Float> entry : distributionData.entrySet()) {
+            entries.add(new PieEntry(entry.getValue(), entry.getKey()));
+        }
+        
+        PieDataSet dataSet = new PieDataSet(entries, "Distribution");
+        dataSet.setSliceSpace(3f);
+        dataSet.setSelectionShift(5f);
+        
+        // Set colors
+        List<Integer> colors = new ArrayList<>();
+        colors.add(Color.parseColor("#FF6384"));
+        colors.add(Color.parseColor("#36A2EB"));
+        colors.add(Color.parseColor("#FFCE56"));
+        colors.add(Color.parseColor("#4BC0C0"));
+        colors.add(Color.parseColor("#9966FF"));
+        dataSet.setColors(colors);
+        
+        PieData pieData = new PieData(dataSet);
+        pieData.setValueTextSize(11f);
+        pieData.setValueTextColor(Color.WHITE);
+        
+        distributionChart.setData(pieData);
+        distributionChart.getLegend().setTextColor(Color.WHITE);
+        
+        // Add to container
+        CardView card = createChartCard("Data Distribution");
+        ((LinearLayout) card.findViewById(R.id.chart_container)).addView(distributionChart);
+        chartsContainer.addView(card);
+        
+        distributionChart.animateY(1000);
+    }
+    
+    private void displayCorrelations(PatternAnalyzer.AnalysisResult result) {
+        // Create correlation matrix visualization
+        createCorrelationMatrix(result.getCorrelations());
+        
+        // Show correlation insights
+        createCorrelationCards(result.getTopCorrelations());
+    }
+    
+    private void displayTrends(PatternAnalyzer.AnalysisResult result) {
+        // Create trend lines for each data type
+        for (Map.Entry<String, PatternAnalyzer.TrendInfo> entry : result.getTrends().entrySet()) {
+            createTrendChart(entry.getKey(), entry.getValue());
+        }
+    }
+    
+    private void displayAnomalies(PatternAnalyzer.AnalysisResult result) {
+        // Highlight anomalies on timeline
+        createAnomalyChart(result.getAnomalies());
+        
+        // List anomaly details
+        createAnomalyList(result.getAnomalies());
+    }
+    
+    private void displayPredictions(PatternAnalyzer.AnalysisResult result) {
+        // Show prediction charts
+        createPredictionChart(result.getPredictions());
+        
+        // Show confidence levels
+        createConfidenceCards(result.getPredictionConfidence());
+    }
+    
+    private CardView createChartCard(String title) {
+        CardView card = new CardView(this);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 0, 0, 16);
+        card.setLayoutParams(params);
+        card.setCardBackgroundColor(Color.parseColor("#2A2A2A"));
+        card.setRadius(8);
+        card.setCardElevation(4);
+        
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(16, 16, 16, 16);
+        
+        TextView titleView = new TextView(this);
+        titleView.setText(title);
+        titleView.setTextColor(Color.WHITE);
+        titleView.setTextSize(18);
+        titleView.setPadding(0, 0, 0, 16);
+        content.addView(titleView);
+        
+        LinearLayout chartContainer = new LinearLayout(this);
+        chartContainer.setId(R.id.chart_container);
+        chartContainer.setOrientation(LinearLayout.VERTICAL);
+        content.addView(chartContainer);
+        
+        card.addView(content);
+        return card;
+    }
+    
+    private void createSummaryCards(Map<String, Object> stats) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        
+        for (Map.Entry<String, Object> entry : stats.entrySet()) {
+            CardView card = new CardView(this);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+            params.setMargins(4, 0, 4, 16);
+            card.setLayoutParams(params);
+            card.setCardBackgroundColor(Color.parseColor("#2A2A2A"));
+            card.setRadius(8);
+            
+            LinearLayout content = new LinearLayout(this);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.setPadding(16, 16, 16, 16);
+            content.setGravity(android.view.Gravity.CENTER);
+            
+            TextView value = new TextView(this);
+            value.setText(String.valueOf(entry.getValue()));
+            value.setTextColor(Color.WHITE);
+            value.setTextSize(24);
+            content.addView(value);
+            
+            TextView label = new TextView(this);
+            label.setText(entry.getKey());
+            label.setTextColor(Color.GRAY);
+            label.setTextSize(12);
+            content.addView(label);
+            
+            card.addView(content);
+            row.addView(card);
+        }
+        
+        chartsContainer.addView(row);
+    }
+    
+    private void displayInsights(List<String> insights) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("📊 Pattern Insights:\n\n");
+        
+        for (String insight : insights) {
+            sb.append("• ").append(insight).append("\n\n");
+        }
+        
+        insightsText.setText(sb.toString());
+    }
+    
+    private void createCorrelationMatrix(Map<String, Map<String, Double>> correlations) {
+        // TODO: Implement correlation matrix visualization
+        // For now, just log
+        Log.d(TAG, "Correlations: " + correlations);
+    }
+    
+    private void createCorrelationCards(List<PatternAnalyzer.Correlation> topCorrelations) {
+        for (PatternAnalyzer.Correlation corr : topCorrelations) {
+            CardView card = new CardView(this);
+            // TODO: Implement correlation card UI
+        }
+    }
+    
+    private void createTrendChart(String dataType, PatternAnalyzer.TrendInfo trend) {
+        // TODO: Implement trend visualization
+        Log.d(TAG, "Trend for " + dataType + ": " + trend);
+    }
+    
+    private void createAnomalyChart(List<PatternAnalyzer.Anomaly> anomalies) {
+        // TODO: Implement anomaly visualization
+        Log.d(TAG, "Anomalies: " + anomalies.size());
+    }
+    
+    private void createAnomalyList(List<PatternAnalyzer.Anomaly> anomalies) {
+        for (PatternAnalyzer.Anomaly anomaly : anomalies) {
+            // TODO: Create anomaly list item
+        }
+    }
+    
+    private void createPredictionChart(Map<String, List<PatternAnalyzer.Prediction>> predictions) {
+        // TODO: Implement prediction visualization
+    }
+    
+    private void createConfidenceCards(Map<String, Double> confidence) {
+        // TODO: Implement confidence cards
+    }
+    
+    private void exportPatterns() {
+        // TODO: Implement pattern export
+        Toast.makeText(this, "Export feature coming soon", Toast.LENGTH_SHORT).show();
+    }
+    
+    private void shareInsights() {
+        // TODO: Implement sharing
+        Toast.makeText(this, "Share feature coming soon", Toast.LENGTH_SHORT).show();
+    }
+    
+    private void showLoading(boolean show) {
+        loadingProgress.setVisibility(show ? View.VISIBLE : View.GONE);
+        chartsContainer.setVisibility(show ? View.GONE : View.VISIBLE);
+    }
+    
+    private void showError(String message) {
+        new AlertDialog.Builder(this)
+                .setTitle("Error")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+    
+    // Inner class for network visualization
+    private class NetworkVisualization {
+        private final Map<String, Node> nodeMap = new HashMap<>();
+        private final List<Edge> edges = new ArrayList<>();
+        
+        public void buildFromData(List<PersonalData> data) {
+            // Build nodes for each data type
+            for (PersonalData item : data) {
+                String type = item.getType();
+                if (!nodeMap.containsKey(type)) {
+                    nodeMap.put(type, new Node(type));
                 }
-            });
-            
-            timeRangeChips.addView(chip);
-        }
-    }
-    
-    private void setupBottomNavigation() {
-        bottomNav.setSelectedItemId(R.id.nav_patterns);
-        
-        bottomNav.setOnItemSelectedListener(item -> {
-            int itemId = item.getItemId();
-            
-            if (itemId == R.id.nav_today) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
-                return true;
-            } else if (itemId == R.id.nav_patterns) {
-                return true; // Already here
-            } else if (itemId == R.id.nav_vault) {
-                // Navigate to vault
-                return true;
+                nodeMap.get(type).incrementCount();
             }
             
-            return false;
-        });
-    }
-    
-    private void loadPatterns() {
-        // Get data for selected time range
-        long endTime = System.currentTimeMillis();
-        long startTime = endTime - (currentTimeRange.days * 24 * 60 * 60 * 1000L);
-        
-        List<PersonalData> data = dataService.getDataInRange(startTime, endTime);
-        
-        // Analyze patterns
-        insights = patternAnalyzer.analyzePatterns(data);
-        
-        // Update all views
-        updateAllViews(data);
-        updateInsights();
-    }
-    
-    private void updateAllViews(List<PersonalData> data) {
-        // Update each view in the ViewPager
-        PatternsPagerAdapter adapter = (PatternsPagerAdapter) viewPager.getAdapter();
-        if (adapter != null) {
-            adapter.updateData(data);
-        }
-    }
-    
-    private void updateInsights() {
-        InsightsAdapter adapter = new InsightsAdapter(insights);
-        insightsRecycler.setAdapter(adapter);
-    }
-    
-    /**
-     * ViewPager adapter for different pattern views
-     */
-    private static class PatternsPagerAdapter extends RecyclerView.Adapter<PatternsPagerAdapter.ViewHolder> {
-        private final Context context;
-        private List<PersonalData> data = new ArrayList<>();
-        
-        PatternsPagerAdapter(Context context) {
-            this.context = context;
-        }
-        
-        void updateData(List<PersonalData> newData) {
-            this.data = newData;
-            notifyDataSetChanged();
-        }
-        
-        @Override
-        public int getItemCount() {
-            return 3; // Timeline, Grid, Flow
-        }
-        
-        @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view = new View(context); // Placeholder
-            
-            switch (viewType) {
-                case 0: // Timeline
-                    view = new TimelineView(context);
-                    break;
-                case 1: // Grid
-                    view = new GridView(context);
-                    break;
-                case 2: // Flow
-                    view = new FlowView(context);
-                    break;
-            }
-            
-            view.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            ));
-            
-            return new ViewHolder(view);
-        }
-        
-        @Override
-        public void onBindViewHolder(ViewHolder holder, int position) {
-            if (holder.itemView instanceof PatternView) {
-                ((PatternView) holder.itemView).setData(data);
-            }
-        }
-        
-        @Override
-        public int getItemViewType(int position) {
-            return position;
-        }
-        
-        static class ViewHolder extends RecyclerView.ViewHolder {
-            ViewHolder(View itemView) {
-                super(itemView);
-            }
-        }
-    }
-    
-    /**
-     * Base interface for pattern views
-     */
-    interface PatternView {
-        void setData(List<PersonalData> data);
-    }
-    
-    /**
-     * Timeline View - Shows data progression over time
-     */
-    public static class TimelineView extends View implements PatternView {
-        private Paint paint;
-        private Paint textPaint;
-        private List<PersonalData> data = new ArrayList<>();
-        private Map<String, Integer> typeColors;
-        
-        public TimelineView(Context context) {
-            super(context);
-            init();
-        }
-        
-        public TimelineView(Context context, AttributeSet attrs) {
-            super(context, attrs);
-            init();
-        }
-        
-        private void init() {
-            paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            textPaint.setTextSize(24f);
-            textPaint.setColor(Color.WHITE);
-            
-            // Define colors for data types
-            typeColors = new HashMap<>();
-            typeColors.put("water", Color.parseColor("#3B82F6"));
-            typeColors.put("exercise", Color.parseColor("#10B981"));
-            typeColors.put("mood", Color.parseColor("#8B5CF6"));
-            typeColors.put("sleep", Color.parseColor("#6366F1"));
-            typeColors.put("location", Color.parseColor("#EC4899"));
-        }
-        
-        @Override
-        public void setData(List<PersonalData> newData) {
-            this.data = newData;
-            invalidate();
-        }
-        
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            
-            if (data.isEmpty()) return;
-            
-            int width = getWidth();
-            int height = getHeight();
-            int padding = 40;
-            
-            // Draw timeline axis
-            paint.setColor(Color.parseColor("#333333"));
-            paint.setStrokeWidth(2f);
-            canvas.drawLine(padding, height - padding, width - padding, height - padding, paint);
-            
-            // Group data by type
-            Map<String, List<PersonalData>> groupedData = new HashMap<>();
-            for (PersonalData item : data) {
-                String type = item.getDataType();
-                if (!groupedData.containsKey(type)) {
-                    groupedData.put(type, new ArrayList<>());
-                }
-                groupedData.get(type).add(item);
-            }
-            
-            // Draw each data stream
-            int streamHeight = (height - 2 * padding) / (groupedData.size() + 1);
-            int streamIndex = 0;
-            
-            for (Map.Entry<String, List<PersonalData>> entry : groupedData.entrySet()) {
-                String type = entry.getKey();
-                List<PersonalData> items = entry.getValue();
-                
-                int y = padding + (streamIndex + 1) * streamHeight;
-                Integer color = typeColors.get(type);
-                if (color == null) color = Color.GRAY;
-                
-                // Draw data points
-                paint.setColor(color);
-                Path path = new Path();
-                boolean first = true;
-                
-                for (PersonalData item : items) {
-                    float x = padding + ((float) (item.getTimestamp() - getMinTimestamp()) 
-                        / (getMaxTimestamp() - getMinTimestamp())) * (width - 2 * padding);
-                    
-                    // Draw point
-                    canvas.drawCircle(x, y, 6f, paint);
-                    
-                    // Draw line
-                    if (first) {
-                        path.moveTo(x, y);
-                        first = false;
-                    } else {
-                        path.lineTo(x, y);
-                    }
-                }
-                
-                // Draw path
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(3f);
-                paint.setAlpha(150);
-                canvas.drawPath(path, paint);
-                paint.setStyle(Paint.Style.FILL);
-                paint.setAlpha(255);
-                
-                // Draw type label
-                textPaint.setTextAlign(Paint.Align.LEFT);
-                canvas.drawText(type, padding + 10, y - 10, textPaint);
-                
-                streamIndex++;
-            }
-        }
-        
-        private long getMinTimestamp() {
-            if (data.isEmpty()) return 0;
-            long min = Long.MAX_VALUE;
-            for (PersonalData item : data) {
-                min = Math.min(min, item.getTimestamp());
-            }
-            return min;
-        }
-        
-        private long getMaxTimestamp() {
-            if (data.isEmpty()) return 0;
-            long max = Long.MIN_VALUE;
-            for (PersonalData item : data) {
-                max = Math.max(max, item.getTimestamp());
-            }
-            return max;
-        }
-    }
-    
-    /**
-     * Grid View - Shows data density in a calendar-like grid
-     */
-    public static class GridView extends View implements PatternView {
-        private Paint paint;
-        private Paint textPaint;
-        private List<PersonalData> data = new ArrayList<>();
-        private Map<String, Integer> dailyCounts;
-        
-        public GridView(Context context) {
-            super(context);
-            init();
-        }
-        
-        private void init() {
-            paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            textPaint.setTextSize(20f);
-            textPaint.setColor(Color.WHITE);
-            textPaint.setTextAlign(Paint.Align.CENTER);
-        }
-        
-        @Override
-        public void setData(List<PersonalData> newData) {
-            this.data = newData;
-            calculateDailyCounts();
-            invalidate();
-        }
-        
-        private void calculateDailyCounts() {
-            dailyCounts = new HashMap<>();
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            
-            for (PersonalData item : data) {
-                String date = dateFormat.format(new Date(item.getTimestamp()));
-                dailyCounts.put(date, dailyCounts.getOrDefault(date, 0) + 1);
-            }
-        }
-        
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            
-            int width = getWidth();
-            int height = getHeight();
-            int padding = 20;
-            
-            // Calculate grid dimensions
-            int cols = 7; // Days of week
-            int cellSize = (width - 2 * padding) / cols;
-            int rows = (height - 2 * padding) / cellSize;
-            
-            // Draw grid
-            Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.DAY_OF_YEAR, -(rows * cols));
-            
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            
-            for (int row = 0; row < rows; row++) {
-                for (int col = 0; col < cols; col++) {
-                    int x = padding + col * cellSize;
-                    int y = padding + row * cellSize;
-                    
-                    String date = dateFormat.format(cal.getTime());
-                    int count = dailyCounts.getOrDefault(date, 0);
-                    
-                    // Draw cell
-                    int alpha = Math.min(255, 50 + count * 30);
-                    paint.setColor(Color.parseColor("#6366F1"));
-                    paint.setAlpha(alpha);
-                    
-                    canvas.drawRoundRect(
-                        x + 2, y + 2, 
-                        x + cellSize - 2, y + cellSize - 2,
-                        8f, 8f, paint
-                    );
-                    
-                    // Draw day number
-                    if (count > 0) {
-                        textPaint.setAlpha(255);
-                        canvas.drawText(
-                            String.valueOf(cal.get(Calendar.DAY_OF_MONTH)),
-                            x + cellSize / 2,
-                            y + cellSize / 2 + 8,
-                            textPaint
-                        );
-                    }
-                    
-                    cal.add(Calendar.DAY_OF_YEAR, 1);
-                }
-            }
-        }
-    }
-    
-    /**
-     * Flow View - Shows connections between different data types
-     */
-    public static class FlowView extends View implements PatternView {
-        private Paint paint;
-        private List<PersonalData> data = new ArrayList<>();
-        private List<Node> nodes = new ArrayList<>();
-        private List<Connection> connections = new ArrayList<>();
-        private ValueAnimator animator;
-        
-        private class Node {
-            String type;
-            float x, y;
-            float vx, vy;
-            int count;
-            int color;
-            
-            void update() {
-                x += vx;
-                y += vy;
-                vx *= 0.99f;
-                vy *= 0.99f;
-                
-                // Bounce off walls
-                if (x < 50 || x > getWidth() - 50) vx *= -1;
-                if (y < 50 || y > getHeight() - 50) vy *= -1;
-            }
-        }
-        
-        private class Connection {
-            Node from, to;
-            float strength;
-        }
-        
-        public FlowView(Context context) {
-            super(context);
-            init();
-        }
-        
-        private void init() {
-            paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            
-            // Start animation
-            animator = ValueAnimator.ofFloat(0f, 1f);
-            animator.setDuration(50);
-            animator.setRepeatCount(ValueAnimator.INFINITE);
-            animator.addUpdateListener(animation -> {
-                updateNodes();
-                invalidate();
-            });
-            animator.start();
-        }
-        
-        @Override
-        public void setData(List<PersonalData> newData) {
-            this.data = newData;
-            buildGraph();
-            invalidate();
-        }
-        
-        private void buildGraph() {
-            nodes.clear();
-            connections.clear();
-            
-            // Create nodes for each data type
-            Map<String, Node> nodeMap = new HashMap<>();
-            Map<String, Integer> typeCounts = new HashMap<>();
-            Map<String, Integer> typeColors = new HashMap<>();
-            typeColors.put("water", Color.parseColor("#3B82F6"));
-            typeColors.put("exercise", Color.parseColor("#10B981"));
-            typeColors.put("mood", Color.parseColor("#8B5CF6"));
-            typeColors.put("sleep", Color.parseColor("#6366F1"));
-            
-            // Count occurrences
-            for (PersonalData item : data) {
-                typeCounts.put(item.getDataType(), 
-                    typeCounts.getOrDefault(item.getDataType(), 0) + 1);
-            }
-            
-            // Create nodes
-            Random rand = new Random();
-            for (Map.Entry<String, Integer> entry : typeCounts.entrySet()) {
-                Node node = new Node();
-                node.type = entry.getKey();
-                node.count = entry.getValue();
-                node.x = rand.nextFloat() * getWidth();
-                node.y = rand.nextFloat() * getHeight();
-                node.vx = (rand.nextFloat() - 0.5f) * 2;
-                node.vy = (rand.nextFloat() - 0.5f) * 2;
-                node.color = typeColors.getOrDefault(node.type, Color.GRAY);
-                
-                nodes.add(node);
-                nodeMap.put(node.type, node);
-            }
-            
-            // Find connections (co-occurrences within time windows)
-            long timeWindow = 60 * 60 * 1000; // 1 hour
-            
-            for (int i = 0; i < data.size(); i++) {
+            // Build edges based on temporal proximity
+            for (int i = 0; i < data.size() - 1; i++) {
                 PersonalData item1 = data.get(i);
+                PersonalData item2 = data.get(i + 1);
                 
-                for (int j = i + 1; j < data.size(); j++) {
-                    PersonalData item2 = data.get(j);
+                // If items are within 5 minutes of each other
+                if (Math.abs(item1.getTimestamp() - item2.getTimestamp()) < 5 * 60 * 1000
+                        && !item1.getType().equals(item2.getType())) {
                     
-                    if (Math.abs(item1.getTimestamp() - item2.getTimestamp()) < timeWindow
-                        && !item1.getDataType().equals(item2.getDataType())) {
-                        
-                        Node from = nodeMap.get(item1.getDataType());
-                        Node to = nodeMap.get(item2.getDataType());
-                        
-                        if (from != null && to != null) {
-                            // Check if connection exists
-                            Connection existing = null;
-                            for (Connection conn : connections) {
-                                if ((conn.from == from && conn.to == to) ||
-                                    (conn.from == to && conn.to == from)) {
-                                    existing = conn;
-                                    break;
-                                }
-                            }
-                            
-                            if (existing != null) {
-                                existing.strength += 0.1f;
-                            } else {
-                                Connection conn = new Connection();
-                                conn.from = from;
-                                conn.to = to;
-                                conn.strength = 0.1f;
-                                connections.add(conn);
-                            }
-                        }
-                    }
+                    Node from = nodeMap.get(item1.getType());
+                    Node to = nodeMap.get(item2.getType());
+                    
+                    Edge edge = findOrCreateEdge(from, to);
+                    edge.incrementWeight();
                 }
             }
         }
         
-        private void updateNodes() {
-            // Apply forces
-            for (int i = 0; i < nodes.size(); i++) {
-                Node n1 = nodes.get(i);
-                
-                // Repulsion between nodes
-                for (int j = i + 1; j < nodes.size(); j++) {
-                    Node n2 = nodes.get(j);
-                    
-                    float dx = n2.x - n1.x;
-                    float dy = n2.y - n1.y;
-                    float dist = (float) Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (dist < 200) {
-                        float force = (200 - dist) / 200 * 0.5f;
-                        dx /= dist;
-                        dy /= dist;
-                        
-                        n1.vx -= dx * force;
-                        n1.vy -= dy * force;
-                        n2.vx += dx * force;
-                        n2.vy += dy * force;
-                    }
+        private Edge findOrCreateEdge(Node from, Node to) {
+            for (Edge edge : edges) {
+                if ((edge.from == from && edge.to == to) ||
+                    (edge.from == to && edge.to == from)) {
+                    return edge;
                 }
-                
-                // Attraction along connections
-                for (Connection conn : connections) {
-                    if (conn.from == n1 || conn.to == n1) {
-                        Node other = (conn.from == n1) ? conn.to : conn.from;
-                        
-                        float dx = other.x - n1.x;
-                        float dy = other.y - n1.y;
-                        float dist = (float) Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (dist > 100) {
-                            float force = conn.strength * 0.1f;
-                            dx /= dist;
-                            dy /= dist;
-                            
-                            n1.vx += dx * force;
-                            n1.vy += dy * force;
-                        }
-                    }
-                }
-                
-                // Update position
-                n1.update();
-            }
-        }
-        
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            
-            // Draw connections
-            paint.setStrokeWidth(2f);
-            for (Connection conn : connections) {
-                paint.setColor(Color.WHITE);
-                paint.setAlpha((int) (conn.strength * 50));
-                canvas.drawLine(conn.from.x, conn.from.y, conn.to.x, conn.to.y, paint);
             }
             
-            // Draw nodes
-            for (Node node : nodes) {
-                paint.setColor(node.color);
-                paint.setAlpha(200);
-                
-                float radius = 20 + (float) Math.sqrt(node.count) * 5;
-                canvas.drawCircle(node.x, node.y, radius, paint);
-                
-                // Draw label
-                paint.setColor(Color.WHITE);
-                paint.setTextAlign(Paint.Align.CENTER);
-                paint.setTextSize(20f);
-                canvas.drawText(node.type, node.x, node.y + 8, paint);
-            }
+            Edge newEdge = new Edge(from, to);
+            edges.add(newEdge);
+            return newEdge;
         }
         
-        @Override
-        protected void onDetachedFromWindow() {
-            super.onDetachedFromWindow();
-            if (animator != null) {
-                animator.cancel();
-            }
-        }
-    }
-    
-    /**
-     * Pattern insight data class
-     */
-    public static class PatternInsight {
-        public String title;
-        public String description;
-        public float confidence;
-        public String icon;
-        
-        PatternInsight(String title, String description, float confidence, String icon) {
-            this.title = title;
-            this.description = description;
-            this.confidence = confidence;
-            this.icon = icon;
-        }
-    }
-    
-    /**
-     * Insights adapter
-     */
-    private static class InsightsAdapter extends RecyclerView.Adapter<InsightsAdapter.ViewHolder> {
-        private final List<PatternInsight> insights;
-        
-        InsightsAdapter(List<PatternInsight> insights) {
-            this.insights = insights;
-        }
-        
-        @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_pattern_insight, parent, false);
-            return new ViewHolder(view);
-        }
-        
-        @Override
-        public void onBindViewHolder(ViewHolder holder, int position) {
-            PatternInsight insight = insights.get(position);
-            holder.bind(insight);
-        }
-        
-        @Override
-        public int getItemCount() {
-            return insights.size();
-        }
-        
-        static class ViewHolder extends RecyclerView.ViewHolder {
-            TextView iconText;
-            TextView titleText;
-            TextView descriptionText;
-            View confidenceBar;
+        class Node {
+            String type;
+            int count = 0;
+            float x, y; // Position for visualization
             
-            ViewHolder(View itemView) {
-                super(itemView);
-                iconText = itemView.findViewById(R.id.insight_icon);
-                titleText = itemView.findViewById(R.id.insight_title);
-                descriptionText = itemView.findViewById(R.id.insight_description);
-                confidenceBar = itemView.findViewById(R.id.confidence_bar);
+            Node(String type) {
+                this.type = type;
+                // Random initial position
+                this.x = (float) Math.random() * 100;
+                this.y = (float) Math.random() * 100;
             }
             
-            void bind(PatternInsight insight) {
-                iconText.setText(insight.icon);
-                titleText.setText(insight.title);
-                descriptionText.setText(insight.description);
-                
-                // Set confidence bar width
-                ViewGroup.LayoutParams params = confidenceBar.getLayoutParams();
-                params.width = (int) (itemView.getWidth() * insight.confidence);
-                confidenceBar.setLayoutParams(params);
+            void incrementCount() {
+                count++;
+            }
+        }
+        
+        class Edge {
+            Node from, to;
+            int weight = 0;
+            
+            Edge(Node from, Node to) {
+                this.from = from;
+                this.to = to;
+            }
+            
+            void incrementWeight() {
+                weight++;
             }
         }
     }

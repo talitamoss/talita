@@ -3,27 +3,31 @@ package com.core.talita;
 import org.json.JSONObject;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+import java.util.Iterator;
 
 /**
- * PersonalData - Core data model for all personal data types
+ * PersonalData - The core data model
+ * Represents any piece of personal data with type, timestamp, and metadata
  * 
- * This class represents any piece of personal data collected by the app.
- * It implements PersonalDataInterface for compatibility with the data pipeline.
+ * Location: app/src/main/java/com/core/talita/PersonalData.java
  */
 public class PersonalData implements PersonalDataInterface {
     
+    private String id;
     private String type;
+    private long timestamp;
     private Map<String, Object> data;
     private Map<String, Object> metadata;
-    private long timestamp;
     
     /**
      * Default constructor
      */
     public PersonalData() {
+        this.id = UUID.randomUUID().toString();
+        this.timestamp = System.currentTimeMillis();
         this.data = new HashMap<>();
         this.metadata = new HashMap<>();
-        this.timestamp = System.currentTimeMillis();
     }
     
     /**
@@ -35,30 +39,58 @@ public class PersonalData implements PersonalDataInterface {
     }
     
     /**
+     * Constructor with type, data, and metadata (for BaseDataCollector compatibility)
+     */
+    public PersonalData(String type, Map<String, Object> data, Map<String, Object> metadata) {
+        this.id = UUID.randomUUID().toString();
+        this.type = type;
+        this.timestamp = System.currentTimeMillis();
+        this.data = new HashMap<>(data);
+        this.metadata = new HashMap<>(metadata);
+    }
+    
+    /**
      * Full constructor
      */
     public PersonalData(String type, Map<String, Object> data, Map<String, Object> metadata, long timestamp) {
+        this.id = UUID.randomUUID().toString();
         this.type = type;
-        this.data = data != null ? data : new HashMap<>();
-        this.metadata = metadata != null ? metadata : new HashMap<>();
+        this.data = data != null ? new HashMap<>(data) : new HashMap<>();
+        this.metadata = metadata != null ? new HashMap<>(metadata) : new HashMap<>();
         this.timestamp = timestamp;
     }
     
-    // PersonalDataInterface implementation
+    /**
+     * Factory method to create PersonalData
+     */
+    public static PersonalData create(String type) {
+        return new PersonalData(type);
+    }
+    
+    // Getters and Setters
+    
+    public String getId() {
+        return id;
+    }
+    
+    public void setId(String id) {
+        this.id = id;
+    }
     
     @Override
     public String getType() {
         return type;
     }
     
-    @Override
-    public Map<String, Object> getData() {
-        return data;
+    /**
+     * Get data type (alias for getType)
+     */
+    public String getDataType() {
+        return getType();
     }
     
-    @Override
-    public Map<String, Object> getMetadata() {
-        return metadata;
+    public void setType(String type) {
+        this.type = type;
     }
     
     @Override
@@ -66,99 +98,83 @@ public class PersonalData implements PersonalDataInterface {
         return timestamp;
     }
     
-    // Setters
-    
-    public void setType(String type) {
-        this.type = type;
-    }
-    
-    public void setData(Map<String, Object> data) {
-        this.data = data;
-    }
-    
-    public void setMetadata(Map<String, Object> metadata) {
-        this.metadata = metadata;
-    }
-    
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
     
-    // Convenience methods
-    
-    public void addData(String key, Object value) {
-        data.put(key, value);
+    @Override
+    public Map<String, Object> getData() {
+        return data;
     }
     
+    public void setData(Map<String, Object> data) {
+        this.data = data != null ? data : new HashMap<>();
+    }
+    
+    @Override
+    public Map<String, Object> getMetadata() {
+        return metadata;
+    }
+    
+    public void setMetadata(Map<String, Object> metadata) {
+        this.metadata = metadata != null ? metadata : new HashMap<>();
+    }
+    
+    /**
+     * Get display summary
+     */
+    public String getDisplaySummary() {
+        // Create a summary from the data
+        if (data.containsKey("summary")) {
+            return data.get("summary").toString();
+        } else if (data.containsKey("value")) {
+            return data.get("value").toString();
+        } else if (data.containsKey("message")) {
+            return data.get("message").toString();
+        } else if (data.containsKey("description")) {
+            return data.get("description").toString();
+        } else if (!data.isEmpty()) {
+            // Return first data value as summary
+            return data.values().iterator().next().toString();
+        }
+        return type + " data";
+    }
+    
+    // Data manipulation methods
+    
+    /**
+     * Add a single data field
+     */
+    public void addDataField(String key, Object value) {
+        this.data.put(key, value);
+    }
+    
+    /**
+     * Add a single metadata field
+     */
     public void addMetadata(String key, Object value) {
-        metadata.put(key, value);
+        this.metadata.put(key, value);
     }
     
-    public Object getDataValue(String key) {
+    /**
+     * Get a data field value
+     */
+    public Object getDataField(String key) {
         return data.get(key);
     }
     
-    public Object getMetadataValue(String key) {
+    /**
+     * Get a metadata field value
+     */
+    public Object getMetadataField(String key) {
         return metadata.get(key);
     }
     
     /**
-     * Get data type (alias for getType)
+     * Check if data contains a field
      */
-    public String getDataType() {
-        return type;
-    }
-    public String getDisplaySummary() {
-        // Generate summary based on type
-        switch (type) {
-            case "water":
-                Integer ml = (Integer) data.get("volume_ml");
-                return ml != null ? ml + "ml" : "Water";
-                
-            case "exercise":
-                String exerciseType = (String) data.get("exercise_type");
-                String duration = (String) data.get("duration");
-                if (exerciseType != null && duration != null) {
-                    return exerciseType + " - " + duration;
-                }
-                return exerciseType != null ? exerciseType : "Exercise";
-                
-            case "mood":
-                Integer rating = (Integer) data.get("mood_rating");
-                return rating != null ? "Mood: " + rating + "/5" : "Mood";
-                
-            case "sleep":
-                Double hours = (Double) data.get("hours_slept");
-                return hours != null ? String.format("%.1fh sleep", hours) : "Sleep";
-                
-            case "location":
-                Double lat = (Double) data.get("latitude");
-                Double lon = (Double) data.get("longitude");
-                if (lat != null && lon != null) {
-                    return String.format("📍 %.4f, %.4f", lat, lon);
-                }
-                return "Location";
-                
-            case "audio":
-                Long audioDuration = (Long) data.get("duration_ms");
-                if (audioDuration != null) {
-                    int seconds = (int) (audioDuration / 1000);
-                    return String.format("🎙️ %d:%02d", seconds / 60, seconds % 60);
-                }
-                return "Audio recording";
-                
-            case "steps":
-                Integer steps = (Integer) data.get("count");
-                return steps != null ? steps + " steps" : "Steps";
-                
-            default:
-                // For custom types, try to create a meaningful summary
-                if (!data.isEmpty()) {
-                    Object firstValue = data.values().iterator().next();
-                    return type + ": " + firstValue;
-                }
-                return type;
-        }
+    public boolean hasDataField(String key) {
+        return data.containsKey(key);
     }
     
     /**
@@ -167,30 +183,40 @@ public class PersonalData implements PersonalDataInterface {
     public String toJson() {
         try {
             JSONObject json = new JSONObject();
+            json.put("id", id);
             json.put("type", type);
             json.put("timestamp", timestamp);
             json.put("data", new JSONObject(data));
             json.put("metadata", new JSONObject(metadata));
             return json.toString();
         } catch (Exception e) {
-            return "{}";
+            e.printStackTrace();
+            return null;
         }
     }
     
     /**
-     * Create from JSON string
+     * Create PersonalData from JSON string
      */
     public static PersonalData fromJson(String jsonString) {
         try {
             JSONObject json = new JSONObject(jsonString);
             PersonalData pd = new PersonalData();
             
-            pd.setType(json.optString("type"));
-            pd.setTimestamp(json.optLong("timestamp", System.currentTimeMillis()));
+            // Parse basic fields
+            if (json.has("id")) {
+                pd.setId(json.getString("id"));
+            }
+            if (json.has("type")) {
+                pd.setType(json.getString("type"));
+            }
+            if (json.has("timestamp")) {
+                pd.setTimestamp(json.getLong("timestamp"));
+            }
             
-            // Parse data
-            JSONObject dataJson = json.optJSONObject("data");
-            if (dataJson != null) {
+            // Parse data map
+            if (json.has("data")) {
+                JSONObject dataJson = json.getJSONObject("data");
                 Map<String, Object> dataMap = new HashMap<>();
                 Iterator<String> keys = dataJson.keys();
                 while (keys.hasNext()) {
@@ -200,9 +226,9 @@ public class PersonalData implements PersonalDataInterface {
                 pd.setData(dataMap);
             }
             
-            // Parse metadata
-            JSONObject metadataJson = json.optJSONObject("metadata");
-            if (metadataJson != null) {
+            // Parse metadata map
+            if (json.has("metadata")) {
+                JSONObject metadataJson = json.getJSONObject("metadata");
                 Map<String, Object> metadataMap = new HashMap<>();
                 Iterator<String> keys = metadataJson.keys();
                 while (keys.hasNext()) {
@@ -215,7 +241,32 @@ public class PersonalData implements PersonalDataInterface {
             return pd;
             
         } catch (Exception e) {
+            e.printStackTrace();
             return null;
         }
+    }
+    
+    @Override
+    public String toString() {
+        return "PersonalData{" +
+                "id='" + id + '\'' +
+                ", type='" + type + '\'' +
+                ", timestamp=" + timestamp +
+                ", data=" + data +
+                ", metadata=" + metadata +
+                '}';
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        PersonalData that = (PersonalData) o;
+        return id.equals(that.id);
+    }
+    
+    @Override
+    public int hashCode() {
+        return id.hashCode();
     }
 }

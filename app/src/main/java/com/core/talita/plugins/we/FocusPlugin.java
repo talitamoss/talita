@@ -25,6 +25,11 @@ public class FocusPlugin extends DataCollectorPlugin {
     }
     
     @Override
+    public String getDescription() {
+        return "Track shared focus sessions for work, study, and collaboration";
+    }
+    
+    @Override
     public String getVersion() {
         return "1.0.0";
     }
@@ -49,32 +54,26 @@ public class FocusPlugin extends DataCollectorPlugin {
         return "🎯";
     }
     
-    @Override
     public int getAccentColor() {
         return Color.parseColor("#00BCD4");
     }
     
-    @Override
     public int getIconResource() {
         return 0;
     }
     
-    @Override
     public String[] getRequiredPermissions() {
         return new String[0];
     }
     
-    @Override
     public boolean requiresBackgroundTracking() {
         return false;
     }
     
-    @Override
     public boolean supportsQuickAdd() {
         return true;
     }
     
-    @Override
     public boolean supportsScheduling() {
         return true;
     }
@@ -90,12 +89,10 @@ public class FocusPlugin extends DataCollectorPlugin {
                 .build();
     }
     
-    @Override
     public boolean hasSettings() {
         return false;
     }
     
-    @Override
     public void openSettings(Context context) {
         // TODO: Settings screen
     }

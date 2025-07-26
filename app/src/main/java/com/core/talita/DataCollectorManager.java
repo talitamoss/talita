@@ -65,17 +65,19 @@ public class DataCollectorManager {
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Failed to start collector from plugin: " + plugin.getPluginId(), e);
+                Log.e(TAG, "❌ Failed to start collector from plugin: " + plugin.getPluginId(), e);
             }
         }
-
-        Log.d(TAG, "✅ Started " + startedCount + " collectors from plugins");
+        
+        Log.d(TAG, "✅ Started " + startedCount + " collectors");
     }
 
     /**
      * Stop all active collectors
      */
     public void stopAllCollectors() {
+        Log.d(TAG, "🛑 Stopping all collectors...");
+        
         for (Map.Entry<String, DataCollector> entry : activeCollectors.entrySet()) {
             try {
                 DataCollector collector = entry.getValue();
@@ -88,118 +90,45 @@ public class DataCollectorManager {
                 Log.e(TAG, "Error stopping collector", e);
             }
         }
+        
         activeCollectors.clear();
     }
 
     /**
-     * Get active collector by plugin ID
+     * Get a specific collector by plugin ID
      */
-    public DataCollector getActiveCollector(String pluginId) {
-        return activeCollectors.get(pluginId);
-    }
-
-    /**
-     * Get all available collectors from plugins
-     */
-    public List<DataCollector> getAllAvailableCollectors() {
-        List<DataCollector> collectors = new ArrayList<>();
+    public DataCollector getCollector(String pluginId) {
+        // Check if already active
+        if (activeCollectors.containsKey(pluginId)) {
+            return activeCollectors.get(pluginId);
+        }
         
-        for (DataCollectorPlugin plugin : pluginManager.getAllPlugins()) {
-            try {
-                DataCollector collector = plugin.createCollector(context);
-                if (collector != null) {
-                    collector.initialize(context);
-                    collectors.add(collector);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to create collector from plugin: " + plugin.getPluginId(), e);
+        // Try to create from plugin
+        DataCollectorPlugin plugin = pluginManager.getPlugin(pluginId);
+        if (plugin != null) {
+            DataCollector collector = plugin.createCollector(context);
+            if (collector != null) {
+                collector.initialize(context);
+                activeCollectors.put(pluginId, collector);
+                return collector;
             }
         }
         
-        return collectors;
+        return null;
     }
 
     /**
-     * Get all collectors (for settings UI)
+     * Get all active collectors
      */
-    public List<DataCollector> getAllCollectors() {
-        return getAllAvailableCollectors();
+    public Collection<DataCollector> getActiveCollectors() {
+        return activeCollectors.values();
     }
 
     /**
-     * Get collectors organized by category
-     */
-    public Map<String, List<DataCollector>> getCollectorsByCategory() {
-        Map<String, List<DataCollector>> byCategory = new HashMap<>();
-        
-        for (DataCollectorPlugin plugin : pluginManager.getAllPlugins()) {
-            try {
-                DataCollector collector = plugin.createCollector(context);
-                if (collector != null) {
-                    collector.initialize(context);
-                    
-                    String category = collector.getCategory();
-                    if (category == null) category = "other";
-                    
-                    byCategory.computeIfAbsent(category, k -> new ArrayList<>()).add(collector);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to create collector", e);
-            }
-        }
-        
-        return byCategory;
-    }
-
-    /**
-     * Quick logging through plugin collectors
-     */
-    public void quickLog(String pluginId, Map<String, Object> data) {
-        // Get or create collector
-        DataCollector collector = activeCollectors.get(pluginId);
-        
-        if (collector == null) {
-            // Try to create collector if not active
-            DataCollectorPlugin plugin = pluginManager.getPlugin(pluginId);
-            if (plugin != null) {
-                collector = plugin.createCollector(context);
-                if (collector != null) {
-                    collector.initialize(context);
-                    activeCollectors.put(pluginId, collector);
-                }
-            }
-        }
-        
-        if (collector != null) {
-            CollectorResult result = collector.collectQuick(data);
-            
-            if (result.isSuccess()) {
-                Log.d(TAG, "✅ Quick logged data for: " + pluginId);
-            } else {
-                Log.e(TAG, "❌ Quick log failed for " + pluginId + ": " + result.getErrorMessage());
-            }
-        } else {
-            Log.e(TAG, "No collector found for plugin: " + pluginId);
-        }
-    }
-
-    /**
-     * Trigger collection UI for a specific plugin
+     * Trigger quick collection for a specific plugin
      */
     public void triggerCollection(String pluginId) {
-        DataCollector collector = activeCollectors.get(pluginId);
-        
-        if (collector == null) {
-            // Try to create if not active
-            DataCollectorPlugin plugin = pluginManager.getPlugin(pluginId);
-            if (plugin != null) {
-                collector = plugin.createCollector(context);
-                if (collector != null) {
-                    collector.initialize(context);
-                    activeCollectors.put(pluginId, collector);
-                }
-            }
-        }
+        DataCollector collector = getCollector(pluginId);
         
         if (collector != null) {
             CollectorResult result = collector.collect();
@@ -267,73 +196,109 @@ public class DataCollectorManager {
     }
 
     /**
-     * Check if a collector is available (has required sensors/permissions)
+     * Check if a collector is enabled
      */
-    public boolean isCollectorAvailable(String pluginId) {
-        try {
-            DataCollectorPlugin plugin = pluginManager.getPlugin(pluginId);
-            if (plugin != null) {
-                DataCollector collector = plugin.createCollector(context);
-                if (collector != null) {
-                    collector.initialize(context);
-                    return collector.isAvailable();
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error checking collector availability", e);
-        }
-        return false;
+    public boolean isCollectorEnabled(String dataType) {
+        return prefs.getBoolean(dataType + "_enabled", true);
     }
 
     /**
-     * Get collection statistics
+     * Get enabled collector types
      */
-    public CollectionStats getCollectionStats() {
-        int totalCollectors = 0;
-        int enabledCollectors = 0;
-        int activeCollectors = 0;
+    public Set<String> getEnabledTypes() {
+        Set<String> enabled = new HashSet<>();
+        Map<String, ?> allPrefs = prefs.getAll();
+        
+        for (Map.Entry<String, ?> entry : allPrefs.entrySet()) {
+            if (entry.getKey().endsWith("_enabled") && (Boolean) entry.getValue()) {
+                String type = entry.getKey().replace("_enabled", "");
+                enabled.add(type);
+            }
+        }
+        
+        return enabled;
+    }
+
+    /**
+     * Quick log water intake
+     * Convenience method for water logging
+     */
+    public void quickLogWater(int amountMl) {
+        // Try to find water collector from plugins
+        DataCollector waterCollector = null;
+        
+        // First try to find from active collectors
+        for (Map.Entry<String, DataCollector> entry : activeCollectors.entrySet()) {
+            if ("water".equals(entry.getValue().getDataType()) || 
+                entry.getKey().contains("water")) {
+                waterCollector = entry.getValue();
+                break;
+            }
+        }
+        
+        // If not found, try to create from water plugin
+        if (waterCollector == null) {
+            DataCollectorPlugin waterPlugin = pluginManager.getPlugin("core.water");
+            if (waterPlugin != null) {
+                waterCollector = waterPlugin.createCollector(context);
+                if (waterCollector != null) {
+                    waterCollector.initialize(context);
+                    activeCollectors.put("core.water", waterCollector);
+                }
+            }
+        }
+        
+        // Log the water intake
+        if (waterCollector != null) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("amount_ml", amountMl);
+            data.put("unit", "ml");
+            
+            CollectorResult result = waterCollector.collectQuick(data);
+            if (result.isSuccess()) {
+                Log.d(TAG, "✅ Quick logged water: " + amountMl + "ml");
+            } else {
+                Log.e(TAG, "❌ Failed to quick log water: " + result.getErrorMessage());
+            }
+        } else {
+            Log.e(TAG, "❌ No water collector available");
+        }
+    }
+
+    /**
+     * Get summary of all collectors
+     */
+    public Map<String, CollectorInfo> getCollectorSummary() {
+        Map<String, CollectorInfo> summary = new HashMap<>();
         
         for (DataCollectorPlugin plugin : pluginManager.getAllPlugins()) {
-            try {
-                DataCollector collector = plugin.createCollector(context);
-                if (collector != null) {
-                    collector.initialize(context);
-                    totalCollectors++;
-                    
-                    if (collector.isEnabled()) {
-                        enabledCollectors++;
-                    }
-                    
-                    if (this.activeCollectors.containsKey(plugin.getPluginId()) &&
-                        collector.isCollectingAutomatically()) {
-                        activeCollectors++;
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error getting stats", e);
+            CollectorInfo info = new CollectorInfo();
+            info.pluginId = plugin.getPluginId();
+            info.name = plugin.getPluginName();
+            info.enabled = plugin.isEnabled();
+            info.isActive = activeCollectors.containsKey(plugin.getPluginId());
+            
+            DataCollector collector = activeCollectors.get(plugin.getPluginId());
+            if (collector != null) {
+                info.isCollecting = collector.isCollectingAutomatically();
+                info.dataType = collector.getDataType();
             }
+            
+            summary.put(plugin.getPluginId(), info);
         }
         
-        return new CollectionStats(totalCollectors, enabledCollectors, activeCollectors);
+        return summary;
     }
 
     /**
-     * Collection statistics
+     * Info class for collector summary
      */
-    public static class CollectionStats {
-        public final int total;
-        public final int enabled;
-        public final int active;
-        
-        CollectionStats(int total, int enabled, int active) {
-            this.total = total;
-            this.enabled = enabled;
-            this.active = active;
-        }
-        
-        public String getSummary() {
-            return String.format("%d enabled / %d total (%d active)", 
-                enabled, total, active);
-        }
+    public static class CollectorInfo {
+        public String pluginId;
+        public String name;
+        public String dataType;
+        public boolean enabled;
+        public boolean isActive;
+        public boolean isCollecting;
     }
 }

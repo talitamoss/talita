@@ -15,10 +15,13 @@ import java.util.Map;
  * 
  * Plugins are modular extensions that can collect specific types of data.
  * They define WHAT data to collect and provide the collector that knows HOW.
+ * 
+ * Location: app/src/main/java/com/core/talita/plugins/DataCollectorPlugin.java
  */
 public abstract class DataCollectorPlugin {
     
     protected PluginContext pluginContext;
+    private boolean enabled = false;
     
     // ===== Plugin Identity =====
     
@@ -58,6 +61,34 @@ public abstract class DataCollectorPlugin {
      */
     public abstract String getEmoji();
     
+    // ===== Plugin State =====
+    
+    /**
+     * Check if plugin is enabled
+     */
+    public boolean isEnabled() {
+        return enabled;
+    }
+    
+    /**
+     * Enable or disable the plugin
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+        if (enabled) {
+            onPluginEnabled(pluginContext != null ? pluginContext.getContext() : null);
+        } else {
+            onPluginDisabled(pluginContext != null ? pluginContext.getContext() : null);
+        }
+    }
+    
+    /**
+     * Get plugin version (alias for getVersion)
+     */
+    public String getPluginVersion() {
+        return getVersion();
+    }
+    
     // ===== Plugin Lifecycle =====
     
     /**
@@ -81,7 +112,9 @@ public abstract class DataCollectorPlugin {
      */
     public void onPluginEnabled(Context context) {
         // Override to handle plugin being enabled
-        pluginContext.log("Plugin enabled: " + getPluginName());
+        if (pluginContext != null) {
+            pluginContext.log("Plugin enabled: " + getPluginName());
+        }
     }
     
     /**
@@ -89,7 +122,9 @@ public abstract class DataCollectorPlugin {
      */
     public void onPluginDisabled(Context context) {
         // Override to handle plugin being disabled
-        pluginContext.log("Plugin disabled: " + getPluginName());
+        if (pluginContext != null) {
+            pluginContext.log("Plugin disabled: " + getPluginName());
+        }
     }
     
     // ===== Configuration =====
@@ -129,10 +164,44 @@ public abstract class DataCollectorPlugin {
     }
     
     /**
+     * Check if plugin has settings (alias for hasSettingsUI)
+     */
+    public boolean hasSettings() {
+        return hasSettingsUI();
+    }
+    
+    /**
      * Get settings activity intent
      */
     public Intent getSettingsIntent(Context context) {
         return null; // Override to provide settings activity
+    }
+    
+    /**
+     * Open plugin settings
+     */
+    public void openSettings(Context context) {
+        Intent intent = getSettingsIntent(context);
+        if (intent != null) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        }
+    }
+    
+    // ===== Background Support =====
+    
+    /**
+     * Check if plugin supports scheduled collection
+     */
+    public boolean supportsScheduling() {
+        return false; // Override if plugin supports scheduled collection
+    }
+    
+    /**
+     * Check if plugin requires background tracking
+     */
+    public boolean requiresBackgroundTracking() {
+        return false; // Override if plugin needs background tracking
     }
     
     // ===== Data Collection =====
@@ -161,7 +230,21 @@ public abstract class DataCollectorPlugin {
      * Handle custom actions
      */
     public PluginResult handleAction(String action, Bundle params) {
-        return PluginResult.failure("Unknown action: " + action);
+        return PluginResult.failure("Action not supported: " + action);
+    }
+    
+    /**
+     * Get plugin state for persistence
+     */
+    public Map<String, Object> getState() {
+        return null; // Override to provide state
+    }
+    
+    /**
+     * Restore plugin state
+     */
+    public void restoreState(Map<String, Object> state) {
+        // Override to restore state
     }
     
     /**
@@ -226,6 +309,13 @@ public abstract class DataCollectorPlugin {
         if (pluginContext != null) {
             pluginContext.logError(message, error);
         }
+    }
+    
+    /**
+     * Called when plugin is about to be unloaded
+     */
+    public void onDestroy() {
+        // Override to clean up resources
     }
     
     @Override

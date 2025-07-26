@@ -1,23 +1,27 @@
 package com.core.talita.api;
 
 /**
- * QuickAddConfig - Configuration for quick add functionality
- * Defines how a data collector appears and behaves in quick add UI
+ * Configuration for quick add UI elements
+ * 
+ * Defines how a plugin appears in the quick add dashboard,
+ * including style, default values, and interaction behavior.
  */
 public class QuickAddConfig {
     
+    /**
+     * Visual style for the quick add element
+     */
     public enum QuickAddStyle {
-        SIMPLE_BUTTON,      // Just a button that triggers collection
-        NUMERIC_INPUT,      // Quick numeric input (water, weight, etc)
-        SLIDER,            // Slider input (mood, energy level)
-        DURATION_TIMER,    // Start/stop timer (exercise, focus)
-        TEXT_NOTE,         // Quick text note
-        MULTI_CHOICE,      // Multiple choice buttons
-        CARD               // Card style display
+        TILE,           // Standard tile with icon and title
+        CARD,           // Larger card with more information
+        BUTTON,         // Simple button style
+        MULTI_CHOICE,   // Multiple choice selector
+        NUMERIC_INPUT,  // Number input with +/- buttons
+        TEXT_INPUT      // Text input field
     }
     
     private final String title;
-    private final String hint;
+    private final String description;
     private final QuickAddStyle style;
     private final boolean showInDashboard;
     private final Object defaultValue;
@@ -25,28 +29,11 @@ public class QuickAddConfig {
     private final Object maxValue;
     private final String[] choices;
     
-    /**
-     * Simple constructor for basic configs
-     */
-    public QuickAddConfig(String title, String hint, QuickAddStyle style, boolean showInDashboard) {
+    private QuickAddConfig(String title, String description, QuickAddStyle style,
+                          boolean showInDashboard, Object defaultValue,
+                          Object minValue, Object maxValue, String[] choices) {
         this.title = title;
-        this.hint = hint;
-        this.style = style;
-        this.showInDashboard = showInDashboard;
-        this.defaultValue = null;
-        this.minValue = null;
-        this.maxValue = null;
-        this.choices = null;
-    }
-    
-    /**
-     * Full constructor with all options
-     */
-    public QuickAddConfig(String title, String hint, QuickAddStyle style, 
-                         boolean showInDashboard, Object defaultValue,
-                         Object minValue, Object maxValue, String[] choices) {
-        this.title = title;
-        this.hint = hint;
+        this.description = description;
         this.style = style;
         this.showInDashboard = showInDashboard;
         this.defaultValue = defaultValue;
@@ -55,72 +42,145 @@ public class QuickAddConfig {
         this.choices = choices;
     }
     
-    // Builder pattern for easier construction
+    /**
+     * Builder for creating QuickAddConfig instances
+     */
     public static class Builder {
-        private String title;
-        private String hint;
-        private QuickAddStyle style = QuickAddStyle.SIMPLE_BUTTON;
+        private String title = "";
+        private String description = "";
+        private QuickAddStyle style = QuickAddStyle.TILE;
         private boolean showInDashboard = true;
-        private Object defaultValue;
-        private Object minValue;
-        private Object maxValue;
-        private String[] choices;
+        private Object defaultValue = null;
+        private Object minValue = null;
+        private Object maxValue = null;
+        private String[] choices = null;
         
-        public Builder(String title) {
+        /**
+         * Set the title displayed on the quick add element
+         */
+        public Builder setTitle(String title) {
             this.title = title;
-            this.hint = "Tap to add";
-        }
-        
-        public Builder() {
-            this.title = "Quick Add";
-            this.hint = "Tap to add";
-        }
-        
-        public Builder hint(String hint) {
-            this.hint = hint;
             return this;
         }
         
-        public Builder style(QuickAddStyle style) {
+        /**
+         * Set the description or hint text
+         */
+        public Builder setDescription(String description) {
+            this.description = description;
+            return this;
+        }
+        
+        /**
+         * Set the visual style using a string
+         * Falls back to TILE if invalid
+         */
+        public Builder setStyle(String style) {
+            try {
+                this.style = QuickAddStyle.valueOf(style);
+            } catch (IllegalArgumentException e) {
+                this.style = QuickAddStyle.TILE;
+            }
+            return this;
+        }
+        
+        /**
+         * Set the visual style using enum
+         */
+        public Builder setStyle(QuickAddStyle style) {
             this.style = style;
             return this;
         }
         
+        /**
+         * Set whether this should appear in the main dashboard
+         */
         public Builder showInDashboard(boolean show) {
             this.showInDashboard = show;
             return this;
         }
         
+        /**
+         * Set the default value for input types
+         */
         public Builder defaultValue(Object value) {
             this.defaultValue = value;
             return this;
         }
         
+        /**
+         * Set the range for numeric inputs
+         */
         public Builder range(Object min, Object max) {
             this.minValue = min;
             this.maxValue = max;
             return this;
         }
         
+        /**
+         * Set choices for multi-choice style
+         * Automatically sets style to MULTI_CHOICE
+         */
         public Builder choices(String... choices) {
             this.choices = choices;
             this.style = QuickAddStyle.MULTI_CHOICE;
             return this;
         }
         
+        /**
+         * Build the QuickAddConfig instance
+         */
         public QuickAddConfig build() {
-            return new QuickAddConfig(title, hint, style, showInDashboard,
+            return new QuickAddConfig(title, description, style, showInDashboard,
                                     defaultValue, minValue, maxValue, choices);
         }
     }
     
     // Getters
-    public String getTitle() { return title; }
-    public String getHint() { return hint; }
-    public QuickAddStyle getStyle() { return style; }
-    public boolean shouldShowInDashboard() { return showInDashboard; }
-    public Object getDefaultValue() { return defaultValue; }
-    public Object getMinValue() { return minValue; }
-    public Object getMaxValue() { return maxValue; }
-    public String[] getChoices() { return choices; }
+    
+    public String getTitle() { 
+        return title; 
+    }
+    
+    public String getDescription() { 
+        return description; 
+    }
+    
+    public QuickAddStyle getStyle() { 
+        return style; 
+    }
+    
+    public boolean shouldShowInDashboard() { 
+        return showInDashboard; 
+    }
+    
+    public Object getDefaultValue() { 
+        return defaultValue; 
+    }
+    
+    public Object getMinValue() { 
+        return minValue; 
+    }
+    
+    public Object getMaxValue() { 
+        return maxValue; 
+    }
+    
+    public String[] getChoices() { 
+        return choices; 
+    }
+    
+    /**
+     * Check if this config has a numeric range
+     */
+    public boolean hasRange() {
+        return minValue != null && maxValue != null;
+    }
+    
+    /**
+     * Check if this config has multiple choices
+     */
+    public boolean hasChoices() {
+        return choices != null && choices.length > 0;
+    }
 }
