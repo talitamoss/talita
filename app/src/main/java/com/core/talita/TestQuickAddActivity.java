@@ -1,5 +1,18 @@
 package com.core.talita;
 
+/**
+ * TestQuickAddActivity - TEMPORARILY DISABLED FOR MVP
+ * 
+ * Test activity for quick add functionality.
+ * Not needed for production MVP build.
+ */
+public class TestQuickAddActivity extends androidx.appcompat.app.AppCompatActivity {
+    // Test activity disabled for MVP build
+}
+
+/* ORIGINAL CODE - COMMENTED FOR MVP
+package com.core.talita;
+
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
@@ -13,10 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Test Quick Add Activity - For testing quick add functionality
- * Updated to use plugin system
- */
 public class TestQuickAddActivity extends AppCompatActivity {
     private static final String TAG = "TestQuickAdd";
     
@@ -52,21 +61,24 @@ public class TestQuickAddActivity extends AppCompatActivity {
     }
     
     private void loadQuickAddButtons() {
-        List<DataCollectorPlugin> quickAddPlugins = pluginManager.getQuickAddPlugins();
+        List<DataCollectorPlugin> plugins = pluginManager.getEnabledPlugins();
+        int addedCount = 0;
         
-        statusText.setText("Found " + quickAddPlugins.size() + " quick add plugins");
-        
-        for (DataCollectorPlugin plugin : quickAddPlugins) {
-            Button button = createQuickAddButton(plugin);
-            quickAddGrid.addView(button);
+        for (DataCollectorPlugin plugin : plugins) {
+            if (plugin.supportsQuickAdd()) {
+                addQuickAddButton(plugin);
+                addedCount++;
+            }
         }
+        
+        statusText.setText("Found " + addedCount + " quick add plugins");
     }
     
-    private Button createQuickAddButton(DataCollectorPlugin plugin) {
+    private void addQuickAddButton(DataCollectorPlugin plugin) {
         Button button = new Button(this);
         button.setText(plugin.getEmoji() + "\n" + plugin.getPluginName());
         button.setTextSize(14);
-        button.setPadding(16, 16, 16, 16);
+        button.setPadding(20, 20, 20, 20);
         
         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
         params.width = 0;
@@ -77,55 +89,45 @@ public class TestQuickAddActivity extends AppCompatActivity {
         
         button.setOnClickListener(v -> testQuickAdd(plugin));
         
-        return button;
+        quickAddGrid.addView(button);
     }
     
     private void testQuickAdd(DataCollectorPlugin plugin) {
         Log.d(TAG, "Testing quick add for: " + plugin.getPluginName());
         
         try {
-            // Test with sample data based on plugin type
-            Map<String, Object> testData = createTestData(plugin.getPluginId());
+            // Option 1: Use plugin's quick add handler
+            plugin.onQuickAddTapped(this);
             
-            if (testData != null) {
-                // Use quick log
-                collectorManager.quickLog(plugin.getPluginId(), testData);
-                
-                String message = "✅ Quick logged: " + plugin.getPluginName();
-                Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-                statusText.setText(message);
-            } else {
-                // Use regular collection UI
-                plugin.onQuickAddTapped(this);
-                statusText.setText("Triggered UI for: " + plugin.getPluginName());
+            // Option 2: Manual quick add with test data
+            Map<String, Object> testData = new HashMap<>();
+            
+            switch (plugin.getPluginId()) {
+                case "core.water":
+                    testData.put("value", 250);
+                    break;
+                case "core.mood":
+                    testData.put("mood", "happy");
+                    testData.put("energy", 8);
+                    break;
+                case "core.exercise":
+                    testData.put("activity", "Running");
+                    testData.put("duration", 30);
+                    break;
+                default:
+                    testData.put("test", "data");
             }
             
+            collectorManager.quickLog(plugin.getPluginId(), testData);
+            
+            Toast.makeText(this, "✅ Quick add successful!", Toast.LENGTH_SHORT).show();
+            statusText.setText("Last action: " + plugin.getPluginName() + " quick add");
+            
         } catch (Exception e) {
-            String error = "❌ Error: " + e.getMessage();
-            Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
-            statusText.setText(error);
-            Log.e(TAG, "Quick add error", e);
+            Log.e(TAG, "Quick add failed", e);
+            Toast.makeText(this, "❌ Quick add failed: " + e.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
         }
-    }
-    
-    private Map<String, Object> createTestData(String pluginId) {
-        Map<String, Object> data = new HashMap<>();
-        
-        // Create test data based on plugin type
-        if (pluginId.contains("water")) {
-            data.put("amount", 250); // 250ml
-            return data;
-        } else if (pluginId.contains("mood")) {
-            data.put("mood", "Happy");
-            data.put("score", 4);
-            return data;
-        } else if (pluginId.contains("exercise")) {
-            data.put("activity", "Walking");
-            data.put("duration", 30);
-            return data;
-        }
-        
-        // Return null for plugins that need UI
-        return null;
     }
 }
+*/

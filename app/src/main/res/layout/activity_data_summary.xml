@@ -49,6 +49,97 @@
 
         </LinearLayout>
 
+        <!-- Summary Text -->
+        <TextView
+            android:id="@+id/summary_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Your data overview"
+            android:textSize="16sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Stats Cards -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                app:cardBackgroundColor="#FF2A2A2A"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:gravity="center">
+
+                    <TextView
+                        android:id="@+id/today_count"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="24sp"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Today"
+                        android:textSize="12sp"
+                        android:textColor="#AAAAAA" />
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                app:cardBackgroundColor="#FF2A2A2A"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:gravity="center">
+
+                    <TextView
+                        android:id="@+id/week_count"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="24sp"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="This Week"
+                        android:textSize="12sp"
+                        android:textColor="#AAAAAA" />
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+        </LinearLayout>
+
         <!-- Today's Summary Card -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
@@ -163,7 +254,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Quick Access"
+            android:text="Quick Actions"
             android:textSize="20sp"
             android:textColor="#FFFFFF"
             android:textStyle="bold"
@@ -176,17 +267,17 @@
             android:layout_marginBottom="24dp">
 
             <androidx.cardview.widget.CardView
-                android:id="@+id/location_card"
+                android:id="@+id/quick_log_card"
                 android:layout_width="0dp"
-                android:layout_height="80dp"
+                android:layout_height="100dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="6dp"
+                android:layout_marginEnd="12dp"
                 app:cardBackgroundColor="#FF2A2A2A"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
+                android:foreground="?android:attr/selectableItemBackground"
                 android:clickable="true"
-                android:focusable="true"
-                android:foreground="?android:attr/selectableItemBackground">
+                android:focusable="true">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -197,13 +288,13 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="📍"
+                        android:text="➕"
                         android:textSize="24sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Location"
+                        android:text="Quick Log"
                         android:textSize="12sp"
                         android:textColor="#FFFFFF"
                         android:layout_marginTop="4dp" />
@@ -213,18 +304,17 @@
             </androidx.cardview.widget.CardView>
 
             <androidx.cardview.widget.CardView
-                android:id="@+id/audio_card"
+                android:id="@+id/view_patterns_card"
                 android:layout_width="0dp"
-                android:layout_height="80dp"
+                android:layout_height="100dp"
                 android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:layout_marginEnd="6dp"
+                android:layout_marginEnd="12dp"
                 app:cardBackgroundColor="#FF2A2A2A"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
+                android:foreground="?android:attr/selectableItemBackground"
                 android:clickable="true"
-                android:focusable="true"
-                android:foreground="?android:attr/selectableItemBackground">
+                android:focusable="true">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -235,13 +325,13 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="🎤"
+                        android:text="📈"
                         android:textSize="24sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Audio"
+                        android:text="Patterns"
                         android:textSize="12sp"
                         android:textColor="#FFFFFF"
                         android:layout_marginTop="4dp" />
@@ -251,17 +341,16 @@
             </androidx.cardview.widget.CardView>
 
             <androidx.cardview.widget.CardView
-                android:id="@+id/all_data_card"
+                android:id="@+id/view_all_card"
                 android:layout_width="0dp"
-                android:layout_height="80dp"
+                android:layout_height="100dp"
                 android:layout_weight="1"
-                android:layout_marginStart="6dp"
                 app:cardBackgroundColor="#FF2A2A2A"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
+                android:foreground="?android:attr/selectableItemBackground"
                 android:clickable="true"
-                android:focusable="true"
-                android:foreground="?android:attr/selectableItemBackground">
+                android:focusable="true">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -318,7 +407,17 @@
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/data_types_recycler"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp" />
+
+        <!-- View All Button -->
+        <Button
+            android:id="@+id/view_all_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="View All Data"
+            android:textSize="16sp"
+            android:layout_marginBottom="24dp" />
 
     </LinearLayout>
 

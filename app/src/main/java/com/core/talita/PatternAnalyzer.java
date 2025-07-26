@@ -1,13 +1,35 @@
 package com.core.talita;
 
+/**
+ * PatternAnalyzer - TEMPORARILY DISABLED FOR MVP
+ * 
+ * This class provides pattern analysis functionality.
+ * Commenting out until inner classes (AnalysisResult, Correlation, etc.) are properly defined.
+ */
+public class PatternAnalyzer {
+    private android.content.Context context;
+    
+    public PatternAnalyzer(android.content.Context context) {
+        this.context = context;
+    }
+    
+    // Class temporarily disabled for MVP build
+    // TODO: Implement missing inner classes:
+    // - AnalysisResult
+    // - TimePoint
+    // - Correlation
+    // - TrendInfo
+    // - Anomaly
+    // - Prediction
+}
+
+/* ORIGINAL CODE - COMMENTED FOR MVP
+package com.core.talita;
+
 import android.content.Context;
 import android.util.Log;
 import java.util.*;
 
-/**
- * Pattern Analyzer - Discovers meaningful patterns and connections in user data
- * This is where the magic happens - finding the "aha!" moments in data
- */
 public class PatternAnalyzer {
     private static final String TAG = "PatternAnalyzer";
     
@@ -22,9 +44,6 @@ public class PatternAnalyzer {
         this.context = context;
     }
     
-    /**
-     * Analyze data and find patterns
-     */
     public List<PatternsActivity.PatternInsight> analyzePatterns(List<PersonalData> data) {
         List<PatternsActivity.PatternInsight> insights = new ArrayList<>();
         
@@ -55,9 +74,6 @@ public class PatternAnalyzer {
         return insights;
     }
     
-    /**
-     * Find correlations between different data types
-     */
     private List<PatternsActivity.PatternInsight> findCorrelations(List<PersonalData> data) {
         List<PatternsActivity.PatternInsight> insights = new ArrayList<>();
         
@@ -91,63 +107,80 @@ public class PatternAnalyzer {
         return insights;
     }
     
-    /**
-     * Find time-based patterns (daily, weekly rhythms)
-     */
     private List<PatternsActivity.PatternInsight> findTimePatterns(List<PersonalData> data) {
         List<PatternsActivity.PatternInsight> insights = new ArrayList<>();
         
-        // Group by type
-        Map<String, List<PersonalData>> byType = groupByType(data);
+        // Group by hour of day
+        Map<String, Map<Integer, Integer>> hourlyActivity = new HashMap<>();
         
-        for (Map.Entry<String, List<PersonalData>> entry : byType.entrySet()) {
-            String type = entry.getKey();
-            List<PersonalData> items = entry.getValue();
+        for (PersonalData item : data) {
+            String type = item.getDataType();
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(item.getTimestamp());
+            int hour = cal.get(Calendar.HOUR_OF_DAY);
             
-            // Check for daily patterns
-            Map<Integer, Integer> hourCounts = new HashMap<>();
-            for (PersonalData item : items) {
-                Calendar cal = Calendar.getInstance();
-                cal.setTimeInMillis(item.getTimestamp());
-                int hour = cal.get(Calendar.HOUR_OF_DAY);
-                hourCounts.put(hour, hourCounts.getOrDefault(hour, 0) + 1);
+            if (!hourlyActivity.containsKey(type)) {
+                hourlyActivity.put(type, new HashMap<>());
             }
             
-            // Find peak hours
+            Map<Integer, Integer> hours = hourlyActivity.get(type);
+            hours.put(hour, hours.getOrDefault(hour, 0) + 1);
+        }
+        
+        // Find peak hours
+        for (Map.Entry<String, Map<Integer, Integer>> entry : hourlyActivity.entrySet()) {
+            String type = entry.getKey();
+            Map<Integer, Integer> hours = entry.getValue();
+            
             int maxHour = -1;
             int maxCount = 0;
-            for (Map.Entry<Integer, Integer> hourEntry : hourCounts.entrySet()) {
+            
+            for (Map.Entry<Integer, Integer> hourEntry : hours.entrySet()) {
                 if (hourEntry.getValue() > maxCount) {
-                    maxCount = hourEntry.getValue();
                     maxHour = hourEntry.getKey();
+                    maxCount = hourEntry.getValue();
                 }
             }
             
-            if (maxCount >= MIN_OCCURRENCES) {
-                String timeOfDay = getTimeOfDay(maxHour);
+            if (maxHour != -1 && maxCount >= MIN_OCCURRENCES) {
+                String timeStr = formatHour(maxHour);
                 insights.add(new PatternsActivity.PatternInsight(
                     "Peak " + type + " time",
-                    "You usually log " + type + " " + timeOfDay,
-                    (float) maxCount / items.size(),
+                    "Most active at " + timeStr,
+                    0.7f,
                     "⏰"
                 ));
             }
+        }
+        
+        // Check for daily patterns
+        Map<String, Map<Integer, Integer>> dailyActivity = new HashMap<>();
+        
+        for (PersonalData item : data) {
+            String type = item.getDataType();
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(item.getTimestamp());
+            int dayOfWeek = cal.get(Calendar.DAY_OF_WEEK);
             
-            // Check for weekly patterns
-            Map<Integer, Integer> dayCounts = new HashMap<>();
-            for (PersonalData item : items) {
-                Calendar cal = Calendar.getInstance();
-                cal.setTimeInMillis(item.getTimestamp());
-                int day = cal.get(Calendar.DAY_OF_WEEK);
-                dayCounts.put(day, dayCounts.getOrDefault(day, 0) + 1);
+            if (!dailyActivity.containsKey(type)) {
+                dailyActivity.put(type, new HashMap<>());
             }
             
-            // Find patterns in day distribution
+            Map<Integer, Integer> days = dailyActivity.get(type);
+            days.put(dayOfWeek, days.getOrDefault(dayOfWeek, 0) + 1);
+        }
+        
+        // Check weekday vs weekend patterns
+        for (Map.Entry<String, Map<Integer, Integer>> entry : dailyActivity.entrySet()) {
+            String type = entry.getKey();
+            Map<Integer, Integer> days = entry.getValue();
+            
             int weekdayCount = 0;
             int weekendCount = 0;
-            for (Map.Entry<Integer, Integer> dayEntry : dayCounts.entrySet()) {
-                if (dayEntry.getKey() == Calendar.SATURDAY || 
-                    dayEntry.getKey() == Calendar.SUNDAY) {
+            
+            for (Map.Entry<Integer, Integer> dayEntry : days.entrySet()) {
+                int day = dayEntry.getKey();
+                if (day == Calendar.SATURDAY || day == Calendar.SUNDAY) {
                     weekendCount += dayEntry.getValue();
                 } else {
                     weekdayCount += dayEntry.getValue();
@@ -174,9 +207,6 @@ public class PatternAnalyzer {
         return insights;
     }
     
-    /**
-     * Find sequence patterns (A often followed by B)
-     */
     private List<PatternsActivity.PatternInsight> findSequencePatterns(List<PersonalData> data) {
         List<PatternsActivity.PatternInsight> insights = new ArrayList<>();
         
@@ -226,9 +256,6 @@ public class PatternAnalyzer {
         return insights;
     }
     
-    /**
-     * Find anomalies or unusual patterns
-     */
     private List<PatternsActivity.PatternInsight> findAnomalies(List<PersonalData> data) {
         List<PatternsActivity.PatternInsight> insights = new ArrayList<>();
         
@@ -293,9 +320,6 @@ public class PatternAnalyzer {
         return insights;
     }
     
-    /**
-     * Calculate correlation between two data streams
-     */
     private float calculateCorrelation(List<PersonalData> data1, List<PersonalData> data2) {
         int correlations = 0;
         int total = 0;
@@ -318,9 +342,6 @@ public class PatternAnalyzer {
         return Math.min(1.0f, normalized);
     }
     
-    /**
-     * Generate human-readable correlation insight
-     */
     private String generateCorrelationInsight(String type1, String type2, float strength) {
         Map<String, Map<String, String>> insights = new HashMap<>();
         
@@ -334,8 +355,8 @@ public class PatternAnalyzer {
         exerciseInsights.put("sleep", "Active days lead to better sleep");
         
         Map<String, String> sleepInsights = new HashMap<>();
-        sleepInsights.put("mood", "Sleep quality affects your mood");
-        sleepInsights.put("exercise", "Good sleep supports your fitness");
+        sleepInsights.put("mood", "Better sleep correlates with better mood");
+        sleepInsights.put("energy", "Good sleep boosts next-day energy");
         
         insights.put("water", waterInsights);
         insights.put("exercise", exerciseInsights);
@@ -344,18 +365,44 @@ public class PatternAnalyzer {
         // Check for known insight
         if (insights.containsKey(type1) && insights.get(type1).containsKey(type2)) {
             return insights.get(type1).get(type2);
-        }
-        if (insights.containsKey(type2) && insights.get(type2).containsKey(type1)) {
+        } else if (insights.containsKey(type2) && insights.get(type2).containsKey(type1)) {
             return insights.get(type2).get(type1);
         }
         
-        // Generic insight
-        return type1 + " and " + type2 + " seem connected";
+        // Generic correlation
+        if (strength > 0.7) {
+            return "Strong correlation between " + type1 + " and " + type2;
+        } else if (strength > 0.5) {
+            return "Moderate correlation between " + type1 + " and " + type2;
+        } else {
+            return "Weak correlation between " + type1 + " and " + type2;
+        }
     }
     
-    /**
-     * Helper methods
-     */
+    private String getIconForTypes(String type1, String type2) {
+        if ((type1.contains("water") || type2.contains("water")) && 
+            (type1.contains("exercise") || type2.contains("exercise"))) {
+            return "💪💧";
+        }
+        if ((type1.contains("sleep") || type2.contains("sleep")) && 
+            (type1.contains("mood") || type2.contains("mood"))) {
+            return "😴😊";
+        }
+        return "🔗";
+    }
+    
+    private String formatHour(int hour) {
+        if (hour == 0) return "12 AM";
+        if (hour < 12) return hour + " AM";
+        if (hour == 12) return "12 PM";
+        return (hour - 12) + " PM";
+    }
+    
+    private String getDateString(long timestamp) {
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd", Locale.getDefault());
+        return sdf.format(new Date(timestamp));
+    }
+    
     private Map<String, List<PersonalData>> groupByType(List<PersonalData> data) {
         Map<String, List<PersonalData>> grouped = new HashMap<>();
         
@@ -369,34 +416,5 @@ public class PatternAnalyzer {
         
         return grouped;
     }
-    
-    private String getTimeOfDay(int hour) {
-        if (hour >= 5 && hour < 12) return "in the morning";
-        if (hour >= 12 && hour < 17) return "in the afternoon";
-        if (hour >= 17 && hour < 21) return "in the evening";
-        return "at night";
-    }
-    
-    private String getDateString(long timestamp) {
-        Calendar cal = Calendar.getInstance();
-        cal.setTimeInMillis(timestamp);
-        return String.format(Locale.getDefault(), "%d-%02d-%02d",
-            cal.get(Calendar.YEAR),
-            cal.get(Calendar.MONTH) + 1,
-            cal.get(Calendar.DAY_OF_MONTH));
-    }
-    
-    private String getIconForTypes(String type1, String type2) {
-        if ((type1.equals("water") && type2.equals("exercise")) ||
-            (type1.equals("exercise") && type2.equals("water"))) {
-            return "💪";
-        }
-        if (type1.contains("mood") || type2.contains("mood")) {
-            return "😊";
-        }
-        if (type1.contains("sleep") || type2.contains("sleep")) {
-            return "😴";
-        }
-        return "🔗";
-    }
 }
+*/

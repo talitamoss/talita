@@ -1,35 +1,39 @@
 package com.core.talita;
 
+/**
+ * PatternsActivity - TEMPORARILY DISABLED FOR MVP
+ * 
+ * This activity provides advanced pattern analysis features.
+ * Commenting out until PatternAnalyzer inner classes are implemented.
+ */
+public class PatternsActivity extends androidx.appcompat.app.AppCompatActivity {
+    // Activity temporarily disabled for MVP build
+    // TODO: Re-enable once PatternAnalyzer.AnalysisResult and related classes are implemented
+}
+
+/* ORIGINAL CODE - COMMENTED FOR MVP
+package com.core.talita;
+
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.*;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
-import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.charts.PieChart;
-import com.github.mikephil.charting.charts.RadarChart;
+import com.github.mikephil.charting.charts.*;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.data.*;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
-import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-/**
- * PatternsActivity - Advanced data visualization and pattern analysis
- * 
- * Location: app/src/main/java/com/core/talita/PatternsActivity.java
- */
 public class PatternsActivity extends AppCompatActivity {
     private static final String TAG = "PatternsActivity";
     
-    // Time range constants
-    private static final long DAY_MS = 24 * 60 * 60 * 1000;
-    private static final long WEEK_MS = 7 * DAY_MS;
-    private static final long MONTH_MS = 30 * DAY_MS;
+    // Core services
+    private UniversalDataService dataService;
+    private PatternAnalyzer analyzer;
     
     // UI Components
     private Spinner timeRangeSpinner;
@@ -39,15 +43,6 @@ public class PatternsActivity extends AppCompatActivity {
     private ProgressBar loadingProgress;
     
     // Data
-    private UniversalDataService dataService;
-    private PatternAnalyzer analyzer;
-    
-    // Charts
-    private LineChart timelineChart;
-    private PieChart distributionChart;
-    private RadarChart correlationChart;
-    
-    // Current state
     private long currentStartTime;
     private long currentEndTime;
     private String currentPatternType = "overview";
@@ -57,7 +52,7 @@ public class PatternsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_patterns);
         
-        // Initialize services - FIXED: Using getInstance()
+        // Initialize services
         dataService = UniversalDataService.getInstance(this);
         analyzer = new PatternAnalyzer();
         
@@ -67,14 +62,14 @@ public class PatternsActivity extends AppCompatActivity {
     }
     
     private void initializeViews() {
-        // Navigation
+        // Back button
         findViewById(R.id.back_button).setOnClickListener(v -> finish());
         
         // Spinners
         timeRangeSpinner = findViewById(R.id.time_range_spinner);
         patternTypeSpinner = findViewById(R.id.pattern_type_spinner);
         
-        // Containers
+        // Content
         chartsContainer = findViewById(R.id.charts_container);
         insightsText = findViewById(R.id.insights_text);
         loadingProgress = findViewById(R.id.loading_progress);
@@ -87,10 +82,9 @@ public class PatternsActivity extends AppCompatActivity {
     
     private void setupSpinners() {
         // Time range options
-        ArrayAdapter<String> timeAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item,
-                new String[]{"Last 24 Hours", "Last Week", "Last Month", "All Time"});
-        timeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        String[] timeRanges = {"Today", "Last 7 Days", "Last 30 Days", "Last 90 Days", "All Time"};
+        ArrayAdapter<String> timeAdapter = new ArrayAdapter<>(this, 
+                android.R.layout.simple_spinner_dropdown_item, timeRanges);
         timeRangeSpinner.setAdapter(timeAdapter);
         
         timeRangeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -105,10 +99,9 @@ public class PatternsActivity extends AppCompatActivity {
         });
         
         // Pattern type options
+        String[] patternTypes = {"Overview", "Correlations", "Trends", "Anomalies", "Predictions"};
         ArrayAdapter<String> patternAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item,
-                new String[]{"Overview", "Correlations", "Trends", "Anomalies", "Predictions"});
-        patternAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                android.R.layout.simple_spinner_dropdown_item, patternTypes);
         patternTypeSpinner.setAdapter(patternAdapter);
         
         patternTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -124,22 +117,33 @@ public class PatternsActivity extends AppCompatActivity {
     }
     
     private void updateTimeRange(int position) {
-        long now = System.currentTimeMillis();
+        Calendar cal = Calendar.getInstance();
+        currentEndTime = System.currentTimeMillis();
+        
         switch (position) {
-            case 0: // Last 24 hours
-                currentStartTime = now - DAY_MS;
+            case 0: // Today
+                cal.set(Calendar.HOUR_OF_DAY, 0);
+                cal.set(Calendar.MINUTE, 0);
+                cal.set(Calendar.SECOND, 0);
+                cal.set(Calendar.MILLISECOND, 0);
+                currentStartTime = cal.getTimeInMillis();
                 break;
-            case 1: // Last week
-                currentStartTime = now - WEEK_MS;
+            case 1: // Last 7 days
+                cal.add(Calendar.DAY_OF_MONTH, -7);
+                currentStartTime = cal.getTimeInMillis();
                 break;
-            case 2: // Last month
-                currentStartTime = now - MONTH_MS;
+            case 2: // Last 30 days
+                cal.add(Calendar.DAY_OF_MONTH, -30);
+                currentStartTime = cal.getTimeInMillis();
                 break;
-            case 3: // All time
+            case 3: // Last 90 days
+                cal.add(Calendar.DAY_OF_MONTH, -90);
+                currentStartTime = cal.getTimeInMillis();
+                break;
+            case 4: // All time
                 currentStartTime = 0;
                 break;
         }
-        currentEndTime = now;
     }
     
     private void updatePatternType(int position) {
@@ -213,69 +217,59 @@ public class PatternsActivity extends AppCompatActivity {
         createTimelineChart(result.getTimelineData());
         
         // Create distribution pie chart
-        createDistributionChart(result.getDistributionData());
+        createDistributionChart(result.getDataDistribution());
         
-        // Add summary cards
-        createSummaryCards(result.getSummaryStats());
+        // Create activity heatmap
+        createActivityHeatmap(result.getActivityData());
     }
     
     private void createTimelineChart(Map<String, List<PatternAnalyzer.TimePoint>> timelineData) {
-        // Create chart view
-        timelineChart = new LineChart(this);
+        LineChart timelineChart = new LineChart(this);
         timelineChart.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 600));
         
-        // Configure chart
-        timelineChart.getDescription().setEnabled(false);
-        timelineChart.setTouchEnabled(true);
-        timelineChart.setDragEnabled(true);
-        timelineChart.setScaleEnabled(true);
-        timelineChart.setPinchZoom(true);
-        timelineChart.setBackgroundColor(Color.parseColor("#1A1A1A"));
-        timelineChart.setGridBackgroundColor(Color.parseColor("#1A1A1A"));
-        
-        // Prepare data sets
         List<ILineDataSet> dataSets = new ArrayList<>();
         int colorIndex = 0;
-        int[] colors = {Color.CYAN, Color.MAGENTA, Color.YELLOW, Color.GREEN, Color.RED};
+        int[] colors = {
+                Color.parseColor("#FF6B6B"),
+                Color.parseColor("#4ECDC4"),
+                Color.parseColor("#45B7D1"),
+                Color.parseColor("#FFA07A"),
+                Color.parseColor("#98D8C8")
+        };
         
         for (Map.Entry<String, List<PatternAnalyzer.TimePoint>> entry : timelineData.entrySet()) {
-            List<Entry> entries = new ArrayList<>();
+            String dataType = entry.getKey();
             List<PatternAnalyzer.TimePoint> points = entry.getValue();
             
+            List<Entry> entries = new ArrayList<>();
             for (int i = 0; i < points.size(); i++) {
-                entries.add(new Entry(i, points.get(i).getValue()));
+                entries.add(new Entry(i, points.get(i).value));
             }
             
-            LineDataSet dataSet = new LineDataSet(entries, entry.getKey());
+            LineDataSet dataSet = new LineDataSet(entries, dataType);
             dataSet.setColor(colors[colorIndex % colors.length]);
             dataSet.setCircleColor(colors[colorIndex % colors.length]);
             dataSet.setLineWidth(2f);
             dataSet.setCircleRadius(3f);
             dataSet.setDrawCircleHole(false);
-            dataSet.setValueTextSize(9f);
-            dataSet.setValueTextColor(Color.WHITE);
-            dataSet.setDrawFilled(true);
-            dataSet.setFillAlpha(50);
-            dataSet.setFillColor(colors[colorIndex % colors.length]);
+            dataSet.setDrawValues(false);
+            dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
             
             dataSets.add(dataSet);
             colorIndex++;
         }
         
-        // Set data
         LineData lineData = new LineData(dataSets);
         timelineChart.setData(lineData);
         
-        // Configure axes
-        XAxis xAxis = timelineChart.getXAxis();
-        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxis.setTextColor(Color.WHITE);
-        xAxis.setDrawGridLines(false);
-        
+        // Customize chart
+        timelineChart.getDescription().setEnabled(false);
+        timelineChart.getLegend().setTextColor(Color.WHITE);
+        timelineChart.getXAxis().setTextColor(Color.WHITE);
         timelineChart.getAxisLeft().setTextColor(Color.WHITE);
         timelineChart.getAxisRight().setEnabled(false);
-        timelineChart.getLegend().setTextColor(Color.WHITE);
+        timelineChart.setDrawGridBackground(false);
         
         // Add to container
         CardView card = createChartCard("Activity Timeline");
@@ -285,39 +279,25 @@ public class PatternsActivity extends AppCompatActivity {
         timelineChart.animateX(1000);
     }
     
-    private void createDistributionChart(Map<String, Float> distributionData) {
-        // Create chart view
-        distributionChart = new PieChart(this);
+    private void createDistributionChart(Map<String, Float> distribution) {
+        PieChart distributionChart = new PieChart(this);
         distributionChart.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 500));
+                LinearLayout.LayoutParams.MATCH_PARENT, 600));
         
-        // Configure chart
-        distributionChart.getDescription().setEnabled(false);
-        distributionChart.setUsePercentValues(true);
-        distributionChart.setExtraOffsets(5, 10, 5, 5);
-        distributionChart.setDragDecelerationFrictionCoef(0.95f);
-        distributionChart.setDrawHoleEnabled(true);
-        distributionChart.setHoleColor(Color.parseColor("#1A1A1A"));
-        distributionChart.setTransparentCircleRadius(61f);
-        distributionChart.setHoleRadius(58f);
-        distributionChart.setRotationAngle(0);
-        distributionChart.setRotationEnabled(true);
-        distributionChart.setHighlightPerTapEnabled(true);
-        
-        // Prepare data
         List<PieEntry> entries = new ArrayList<>();
-        for (Map.Entry<String, Float> entry : distributionData.entrySet()) {
+        for (Map.Entry<String, Float> entry : distribution.entrySet()) {
             entries.add(new PieEntry(entry.getValue(), entry.getKey()));
         }
         
-        PieDataSet dataSet = new PieDataSet(entries, "Distribution");
-        dataSet.setSliceSpace(3f);
-        dataSet.setSelectionShift(5f);
+        PieDataSet dataSet = new PieDataSet(entries, "Data Distribution");
+        dataSet.setDrawValues(true);
+        dataSet.setValueTextSize(12f);
         
         // Set colors
         List<Integer> colors = new ArrayList<>();
-        colors.add(Color.parseColor("#FF6384"));
-        colors.add(Color.parseColor("#36A2EB"));
+        colors.add(Color.parseColor("#FF6B6B"));
+        colors.add(Color.parseColor("#4ECDC4"));
+        colors.add(Color.parseColor("#45B7D1"));
         colors.add(Color.parseColor("#FFCE56"));
         colors.add(Color.parseColor("#4BC0C0"));
         colors.add(Color.parseColor("#9966FF"));
@@ -377,8 +357,8 @@ public class PatternsActivity extends AppCompatActivity {
         params.setMargins(0, 0, 0, 16);
         card.setLayoutParams(params);
         card.setCardBackgroundColor(Color.parseColor("#2A2A2A"));
-        card.setRadius(8);
-        card.setCardElevation(4);
+        card.setRadius(12f);
+        card.setCardElevation(4f);
         
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -386,56 +366,71 @@ public class PatternsActivity extends AppCompatActivity {
         
         TextView titleView = new TextView(this);
         titleView.setText(title);
+        titleView.setTextSize(18f);
         titleView.setTextColor(Color.WHITE);
-        titleView.setTextSize(18);
         titleView.setPadding(0, 0, 0, 16);
         content.addView(titleView);
         
         LinearLayout chartContainer = new LinearLayout(this);
         chartContainer.setId(R.id.chart_container);
-        chartContainer.setOrientation(LinearLayout.VERTICAL);
         content.addView(chartContainer);
         
         card.addView(content);
         return card;
     }
     
-    private void createSummaryCards(Map<String, Object> stats) {
+    private void createActivityHeatmap(Map<String, Map<Integer, Integer>> activityData) {
+        // TODO: Implement heatmap visualization
+        // For now, create a simple grid view
+        
+        LinearLayout heatmapContainer = new LinearLayout(this);
+        heatmapContainer.setOrientation(LinearLayout.VERTICAL);
+        
+        for (Map.Entry<String, Map<Integer, Integer>> entry : activityData.entrySet()) {
+            TextView typeLabel = new TextView(this);
+            typeLabel.setText(entry.getKey());
+            typeLabel.setTextColor(Color.WHITE);
+            heatmapContainer.addView(typeLabel);
+            
+            // Create hour grid
+            LinearLayout hourGrid = new LinearLayout(this);
+            hourGrid.setOrientation(LinearLayout.HORIZONTAL);
+            
+            for (int hour = 0; hour < 24; hour++) {
+                TextView hourCell = new TextView(this);
+                int count = entry.getValue().getOrDefault(hour, 0);
+                hourCell.setText(String.valueOf(count));
+                hourCell.setTextSize(10f);
+                hourCell.setPadding(4, 4, 4, 4);
+                
+                // Color based on intensity
+                int intensity = Math.min(255, count * 50);
+                hourCell.setBackgroundColor(Color.argb(intensity, 255, 107, 107));
+                
+                hourGrid.addView(hourCell);
+            }
+            
+            heatmapContainer.addView(hourGrid);
+        }
+        
+        CardView card = createChartCard("Activity Heatmap");
+        LinearLayout content = (LinearLayout) card.getChildAt(0);
+        LinearLayout chartContainer = new LinearLayout(this);
+        chartContainer.addView(heatmapContainer);
+        
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        chartContainer.setLayoutParams(params);
+        
+        content.addView(chartContainer);
+        
+        // Create a horizontal scroll view for wide content
+        HorizontalScrollView scrollView = new HorizontalScrollView(this);
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-        
-        for (Map.Entry<String, Object> entry : stats.entrySet()) {
-            CardView card = new CardView(this);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-            params.setMargins(4, 0, 4, 16);
-            card.setLayoutParams(params);
-            card.setCardBackgroundColor(Color.parseColor("#2A2A2A"));
-            card.setRadius(8);
-            
-            LinearLayout content = new LinearLayout(this);
-            content.setOrientation(LinearLayout.VERTICAL);
-            content.setPadding(16, 16, 16, 16);
-            content.setGravity(android.view.Gravity.CENTER);
-            
-            TextView value = new TextView(this);
-            value.setText(String.valueOf(entry.getValue()));
-            value.setTextColor(Color.WHITE);
-            value.setTextSize(24);
-            content.addView(value);
-            
-            TextView label = new TextView(this);
-            label.setText(entry.getKey());
-            label.setTextColor(Color.GRAY);
-            label.setTextSize(12);
-            content.addView(label);
-            
-            card.addView(content);
-            row.addView(card);
-        }
+        scrollView.addView(content);
+        row.addView(card);
         
         chartsContainer.addView(row);
     }
@@ -501,91 +496,11 @@ public class PatternsActivity extends AppCompatActivity {
     private void showLoading(boolean show) {
         loadingProgress.setVisibility(show ? View.VISIBLE : View.GONE);
         chartsContainer.setVisibility(show ? View.GONE : View.VISIBLE);
+        insightsText.setVisibility(show ? View.GONE : View.VISIBLE);
     }
     
     private void showError(String message) {
-        new AlertDialog.Builder(this)
-                .setTitle("Error")
-                .setMessage(message)
-                .setPositiveButton("OK", null)
-                .show();
-    }
-    
-    // Inner class for network visualization
-    private class NetworkVisualization {
-        private final Map<String, Node> nodeMap = new HashMap<>();
-        private final List<Edge> edges = new ArrayList<>();
-        
-        public void buildFromData(List<PersonalData> data) {
-            // Build nodes for each data type
-            for (PersonalData item : data) {
-                String type = item.getType();
-                if (!nodeMap.containsKey(type)) {
-                    nodeMap.put(type, new Node(type));
-                }
-                nodeMap.get(type).incrementCount();
-            }
-            
-            // Build edges based on temporal proximity
-            for (int i = 0; i < data.size() - 1; i++) {
-                PersonalData item1 = data.get(i);
-                PersonalData item2 = data.get(i + 1);
-                
-                // If items are within 5 minutes of each other
-                if (Math.abs(item1.getTimestamp() - item2.getTimestamp()) < 5 * 60 * 1000
-                        && !item1.getType().equals(item2.getType())) {
-                    
-                    Node from = nodeMap.get(item1.getType());
-                    Node to = nodeMap.get(item2.getType());
-                    
-                    Edge edge = findOrCreateEdge(from, to);
-                    edge.incrementWeight();
-                }
-            }
-        }
-        
-        private Edge findOrCreateEdge(Node from, Node to) {
-            for (Edge edge : edges) {
-                if ((edge.from == from && edge.to == to) ||
-                    (edge.from == to && edge.to == from)) {
-                    return edge;
-                }
-            }
-            
-            Edge newEdge = new Edge(from, to);
-            edges.add(newEdge);
-            return newEdge;
-        }
-        
-        class Node {
-            String type;
-            int count = 0;
-            float x, y; // Position for visualization
-            
-            Node(String type) {
-                this.type = type;
-                // Random initial position
-                this.x = (float) Math.random() * 100;
-                this.y = (float) Math.random() * 100;
-            }
-            
-            void incrementCount() {
-                count++;
-            }
-        }
-        
-        class Edge {
-            Node from, to;
-            int weight = 0;
-            
-            Edge(Node from, Node to) {
-                this.from = from;
-                this.to = to;
-            }
-            
-            void incrementWeight() {
-                weight++;
-            }
-        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 }
+*/

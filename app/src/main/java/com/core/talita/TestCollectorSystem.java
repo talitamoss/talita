@@ -1,5 +1,18 @@
 package com.core.talita;
 
+/**
+ * TestCollectorSystem - TEMPORARILY DISABLED FOR MVP
+ * 
+ * Test class for verifying the plugin-based collector system.
+ * Not needed for production MVP build.
+ */
+public class TestCollectorSystem {
+    // Test class disabled for MVP build
+}
+
+/* ORIGINAL CODE - COMMENTED FOR MVP
+package com.core.talita;
+
 import android.content.Context;
 import android.util.Log;
 import com.core.talita.api.*;
@@ -8,16 +21,9 @@ import com.core.talita.plugins.DataCollectorPlugin;
 import com.core.talita.plugins.core.WaterPlugin;
 import java.util.*;
 
-/**
- * Test class to verify the plugin-based collector system works
- * Updated to use the new plugin architecture
- */
 public class TestCollectorSystem {
     private static final String TAG = "TestCollectorSystem";
 
-    /**
-     * Test the water collection system using plugins
-     */
     public static void testWaterCollection(Context context) {
         Log.d(TAG, "🧪 Testing water collection system with plugins...");
 
@@ -77,9 +83,6 @@ public class TestCollectorSystem {
         }
     }
 
-    /**
-     * Test getting all collectors for UI
-     */
     public static void testCollectorCategories(Context context) {
         Log.d(TAG, "🧪 Testing collector categories with plugin system...");
 
@@ -110,100 +113,53 @@ public class TestCollectorSystem {
         }
     }
 
-    /**
-     * Test plugin system functionality
-     */
-    public static void testPluginSystem(Context context) {
-        Log.d(TAG, "🧪 Testing plugin system...");
-
-        try {
-            PluginManager pluginManager = PluginManager.getInstance(context);
-
-            // List all plugins
-            List<DataCollectorPlugin> allPlugins = pluginManager.getAllPlugins();
-            Log.d(TAG, "📦 Total plugins: " + allPlugins.size());
-
-            for (DataCollectorPlugin plugin : allPlugins) {
-                Log.d(TAG, "  Plugin: " + plugin.getEmoji() + " " + 
-                           plugin.getPluginName() + " v" + plugin.getPluginVersion() +
-                           " [" + plugin.getPluginId() + "]");
-            }
-
-            // Test plugin categories
-            String[] categories = {"i", "we", "all"};
-            for (String category : categories) {
-                List<DataCollectorPlugin> categoryPlugins = pluginManager.getPluginsByCategory(category);
-                Log.d(TAG, "📂 Category '" + getCategoryName(category) + "' has " + 
-                           categoryPlugins.size() + " plugins");
-            }
-
-            // Test enabling/disabling
-            String testPluginId = "core.water";
-            boolean originalState = pluginManager.getPlugin(testPluginId).isEnabled();
-            
-            pluginManager.setPluginEnabled(testPluginId, false);
-            Log.d(TAG, "🔄 Disabled " + testPluginId);
-            
-            pluginManager.setPluginEnabled(testPluginId, true);
-            Log.d(TAG, "🔄 Re-enabled " + testPluginId);
-            
-            pluginManager.setPluginEnabled(testPluginId, originalState);
-
-            Log.d(TAG, "🎉 Plugin system test PASSED!");
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Plugin system test FAILED: " + e.getMessage());
-            e.printStackTrace();
+    private static String getCategoryName(String categoryId) {
+        switch (categoryId) {
+            case "movement": return "Movement & Fitness";
+            case "wellness": return "Lifestyle & Wellness";
+            case "mood": return "Mood & Energy";
+            case "i": return "Personal & Social";
+            case "it": return "IT & Technology";
+            default: return categoryId;
         }
     }
 
-    /**
-     * Run all tests
-     */
-    public static void runAllTests(Context context) {
-        Log.d(TAG, "🚀 Starting plugin-based collector system tests...");
-        Log.d(TAG, "================================================");
+    public static void testAllPlugins(Context context) {
+        Log.d(TAG, "🧪 Testing all plugins...");
 
-        testPluginSystem(context);
-        Log.d(TAG, "------------------------------------------------");
-        
-        testWaterCollection(context);
-        Log.d(TAG, "------------------------------------------------");
-        
-        testCollectorCategories(context);
-        Log.d(TAG, "------------------------------------------------");
+        PluginManager pluginManager = PluginManager.getInstance(context);
+        List<DataCollectorPlugin> allPlugins = pluginManager.getAllPlugins();
 
-        Log.d(TAG, "✅ All collector system tests completed!");
-        Log.d(TAG, "================================================");
-    }
+        Log.d(TAG, "📋 Found " + allPlugins.size() + " plugins:");
 
-    /**
-     * Get friendly category name
-     */
-    private static String getCategoryName(String category) {
-        switch (category.toLowerCase()) {
-            case "i":
-                return "I (Personal)";
-            case "we":
-                return "We (Social)";
-            case "all":
-                return "All (Universal)";
-            default:
-                return category;
+        for (DataCollectorPlugin plugin : allPlugins) {
+            Log.d(TAG, "\n--- Testing " + plugin.getPluginName() + " ---");
+            Log.d(TAG, "ID: " + plugin.getPluginId());
+            Log.d(TAG, "Version: " + plugin.getVersion());
+            Log.d(TAG, "Author: " + plugin.getAuthor());
+            Log.d(TAG, "Category: " + plugin.getCategory());
+            Log.d(TAG, "Enabled: " + plugin.isEnabled());
+
+            try {
+                // Test creating collector
+                DataCollector collector = plugin.createCollector(context);
+                if (collector != null) {
+                    Log.d(TAG, "✅ Collector created successfully");
+                    
+                    // Test quick add if supported
+                    if (plugin.supportsQuickAdd()) {
+                        QuickAddConfig config = plugin.getQuickAddConfig();
+                        Log.d(TAG, "✅ Quick Add supported: " + config.getTitle());
+                    }
+                } else {
+                    Log.d(TAG, "❌ Failed to create collector");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error testing plugin: " + e.getMessage());
+            }
         }
-    }
 
-    /**
-     * Clear test data
-     */
-    public static void clearTestData(Context context) {
-        Log.d(TAG, "🧹 Clearing test data...");
-        
-        // Clear water data
-        WaterPlugin.WaterHelper.clearTodayData(context);
-        
-        // Clear other test data as needed
-        
-        Log.d(TAG, "✅ Test data cleared");
+        Log.d(TAG, "\n🎉 Plugin test completed!");
     }
 }
+*/

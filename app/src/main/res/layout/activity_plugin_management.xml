@@ -9,92 +9,70 @@
     <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:background="#FF1E1E1E"
-        android:elevation="4dp">
+        android:layout_height="?attr/actionBarSize"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:background="#FF1A1A1A">
 
-        <!-- Title Bar -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <ImageButton
-                android:id="@+id/back_button"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_arrow_back"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:tint="#FFFFFF" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Plugin Store"
-                android:textSize="24sp"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:layout_marginStart="16dp" />
-
-            <ImageButton
-                android:id="@+id/settings_button"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_settings"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:tint="#FFFFFF" />
-
-        </LinearLayout>
-
-        <!-- Search Bar -->
-        <androidx.appcompat.widget.SearchView
-            android:id="@+id/search_view"
-            android:layout_width="match_parent"
+        <Button
+            android:id="@+id/back_button"
+            android:layout_width="48dp"
             android:layout_height="48dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/search_background"
-            app:queryHint="Search plugins..."
-            app:iconifiedByDefault="false"
-            app:searchHintIcon="@null"
-            app:searchIcon="@drawable/ic_search"
-            app:closeIcon="@drawable/ic_close" />
+            android:text="←"
+            android:textSize="20sp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:textColor="#FFFFFFFF" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:text="Plugin Management"
+            android:textSize="20sp"
+            android:textColor="#FFFFFFFF"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/reload_plugins_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Reload"
+            android:textSize="14sp"
+            android:background="@android:color/transparent"
+            android:textColor="#4285F4" />
 
     </LinearLayout>
 
-    <!-- Tabs -->
-    <com.google.android.material.tabs.TabLayout
-        android:id="@+id/tab_layout"
+    <!-- Active Plugins Count -->
+    <TextView
+        android:id="@+id/active_plugins_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#FF1E1E1E"
-        app:tabTextColor="#888888"
-        app:tabSelectedTextColor="#FFFFFF"
-        app:tabIndicatorColor="#6366F1"
-        app:tabMode="fixed"
-        app:tabGravity="fill" />
+        android:padding="16dp"
+        android:text="0 active plugins"
+        android:textSize="14sp"
+        android:textColor="#AAAAAA"
+        android:background="#FF1A1A1A" />
 
-    <!-- Content -->
-    <FrameLayout
+    <!-- Category Filter -->
+    <Spinner
+        android:id="@+id/category_filter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
+        android:background="#FF2A2A2A"
+        android:padding="12dp"
+        android:popupBackground="#FF2A2A2A" />
+
+    <!-- Plugins List -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/plugins_recycler"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.viewpager2.widget.ViewPager2
-            android:id="@+id/view_pager"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <ProgressBar
-            android:id="@+id/progress_bar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="gone" />
-
-    </FrameLayout>
-
-</LinearLayout>
+        android:layout_weight="1"
+        android:paddingHorizontal="16dp"
+        android:clipToPadding="false" />
