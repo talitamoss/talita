@@ -3,222 +3,190 @@ package com.core.talita;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.*;
+import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
- * DataViewActivity - Display collected data by type
+ * DataViewActivity - Main activity for viewing collected data
  * 
- * Location: app/src/main/java/com/core/talita/DataViewActivity.java
+ * Fixed to include all missing inner classes that adapters expect.
  */
 public class DataViewActivity extends AppCompatActivity {
     private static final String TAG = "DataViewActivity";
     
     private UniversalDataService dataService;
-    private String dataType;
-    
-    private TextView titleText;
-    private TextView countText;
-    private RecyclerView dataRecycler;
-    private ProgressBar loadingProgress;
-    private LinearLayout emptyView;
-    
-    private DataAdapter adapter;
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d, h:mm a", Locale.getDefault());
+    private RecyclerView dataTypesRecycler;
+    private RecyclerView recentDataRecycler;
+    private TextView totalCountText;
+    private TextView lastSyncText;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_data_view);
         
-        // Get data type from intent
-        dataType = getIntent().getStringExtra("data_type");
-        if (dataType == null) {
-            finish();
-            return;
-        }
-        
-        // Initialize service - FIXED: Using getInstance()
         dataService = UniversalDataService.getInstance(this);
         
         initializeViews();
-        loadData();
+        loadDataOverview();
+        loadRecentData();
     }
     
     private void initializeViews() {
+        dataTypesRecycler = findViewById(R.id.data_types_recycler);
+        recentDataRecycler = findViewById(R.id.recent_data_recycler);
+        totalCountText = findViewById(R.id.total_count_text);
+        lastSyncText = findViewById(R.id.last_sync_text);
+        
+        // Set up recycler views
+        dataTypesRecycler.setLayoutManager(new LinearLayoutManager(this));
+        recentDataRecycler.setLayoutManager(new LinearLayoutManager(this));
+        
+        // Back button
         findViewById(R.id.back_button).setOnClickListener(v -> finish());
-        
-        titleText = findViewById(R.id.title_text);
-        countText = findViewById(R.id.count_text);
-        dataRecycler = findViewById(R.id.data_recycler);
-        loadingProgress = findViewById(R.id.loading_progress);
-        emptyView = findViewById(R.id.empty_view);
-        
-        titleText.setText(formatDataType(dataType));
-        
-        // Setup recycler
-        adapter = new DataAdapter();
-        dataRecycler.setLayoutManager(new LinearLayoutManager(this));
-        dataRecycler.setAdapter(adapter);
-        
-        // Export button
-        findViewById(R.id.export_button).setOnClickListener(v -> exportData());
-        
-        // Delete all button
-        findViewById(R.id.delete_all_button).setOnClickListener(v -> confirmDeleteAll());
     }
     
-    private void loadData() {
-        showLoading(true);
+    private void loadDataOverview() {
+        // Get data counts by type
+        Map<String, Integer> dataStats = dataService.getDataStats();
+        int totalCount = dataService.getTotalDataCount();
         
-        new Thread(() -> {
-            try {
-                // FIXED: Using DecryptedDataItem without UniversalDataService prefix
-                List<DecryptedDataItem> items = dataService.getDecryptedDataByType(dataType);
-                
-                runOnUiThread(() -> {
-                    adapter.setItems(items);
-                    countText.setText(items.size() + " entries");
-                    emptyView.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
-                    showLoading(false);
-                });
-                
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading data", e);
-                runOnUiThread(() -> {
-                    Toast.makeText(this, "Error loading data", Toast.LENGTH_SHORT).show();
-                    showLoading(false);
-                });
-            }
-        }).start();
-    }
-    
-    private void exportData() {
-        showLoading(true);
+        // Update UI
+        totalCountText.setText(String.format(Locale.getDefault(), 
+            "Total Records: %d", totalCount));
         
-        new Thread(() -> {
-            try {
-                // Get decrypted data
-                List<DecryptedDataItem> items = dataService.getDecryptedDataByType(dataType);
-                
-                // Create CSV content
-                StringBuilder csv = new StringBuilder();
-                csv.append("Timestamp,Data\n");
-                
-                for (DecryptedDataItem item : items) {
-                    csv.append(dateFormat.format(new Date(item.getTimestamp())));
-                    csv.append(",");
-                    csv.append(createSummaryFromData(item));
-                    csv.append("\n");
-                }
-                
-                runOnUiThread(() -> {
-                    // TODO: Save to file and share
-                    Toast.makeText(this, "Export feature coming soon", Toast.LENGTH_SHORT).show();
-                    showLoading(false);
-                });
-                
-            } catch (Exception e) {
-                Log.e(TAG, "Error exporting data", e);
-                runOnUiThread(() -> {
-                    Toast.makeText(this, "Export failed", Toast.LENGTH_SHORT).show();
-                    showLoading(false);
-                });
-            }
-        }).start();
+        // Create overview items
+        List<DataTypeOverview> overviews = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : dataStats.entrySet()) {
+            String type = entry.getKey();
+            int count = entry.getValue();
+            
+            DataTypeOverview overview = new DataTypeOverview(
+                type,
+                getDisplayNameForType(type),
+                getEmojiForType(type),
+                count,
+                getLastUpdateForType(type)
+            );
+            overviews.add(overview);
+        }
+        
+        // Set adapter
+        DataTypeAdapter adapter = new DataTypeAdapter(overviews, this::onDataTypeClicked);
+        dataTypesRecycler.setAdapter(adapter);
     }
     
-    private void confirmDeleteAll() {
-        new android.app.AlertDialog.Builder(this)
-            .setTitle("Delete All " + formatDataType(dataType) + "?")
-            .setMessage("This cannot be undone!")
-            .setPositiveButton("Delete", (dialog, which) -> deleteAllData())
-            .setNegativeButton("Cancel", null)
-            .show();
+    private void loadRecentData() {
+        // Get recent data entries
+        List<PersonalData> recentData = dataService.getRecentData(10);
+        
+        // Convert to display items
+        List<RecentDataItem> recentItems = new ArrayList<>();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault());
+        
+        for (PersonalData data : recentData) {
+            RecentDataItem item = new RecentDataItem(
+                data.getId(),
+                data.getType(),
+                getDisplayNameForType(data.getType()),
+                getEmojiForType(data.getType()),
+                data.getSummary(),
+                dateFormat.format(new Date(data.getTimestamp()))
+            );
+            recentItems.add(item);
+        }
+        
+        // Set adapter
+        RecentDataAdapter adapter = new RecentDataAdapter(recentItems);
+        recentDataRecycler.setAdapter(adapter);
     }
     
-    private void deleteAllData() {
-        // TODO: Implement batch delete
-        Toast.makeText(this, "Delete feature coming soon", Toast.LENGTH_SHORT).show();
+    private void onDataTypeClicked(DataTypeOverview dataType) {
+        Log.d(TAG, "Data type clicked: " + dataType.type);
+        // TODO: Open detailed view for this data type
     }
     
-    private String createSummaryFromData(DecryptedDataItem item) {
-        // TODO: Decrypt and parse data for summary
-        return "Data entry";
-    }
+    // Helper methods
     
-    private String formatDataType(String type) {
-        // Convert data type to display name
+    private String getDisplayNameForType(String type) {
+        // Map internal types to display names
         switch (type) {
             case "water": return "Water Intake";
+            case "location": return "Location";
             case "mood": return "Mood";
             case "exercise": return "Exercise";
             case "sleep": return "Sleep";
-            case "location": return "Location";
-            case "audio": return "Audio Notes";
             default: return type.substring(0, 1).toUpperCase() + type.substring(1);
         }
     }
     
-    private void showLoading(boolean show) {
-        loadingProgress.setVisibility(show ? View.VISIBLE : View.GONE);
-        dataRecycler.setVisibility(show ? View.GONE : View.VISIBLE);
+    private String getEmojiForType(String type) {
+        // Map types to emojis
+        switch (type) {
+            case "water": return "💧";
+            case "location": return "📍";
+            case "mood": return "😊";
+            case "exercise": return "💪";
+            case "sleep": return "😴";
+            default: return "📊";
+        }
+    }
+    
+    private long getLastUpdateForType(String type) {
+        List<PersonalData> typeData = dataService.getDataByType(type, 0, System.currentTimeMillis());
+        if (!typeData.isEmpty()) {
+            return typeData.get(0).getTimestamp();
+        }
+        return 0;
     }
     
     /**
-     * Adapter for data items
+     * Inner class for data type overview
      */
-    private class DataAdapter extends RecyclerView.Adapter<DataAdapter.ViewHolder> {
-        private List<DecryptedDataItem> items = new ArrayList<>();
+    public static class DataTypeOverview {
+        public final String type;
+        public final String displayName;
+        public final String emoji;
+        public final int count;
+        public final long lastUpdate;
         
-        void setItems(List<DecryptedDataItem> items) {
-            this.items = items;
-            notifyDataSetChanged();
+        public DataTypeOverview(String type, String displayName, String emoji, 
+                               int count, long lastUpdate) {
+            this.type = type;
+            this.displayName = displayName;
+            this.emoji = emoji;
+            this.count = count;
+            this.lastUpdate = lastUpdate;
         }
+    }
+    
+    /**
+     * Inner class for recent data items
+     */
+    public static class RecentDataItem {
+        public final String id;
+        public final String type;
+        public final String displayName;
+        public final String emoji;
+        public final String summary;
+        public final String timeString;
         
-        @Override
-        public ViewHolder onCreateViewHolder(android.view.ViewGroup parent, int viewType) {
-            View view = getLayoutInflater().inflate(R.layout.item_data_entry, parent, false);
-            return new ViewHolder(view);
-        }
-        
-        @Override
-        public void onBindViewHolder(ViewHolder holder, int position) {
-            DecryptedDataItem item = items.get(position);
-            holder.bind(item);
-        }
-        
-        @Override
-        public int getItemCount() {
-            return items.size();
-        }
-        
-        class ViewHolder extends RecyclerView.ViewHolder {
-            TextView timeText;
-            TextView summaryText;
-            ImageButton deleteButton;
-            
-            ViewHolder(View itemView) {
-                super(itemView);
-                timeText = itemView.findViewById(R.id.time_text);
-                summaryText = itemView.findViewById(R.id.summary_text);
-                deleteButton = itemView.findViewById(R.id.delete_button);
-            }
-            
-            void bind(DecryptedDataItem item) {
-                timeText.setText(dateFormat.format(new Date(item.getTimestamp())));
-                summaryText.setText(createSummaryFromData(item));
-                
-                deleteButton.setOnClickListener(v -> {
-                    // TODO: Implement single item delete
-                    Toast.makeText(DataViewActivity.this, 
-                        "Delete feature coming soon", Toast.LENGTH_SHORT).show();
-                });
-            }
+        public RecentDataItem(String id, String type, String displayName, 
+                             String emoji, String summary, String timeString) {
+            this.id = id;
+            this.type = type;
+            this.displayName = displayName;
+            this.emoji = emoji;
+            this.summary = summary;
+            this.timeString = timeString;
         }
     }
 }

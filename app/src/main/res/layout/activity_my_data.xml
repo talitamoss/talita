@@ -50,7 +50,7 @@
             app:tabTextColor="#AAAAAA"
             app:tabSelectedTextColor="#FFFFFF"
             app:tabIndicatorColor="#FF7B1FA2"
-            app:tabBackground="#FF2A2A2A" />
+            android:background="#FF2A2A2A" />
 
         <!-- Summary Card -->
         <androidx.cardview.widget.CardView
@@ -92,10 +92,10 @@
                         android:textColor="#FFFFFF" />
 
                     <TextView
-                        android:id="@+id/streak_text"
+                        android:id="@+id/data_points_text"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="0 day streak"
+                        android:text="0 data points"
                         android:textSize="16sp"
                         android:textColor="#FFFFFF" />
 
@@ -105,134 +105,14 @@
 
         </androidx.cardview.widget.CardView>
 
-        <!-- Stats Overview -->
+        <!-- Data Categories -->
         <LinearLayout
+            android:id="@+id/categories_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="24dp">
-
-            <androidx.cardview.widget.CardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                app:cardCornerRadius="8dp"
-                app:cardBackgroundColor="#FF2A2A2A">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp"
-                    android:gravity="center">
-
-                    <TextView
-                        android:id="@+id/total_entries_text"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textSize="24sp"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Entries"
-                        android:textSize="12sp"
-                        android:textColor="#AAAAAA" />
-
-                </LinearLayout>
-
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                app:cardCornerRadius="8dp"
-                app:cardBackgroundColor="#FF2A2A2A">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp"
-                    android:gravity="center">
-
-                    <TextView
-                        android:id="@+id/data_types_text"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textSize="24sp"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Types"
-                        android:textSize="12sp"
-                        android:textColor="#AAAAAA" />
-
-                </LinearLayout>
-
-            </androidx.cardview.widget.CardView>
-
+            android:orientation="vertical">
+            <!-- Categories will be added dynamically -->
         </LinearLayout>
-
-        <!-- Action Buttons -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="ACTIONS"
-            android:textSize="14sp"
-            android:textColor="#FF7B1FA2"
-            android:textStyle="bold"
-            android:layout_marginBottom="12dp" />
-
-        <Button
-            android:id="@+id/view_all_data_button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="View All Data"
-            android:textSize="16sp" />
-
-        <Button
-            android:id="@+id/export_data_button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="Export Data"
-            android:textSize="16sp" />
-
-        <Button
-            android:id="@+id/data_patterns_button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            android:text="View Patterns"
-            android:textSize="16sp" />
-
-        <!-- Recent Activity -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="RECENT ACTIVITY"
-            android:textSize="14sp"
-            android:textColor="#FF7B1FA2"
-            android:textStyle="bold"
-            android:layout_marginBottom="12dp" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recent_activity_recycler"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:nestedScrollingEnabled="false" />
 
     </LinearLayout>
 

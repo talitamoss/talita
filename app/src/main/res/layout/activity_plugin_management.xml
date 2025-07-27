@@ -76,3 +76,5 @@
         android:layout_weight="1"
         android:paddingHorizontal="16dp"
         android:clipToPadding="false" />
+
+</LinearLayout>

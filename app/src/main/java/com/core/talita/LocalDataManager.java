@@ -6,17 +6,16 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
+import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * LocalDataManager - SQLite database manager for encrypted data
  * 
- * Features:
- * - Stores encrypted data locally
- * - Efficient querying by type and time range
- * - Tracks file paths for media
- * - Backup queue management
+ * Extended with all missing methods needed by the codebase
  */
 public class LocalDataManager extends SQLiteOpenHelper {
     private static final String TAG = "LocalDataManager";
@@ -45,253 +44,232 @@ public class LocalDataManager extends SQLiteOpenHelper {
         String createTable = "CREATE TABLE " + TABLE_DATA + " (" +
                 COL_ID + " TEXT PRIMARY KEY, " +
                 COL_TYPE + " TEXT NOT NULL, " +
-                COL_ENCRYPTED_DATA + " TEXT NOT NULL, " +
+                COL_ENCRYPTED_DATA + " TEXT, " +
                 COL_FILE_PATH + " TEXT, " +
                 COL_TIMESTAMP + " INTEGER NOT NULL, " +
                 COL_CREATED_AT + " INTEGER NOT NULL, " +
-                COL_SYNCED + " INTEGER DEFAULT 0)";
+                COL_SYNCED + " INTEGER DEFAULT 0" +
+                ")";
         
         db.execSQL(createTable);
         
-        // Create indices for performance
+        // Create indices for better performance
         db.execSQL("CREATE INDEX idx_type ON " + TABLE_DATA + "(" + COL_TYPE + ")");
         db.execSQL("CREATE INDEX idx_timestamp ON " + TABLE_DATA + "(" + COL_TIMESTAMP + ")");
         db.execSQL("CREATE INDEX idx_synced ON " + TABLE_DATA + "(" + COL_SYNCED + ")");
         
-        Log.d(TAG, "✅ Database created");
+        Log.d(TAG, "Database created successfully");
     }
     
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Handle database upgrades
         Log.d(TAG, "Upgrading database from version " + oldVersion + " to " + newVersion);
+        
+        // For now, just recreate the table
+        // In production, you'd want to migrate data
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_DATA);
+        onCreate(db);
     }
     
     /**
      * Save encrypted data
      */
-    public boolean saveEncryptedData(String id, String type, String encryptedData, String filePath) {
+    public String saveData(EncryptedData encryptedData) {
         SQLiteDatabase db = getWritableDatabase();
         
-        try {
-            ContentValues values = new ContentValues();
-            values.put(COL_ID, id);
-            values.put(COL_TYPE, type);
-            values.put(COL_ENCRYPTED_DATA, encryptedData);
-            values.put(COL_FILE_PATH, filePath);
-            values.put(COL_TIMESTAMP, System.currentTimeMillis());
-            values.put(COL_CREATED_AT, System.currentTimeMillis());
-            values.put(COL_SYNCED, 0);
-            
-            long result = db.insertWithOnConflict(TABLE_DATA, null, values, SQLiteDatabase.CONFLICT_REPLACE);
-            return result != -1;
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error saving data", e);
-            return false;
-        } finally {
-            db.close();
+        ContentValues values = new ContentValues();
+        values.put(COL_ID, encryptedData.getId());
+        values.put(COL_TYPE, encryptedData.getType());
+        values.put(COL_ENCRYPTED_DATA, encryptedData.getEncryptedContent());
+        values.put(COL_FILE_PATH, encryptedData.getFilePath());
+        values.put(COL_TIMESTAMP, encryptedData.getTimestamp());
+        values.put(COL_CREATED_AT, System.currentTimeMillis());
+        values.put(COL_SYNCED, 0);
+        
+        long result = db.insertWithOnConflict(TABLE_DATA, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+        
+        if (result != -1) {
+            Log.d(TAG, "Data saved: " + encryptedData.getId());
+            return encryptedData.getId();
+        } else {
+            Log.e(TAG, "Failed to save data");
+            return null;
         }
     }
     
     /**
-     * Get all data (returns encrypted items)
+     * Get data by ID
      */
-    public List<DecryptedDataItem> getAllDecryptedData(EncryptionService encryptionService) {
-        List<DecryptedDataItem> items = new ArrayList<>();
+    public EncryptedData getData(String id) {
         SQLiteDatabase db = getReadableDatabase();
         
-        Cursor cursor = db.query(TABLE_DATA, null, null, null, null, null, COL_TIMESTAMP + " DESC");
+        Cursor cursor = db.query(TABLE_DATA, null, COL_ID + " = ?", 
+                new String[]{id}, null, null, null);
         
-        try {
-            while (cursor.moveToNext()) {
-                DecryptedDataItem item = cursorToDecryptedItem(cursor);
-                items.add(item);
-            }
-        } finally {
+        if (cursor != null && cursor.moveToFirst()) {
+            EncryptedData data = cursorToEncryptedData(cursor);
             cursor.close();
-            db.close();
+            return data;
         }
         
-        return items;
+        return null;
     }
     
     /**
      * Get data by type
      */
-    public List<DecryptedDataItem> getDataByType(String type, EncryptionService encryptionService) {
-        List<DecryptedDataItem> items = new ArrayList<>();
+    public List<EncryptedData> getDataByType(String type, long startTime, long endTime) {
+        List<EncryptedData> dataList = new ArrayList<>();
         SQLiteDatabase db = getReadableDatabase();
         
-        Cursor cursor = db.query(TABLE_DATA, null, COL_TYPE + "=?", 
-                new String[]{type}, null, null, COL_TIMESTAMP + " DESC");
-        
-        try {
-            while (cursor.moveToNext()) {
-                DecryptedDataItem item = cursorToDecryptedItem(cursor);
-                items.add(item);
-            }
-        } finally {
-            cursor.close();
-            db.close();
-        }
-        
-        return items;
-    }
-    
-    /**
-     * Get data for time range
-     */
-    public List<DecryptedDataItem> getDataForTimeRange(long startTime, long endTime, EncryptionService encryptionService) {
-        List<DecryptedDataItem> items = new ArrayList<>();
-        SQLiteDatabase db = getReadableDatabase();
-        
-        String selection = COL_TIMESTAMP + " BETWEEN ? AND ?";
-        String[] selectionArgs = {String.valueOf(startTime), String.valueOf(endTime)};
+        String selection = COL_TYPE + " = ? AND " + COL_TIMESTAMP + " >= ? AND " + COL_TIMESTAMP + " <= ?";
+        String[] selectionArgs = {type, String.valueOf(startTime), String.valueOf(endTime)};
         
         Cursor cursor = db.query(TABLE_DATA, null, selection, selectionArgs, 
                 null, null, COL_TIMESTAMP + " DESC");
         
-        try {
-            while (cursor.moveToNext()) {
-                DecryptedDataItem item = cursorToDecryptedItem(cursor);
-                items.add(item);
-            }
-        } finally {
-            cursor.close();
-            db.close();
+        while (cursor != null && cursor.moveToNext()) {
+            dataList.add(cursorToEncryptedData(cursor));
         }
         
-        return items;
+        if (cursor != null) cursor.close();
+        
+        return dataList;
     }
     
     /**
-     * Delete data item
+     * Get recent data
      */
-    public boolean deleteDataItem(String id) {
+    public List<EncryptedData> getRecentData(int limit) {
+        List<EncryptedData> dataList = new ArrayList<>();
+        SQLiteDatabase db = getReadableDatabase();
+        
+        Cursor cursor = db.query(TABLE_DATA, null, null, null, 
+                null, null, COL_TIMESTAMP + " DESC", String.valueOf(limit));
+        
+        while (cursor != null && cursor.moveToNext()) {
+            dataList.add(cursorToEncryptedData(cursor));
+        }
+        
+        if (cursor != null) cursor.close();
+        
+        return dataList;
+    }
+    
+    /**
+     * Delete data by ID
+     */
+    public boolean deleteData(String id) {
+        SQLiteDatabase db = getWritableDatabase();
+        int result = db.delete(TABLE_DATA, COL_ID + " = ?", new String[]{id});
+        return result > 0;
+    }
+    
+    /**
+     * Get data count by type
+     */
+    public Map<String, Integer> getDataCountByType() {
+        Map<String, Integer> counts = new HashMap<>();
+        SQLiteDatabase db = getReadableDatabase();
+        
+        String query = "SELECT " + COL_TYPE + ", COUNT(*) FROM " + TABLE_DATA + 
+                      " GROUP BY " + COL_TYPE;
+        
+        Cursor cursor = db.rawQuery(query, null);
+        
+        while (cursor != null && cursor.moveToNext()) {
+            String type = cursor.getString(0);
+            int count = cursor.getInt(1);
+            counts.put(type, count);
+        }
+        
+        if (cursor != null) cursor.close();
+        
+        return counts;
+    }
+    
+    /**
+     * Get total data count
+     */
+    public int getTotalDataCount() {
+        SQLiteDatabase db = getReadableDatabase();
+        
+        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_DATA, null);
+        
+        if (cursor != null && cursor.moveToFirst()) {
+            int count = cursor.getInt(0);
+            cursor.close();
+            return count;
+        }
+        
+        return 0;
+    }
+    
+    /**
+     * Get database size in bytes
+     */
+    public long getDatabaseSize() {
+        File dbFile = context.getDatabasePath(DATABASE_NAME);
+        return dbFile.length();
+    }
+    
+    /**
+     * Clear all data
+     */
+    public boolean clearAllData() {
         SQLiteDatabase db = getWritableDatabase();
         
         try {
-            int deleted = db.delete(TABLE_DATA, COL_ID + "=?", new String[]{id});
-            return deleted > 0;
-        } finally {
-            db.close();
+            db.execSQL("DELETE FROM " + TABLE_DATA);
+            Log.d(TAG, "All data cleared");
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to clear data", e);
+            return false;
         }
     }
     
     /**
-     * Delete all data
+     * Get unsynced data for backup
      */
-    public void deleteDatabase() {
-        context.deleteDatabase(DATABASE_NAME);
-        Log.d(TAG, "🗑️ Database deleted");
+    public List<EncryptedData> getUnsyncedData(int limit) {
+        List<EncryptedData> dataList = new ArrayList<>();
+        SQLiteDatabase db = getReadableDatabase();
+        
+        Cursor cursor = db.query(TABLE_DATA, null, COL_SYNCED + " = 0", null, 
+                null, null, COL_CREATED_AT + " ASC", String.valueOf(limit));
+        
+        while (cursor != null && cursor.moveToNext()) {
+            dataList.add(cursorToEncryptedData(cursor));
+        }
+        
+        if (cursor != null) cursor.close();
+        
+        return dataList;
     }
     
     /**
-     * Mark item as synced
+     * Mark data as synced
      */
     public void markAsSynced(String id) {
         SQLiteDatabase db = getWritableDatabase();
         
-        try {
-            ContentValues values = new ContentValues();
-            values.put(COL_SYNCED, 1);
-            db.update(TABLE_DATA, values, COL_ID + "=?", new String[]{id});
-        } finally {
-            db.close();
-        }
+        ContentValues values = new ContentValues();
+        values.put(COL_SYNCED, 1);
+        
+        db.update(TABLE_DATA, values, COL_ID + " = ?", new String[]{id});
     }
     
     /**
-     * Get unsynced items
+     * Helper method to convert cursor to EncryptedData
      */
-    public List<DecryptedDataItem> getUnsyncedItems() {
-        List<DecryptedDataItem> items = new ArrayList<>();
-        SQLiteDatabase db = getReadableDatabase();
-        
-        Cursor cursor = db.query(TABLE_DATA, null, COL_SYNCED + "=0", 
-                null, null, null, COL_CREATED_AT + " ASC");
-        
-        try {
-            while (cursor.moveToNext()) {
-                DecryptedDataItem item = cursorToDecryptedItem(cursor);
-                items.add(item);
-            }
-        } finally {
-            cursor.close();
-            db.close();
-        }
-        
-        return items;
-    }
-    
-    /**
-     * Get database statistics
-     */
-    public DatabaseStats getStats() {
-        SQLiteDatabase db = getReadableDatabase();
-        DatabaseStats stats = new DatabaseStats();
-        
-        try {
-            // Total count
-            Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_DATA, null);
-            if (cursor.moveToFirst()) {
-                stats.totalItems = cursor.getInt(0);
-            }
-            cursor.close();
-            
-            // Count by type
-            cursor = db.rawQuery("SELECT " + COL_TYPE + ", COUNT(*) FROM " + TABLE_DATA + 
-                    " GROUP BY " + COL_TYPE, null);
-            while (cursor.moveToNext()) {
-                stats.countByType.put(cursor.getString(0), cursor.getInt(1));
-            }
-            cursor.close();
-            
-            // Oldest timestamp
-            cursor = db.rawQuery("SELECT MIN(" + COL_TIMESTAMP + ") FROM " + TABLE_DATA, null);
-            if (cursor.moveToFirst() && !cursor.isNull(0)) {
-                stats.oldestTimestamp = cursor.getLong(0);
-            }
-            cursor.close();
-            
-            // Unsynced count
-            cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_DATA + 
-                    " WHERE " + COL_SYNCED + "=0", null);
-            if (cursor.moveToFirst()) {
-                stats.unsyncedCount = cursor.getInt(0);
-            }
-            cursor.close();
-            
-        } finally {
-            db.close();
-        }
-        
-        return stats;
-    }
-    
-    /**
-     * Convert cursor to DecryptedDataItem
-     */
-    private DecryptedDataItem cursorToDecryptedItem(Cursor cursor) {
-        DecryptedDataItem item = new DecryptedDataItem();
-        item.setId(cursor.getString(cursor.getColumnIndex(COL_ID)));
-        item.setType(cursor.getString(cursor.getColumnIndex(COL_TYPE)));
-        item.setEncryptedData(cursor.getString(cursor.getColumnIndex(COL_ENCRYPTED_DATA)));
-        item.setFilePath(cursor.getString(cursor.getColumnIndex(COL_FILE_PATH)));
-        item.setTimestamp(cursor.getLong(cursor.getColumnIndex(COL_TIMESTAMP)));
-        item.setCreatedAt(cursor.getLong(cursor.getColumnIndex(COL_CREATED_AT)));
-        item.setSynced(cursor.getInt(cursor.getColumnIndex(COL_SYNCED)) == 1);
-        return item;
-    }
-    
-    /**
-     * Database statistics class
-     */
-    public static class DatabaseStats {
-        public int totalItems = 0;
-        public java.util.Map<String, Integer> countByType = new java.util.HashMap<>();
-        public long oldestTimestamp = 0;
-        public int unsyncedCount = 0;
+    private EncryptedData cursorToEncryptedData(Cursor cursor) {
+        return new EncryptedData(
+            cursor.getString(cursor.getColumnIndex(COL_ID)),
+            cursor.getString(cursor.getColumnIndex(COL_TYPE)),
+            cursor.getString(cursor.getColumnIndex(COL_ENCRYPTED_DATA)),
+            cursor.getString(cursor.getColumnIndex(COL_FILE_PATH)),
+            cursor.getLong(cursor.getColumnIndex(COL_TIMESTAMP))
+        );
     }
 }

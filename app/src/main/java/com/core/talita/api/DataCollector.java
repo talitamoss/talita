@@ -9,6 +9,8 @@ import java.util.Map;
  * 
  * Defines the contract that all collectors must implement.
  * Collectors handle HOW to collect specific types of data.
+ * 
+ * This is the canonical interface - all collectors should implement this.
  */
 public interface DataCollector {
     
@@ -96,6 +98,7 @@ public interface DataCollector {
     
     /**
      * Start automated/background collection
+     * Note: This is VOID, not boolean
      */
     void startAutomatedCollection();
     
@@ -119,10 +122,17 @@ public interface DataCollector {
      */
     CollectorResult collectQuick(Map<String, Object> data);
     
+    /**
+     * Validate data before collection
+     * This is public so UI can pre-validate
+     */
+    boolean validateData(Map<String, Object> data);
+    
     // ===== Callbacks =====
     
     /**
      * Callback for data collection events
+     * Used for async collection notifications
      */
     interface CollectionCallback {
         void onDataCollected(String dataType, Map<String, Object> data);

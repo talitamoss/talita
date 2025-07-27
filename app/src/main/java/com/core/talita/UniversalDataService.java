@@ -2,20 +2,21 @@ package com.core.talita;
 
 import android.content.Context;
 import android.util.Log;
-import com.core.talita.cloud.CloudBackupManager;
-import org.json.JSONObject;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
 
 /**
  * UniversalDataService - Central orchestrator for all data operations
  * 
- * Handles the complete data pipeline:
- * 1. Receive data from collectors
- * 2. Encrypt using hardware-backed keys
- * 3. Store locally in SQLite
- * 4. Queue for cloud backup
+ * SIMPLIFIED VERSION without cloud backup complexity.
+ * This handles:
+ * - Data encryption
+ * - Local storage
+ * - Data retrieval
  * 
- * Fixed to use proper singleton pattern with getInstance()
+ * Cloud backup can be added later when needed.
  */
 public class UniversalDataService {
     private static final String TAG = "UniversalDataService";
@@ -24,18 +25,16 @@ public class UniversalDataService {
     private final Context context;
     private final EncryptionService encryptionService;
     private final LocalDataManager localDataManager;
-    private final CloudBackupManager cloudBackupManager;
     
     /**
-     * Private constructor for singleton
+     * Private constructor - use getInstance()
      */
     private UniversalDataService(Context context) {
         this.context = context.getApplicationContext();
         this.encryptionService = new EncryptionService(context);
         this.localDataManager = new LocalDataManager(context);
-        this.cloudBackupManager = CloudBackupManager.getInstance(context);
         
-        Log.d(TAG, "🚀 Universal Data Service initialized");
+        Log.d(TAG, "UniversalDataService initialized (simplified, no cloud)");
     }
     
     /**
@@ -49,320 +48,118 @@ public class UniversalDataService {
     }
     
     /**
-     * Main entry point - process any personal data through the pipeline
+     * Main entry point for saving data
+     * This is what collectors call
      */
-    public String capture(PersonalDataInterface data) {
+    public boolean saveData(PersonalData data) {
         try {
-            Log.d(TAG, "📥 Capturing data: " + data.getType());
+            Log.d(TAG, "Saving data of type: " + data.getType());
             
-            // Step 1: Convert to universal format
-            UniversalPersonalData universalData = convertToUniversal(data);
-            
-            // Step 2: Validate
-            if (!validateData(universalData)) {
-                Log.e(TAG, "❌ Data validation failed");
-                return null;
+            // 1. Encrypt the data
+            EncryptedData encrypted = encryptData(data);
+            if (encrypted == null) {
+                Log.e(TAG, "Failed to encrypt data");
+                return false;
             }
             
-            // Step 3: Serialize to JSON
-            String jsonData = universalData.toJson();
-            
-            // Step 4: Encrypt
-            String encryptedJson = encryptionService.encryptData(jsonData);
-            
-            // Step 5: Store locally
-            String dataId = generateDataId();
-            boolean saved = localDataManager.saveEncryptedData(
-                dataId,
-                data.getType(),
-                encryptedJson,
-                universalData.getFilePath()
-            );
-            
-            if (!saved) {
-                Log.e(TAG, "❌ Failed to save data locally");
-                return null;
+            // 2. Save to local database
+            String savedId = localDataManager.saveData(encrypted);
+            if (savedId == null) {
+                Log.e(TAG, "Failed to save to local database");
+                return false;
             }
             
-            // Step 6: Queue for cloud backup
-            if (cloudBackupManager.isEnabled()) {
-                // Create a simple wrapper for the backup
-                UniversalDataType backupData = new UniversalDataType() {
-                    @Override
-                    public String getType() { return data.getType(); }
-                    
-                    @Override
-                    public String getId() { return dataId; }
-                    
-                    @Override
-                    public long getTimestamp() { return universalData.getTimestamp(); }
-                    
-                    @Override
-                    public Map<String, Object> getMetadata() { return universalData.getMetadata(); }
-                    
-                    @Override
-                    public String getDisplayName() { return data.getType(); }
-                    
-                    @Override
-                    public String getDisplaySummary() { return "Data entry"; }
-                    
-                    @Override
-                    public double getLatitude() { return 0.0; }
-                    
-                    @Override
-                    public double getLongitude() { return 0.0; }
-                };
-                cloudBackupManager.queueForBackup(backupData);
-            }
-            
-            Log.d(TAG, "✅ Data captured successfully: " + dataId);
-            return dataId;
+            // That's it! No cloud backup complexity
+            Log.d(TAG, "Data saved successfully: " + savedId);
+            return true;
             
         } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to capture data", e);
+            Log.e(TAG, "Failed to save data", e);
+            return false;
+        }
+    }
+    
+    /**
+     * Retrieve data by ID
+     */
+    public PersonalData getData(String id) {
+        try {
+            EncryptedData encrypted = localDataManager.getData(id);
+            if (encrypted == null) {
+                return null;
+            }
+            
+            return decryptData(encrypted);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to retrieve data", e);
             return null;
         }
     }
     
     /**
-     * Alternative capture method that accepts UniversalDataType directly
+     * Retrieve data by type and time range
      */
-    public String captureData(UniversalDataType data) {
+    public List<PersonalData> getDataByType(String type, long startTime, long endTime) {
+        List<PersonalData> results = new ArrayList<>();
+        
         try {
-            Log.d(TAG, "📥 Capturing data: " + data.getType());
+            List<EncryptedData> encryptedList = localDataManager.getDataByType(type, startTime, endTime);
             
-            // Create a PersonalDataInterface wrapper
-            PersonalDataInterface wrapper = new PersonalDataInterface() {
-                @Override
-                public String getType() { return data.getType(); }
-                
-                @Override
-                public Map<String, Object> getData() {
-                    Map<String, Object> result = new HashMap<>();
-                    result.putAll(data.getMetadata());
-                    return result;
+            for (EncryptedData encrypted : encryptedList) {
+                PersonalData decrypted = decryptData(encrypted);
+                if (decrypted != null) {
+                    results.add(decrypted);
                 }
-                
-                @Override
-                public Map<String, Object> getMetadata() { return data.getMetadata(); }
-                
-                @Override
-                public long getTimestamp() { return data.getTimestamp(); }
-            };
-            
-            return capture(wrapper);
+            }
             
         } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to capture data", e);
-            return null;
-        }
-    }
-    
-    /**
-     * Process data - alias for saveData for compatibility
-     */
-    public void processData(PersonalData data) {
-        saveData(data);
-    }
-    
-    /**
-     * Save PersonalData directly
-     */
-    public void saveData(PersonalData data) {
-        if (data == null) {
-            Log.e(TAG, "Cannot save null data");
-            return;
+            Log.e(TAG, "Failed to retrieve data by type", e);
         }
         
-        // Convert PersonalData to PersonalDataInterface and capture it
-        PersonalDataInterface pdi = new PersonalDataInterface() {
-            @Override
-            public String getType() {
-                return data.getType();
+        return results;
+    }
+    
+    /**
+     * Get recent data entries
+     */
+    public List<PersonalData> getRecentData(int limit) {
+        List<PersonalData> results = new ArrayList<>();
+        
+        try {
+            List<EncryptedData> encryptedList = localDataManager.getRecentData(limit);
+            
+            for (EncryptedData encrypted : encryptedList) {
+                PersonalData decrypted = decryptData(encrypted);
+                if (decrypted != null) {
+                    results.add(decrypted);
+                }
             }
             
-            @Override
-            public Map<String, Object> getData() {
-                return data.getData();
-            }
-            
-            @Override
-            public Map<String, Object> getMetadata() {
-                return data.getMetadata();
-            }
-            
-            @Override
-            public long getTimestamp() {
-                return data.getTimestamp();
-            }
-        };
-        
-        capture(pdi);
-    }
-    
-    /**
-     * Convert any PersonalDataInterface to UniversalPersonalData
-     */
-    private UniversalPersonalData convertToUniversal(PersonalDataInterface data) {
-        UniversalPersonalData universal = new UniversalPersonalData();
-        universal.setType(data.getType());
-        universal.setTimestamp(data.getTimestamp());
-        universal.setData(data.getData());
-        universal.setMetadata(data.getMetadata());
-        
-        // Extract file path if available
-        if (data instanceof UniversalDataType) {
-            UniversalDataType udt = (UniversalDataType) data;
-            if (udt instanceof LocationData) {
-                LocationData ld = (LocationData) udt;
-                universal.setLatitude(ld.getLatitude());
-                universal.setLongitude(ld.getLongitude());
-            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to retrieve recent data", e);
         }
         
-        return universal;
+        return results;
     }
     
     /**
-     * Validate data before processing
-     */
-    private boolean validateData(UniversalPersonalData data) {
-        if (data == null) return false;
-        if (data.getType() == null || data.getType().isEmpty()) return false;
-        if (data.getTimestamp() <= 0) return false;
-        return true;
-    }
-    
-    /**
-     * Generate unique data ID
-     */
-    private String generateDataId() {
-        return UUID.randomUUID().toString();
-    }
-    
-    /**
-     * Get all data (decrypted)
-     */
-    public List<PersonalData> getAllData() {
-        List<PersonalData> result = new ArrayList<>();
-        List<DecryptedDataItem> items = localDataManager.getAllDecryptedData(encryptionService);
-        
-        for (DecryptedDataItem item : items) {
-            try {
-                String decryptedJson = encryptionService.decryptData(item.getEncryptedData());
-                if (decryptedJson != null) {
-                    PersonalData pd = PersonalData.fromJson(decryptedJson);
-                    if (pd != null) {
-                        result.add(pd);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error decrypting item", e);
-            }
-        }
-        
-        return result;
-    }
-    
-    /**
-     * Get data by type (decrypted)
-     */
-    public List<PersonalData> getDataByType(String type) {
-        List<PersonalData> result = new ArrayList<>();
-        List<DecryptedDataItem> items = localDataManager.getDataByType(type, encryptionService);
-        
-        for (DecryptedDataItem item : items) {
-            try {
-                String decryptedJson = encryptionService.decryptData(item.getEncryptedData());
-                if (decryptedJson != null) {
-                    PersonalData pd = PersonalData.fromJson(decryptedJson);
-                    if (pd != null) {
-                        result.add(pd);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error decrypting item", e);
-            }
-        }
-        
-        return result;
-    }
-    
-    /**
-     * Get data for time range (decrypted)
-     */
-    public List<PersonalData> getDataForTimeRange(long startTime, long endTime) {
-        List<PersonalData> result = new ArrayList<>();
-        List<DecryptedDataItem> items = localDataManager.getDataForTimeRange(startTime, endTime, encryptionService);
-        
-        for (DecryptedDataItem item : items) {
-            try {
-                String decryptedJson = encryptionService.decryptData(item.getEncryptedData());
-                if (decryptedJson != null) {
-                    PersonalData pd = PersonalData.fromJson(decryptedJson);
-                    if (pd != null) {
-                        result.add(pd);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error decrypting item", e);
-            }
-        }
-        
-        return result;
-    }
-    
-    /**
-     * Get data in range - alias for getDataForTimeRange
-     */
-    public List<PersonalData> getDataInRange(long startTime, long endTime) {
-        return getDataForTimeRange(startTime, endTime);
-    }
-    
-    /**
-     * Get today's data
-     */
-    public List<PersonalData> getTodaysData() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        
-        long startOfDay = cal.getTimeInMillis();
-        long endOfDay = System.currentTimeMillis();
-        
-        return getDataInRange(startOfDay, endOfDay);
-    }
-    
-    /**
-     * Get decrypted data by type
-     * Returns the raw DecryptedDataItem objects (still encrypted)
-     */
-    public List<DecryptedDataItem> getDecryptedDataByType(String type) {
-        return localDataManager.getDataByType(type, encryptionService);
-    }
-    
-    /**
-     * Delete data item
+     * Delete data by ID
      */
     public boolean deleteData(String dataId) {
         try {
-            // Delete from local storage
-            boolean deleted = localDataManager.deleteData(dataId);
-            
-            if (deleted) {
-                // Remove from backup queue if present
-                cloudBackupManager.removeFromQueue(dataId);
-                Log.d(TAG, "🗑️ Deleted data: " + dataId);
-            }
-            
-            return deleted;
-            
+            return localDataManager.deleteData(dataId);
         } catch (Exception e) {
-            Log.e(TAG, "Error deleting data", e);
+            Log.e(TAG, "Failed to delete data", e);
             return false;
         }
+    }
+    
+    /**
+     * Get data statistics by type
+     */
+    public Map<String, Integer> getDataStats() {
+        return localDataManager.getDataCountByType();
     }
     
     /**
@@ -380,51 +177,91 @@ public class UniversalDataService {
     }
     
     /**
-     * Get database size in bytes
+     * Get database size
      */
     public long getDatabaseSize() {
         return localDataManager.getDatabaseSize();
     }
     
     /**
-     * Export all data to JSON
+     * Clear all data
      */
-    public String exportAllDataToJson() {
+    public boolean clearAllData() {
         try {
-            List<PersonalData> allData = getAllData();
-            JSONObject export = new JSONObject();
-            export.put("export_date", System.currentTimeMillis());
-            export.put("data_count", allData.size());
+            return localDataManager.clearAllData();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to clear all data", e);
+            return false;
+        }
+    }
+    
+    /**
+     * Export all data (for vault/export features)
+     */
+    public Map<String, List<PersonalData>> exportAllData() {
+        Map<String, List<PersonalData>> exportMap = new HashMap<>();
+        
+        try {
+            // Get all data types
+            Map<String, Integer> types = getDataCountByType();
             
-            // Convert data to JSON array
-            List<JSONObject> dataArray = new ArrayList<>();
-            for (PersonalData pd : allData) {
-                dataArray.add(new JSONObject(pd.toJson()));
+            // For each type, get all data
+            for (String type : types.keySet()) {
+                List<PersonalData> typeData = getDataByType(type, 0, System.currentTimeMillis());
+                if (!typeData.isEmpty()) {
+                    exportMap.put(type, typeData);
+                }
             }
-            export.put("data", dataArray);
-            
-            return export.toString(2); // Pretty print with 2-space indent
             
         } catch (Exception e) {
-            Log.e(TAG, "Error exporting data", e);
+            Log.e(TAG, "Failed to export data", e);
+        }
+        
+        return exportMap;
+    }
+    
+    // Private helper methods
+    
+    /**
+     * Encrypt PersonalData to EncryptedData
+     */
+    private EncryptedData encryptData(PersonalData data) {
+        try {
+            // Convert data to JSON string
+            String jsonData = data.toJson();
+            
+            // Encrypt the JSON
+            String encrypted = encryptionService.encryptString(jsonData);
+            
+            // Create EncryptedData object
+            return new EncryptedData(
+                data.getId(),
+                data.getType(),
+                encrypted,
+                null, // file path if applicable
+                data.getTimestamp()
+            );
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to encrypt data", e);
             return null;
         }
     }
     
     /**
-     * Clear all data (use with caution!)
+     * Decrypt EncryptedData to PersonalData
      */
-    public boolean clearAllData() {
+    private PersonalData decryptData(EncryptedData encrypted) {
         try {
-            boolean cleared = localDataManager.clearAllData();
-            if (cleared) {
-                cloudBackupManager.clearQueue();
-                Log.w(TAG, "⚠️ All data cleared!");
-            }
-            return cleared;
+            // Decrypt the content
+            String decrypted = encryptionService.decryptString(encrypted.getEncryptedContent());
+            
+            // Parse back to PersonalData
+            return PersonalData.fromJson(decrypted);
+            
         } catch (Exception e) {
-            Log.e(TAG, "Error clearing data", e);
-            return false;
+            Log.e(TAG, "Failed to decrypt data", e);
+            return null;
         }
     }
 }

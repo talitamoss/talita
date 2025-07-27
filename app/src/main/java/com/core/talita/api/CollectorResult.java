@@ -3,9 +3,9 @@ package com.core.talita.api;
 import java.util.Map;
 
 /**
- * CollectorResult - Result of a data collection operation
+ * CollectorResult - Result of a data collection attempt
  * 
- * Represents the outcome of attempting to collect data,
+ * Represents the outcome of trying to collect data,
  * including success/failure status and any collected data.
  */
 public class CollectorResult {
@@ -13,26 +13,28 @@ public class CollectorResult {
     public enum Status {
         SUCCESS,    // Data collected successfully
         FAILURE,    // Collection failed
-        PENDING,    // Collection in progress (e.g., user input dialog shown)
-        CANCELLED   // User cancelled the collection
+        PENDING,    // Collection in progress (async)
+        CANCELLED   // User cancelled collection
     }
     
     private final Status status;
     private final String dataType;
     private final Map<String, Object> data;
-    private final String errorMessage;
+    private final String message;
     private final long timestamp;
     
-    private CollectorResult(Status status, String dataType, Map<String, Object> data, String errorMessage) {
+    private CollectorResult(Status status, String dataType, Map<String, Object> data, String message) {
         this.status = status;
         this.dataType = dataType;
         this.data = data;
-        this.errorMessage = errorMessage;
+        this.message = message;
         this.timestamp = System.currentTimeMillis();
     }
     
+    // Factory methods for different result types
+    
     /**
-     * Create a successful result with data
+     * Create a success result with collected data
      */
     public static CollectorResult success(String dataType, Map<String, Object> data) {
         return new CollectorResult(Status.SUCCESS, dataType, data, null);
@@ -46,10 +48,10 @@ public class CollectorResult {
     }
     
     /**
-     * Create a pending result (collection in progress)
+     * Create a pending result for async operations
      */
     public static CollectorResult pending(String dataType) {
-        return new CollectorResult(Status.PENDING, dataType, null, null);
+        return new CollectorResult(Status.PENDING, dataType, null, "Collection in progress");
     }
     
     /**
@@ -60,6 +62,7 @@ public class CollectorResult {
     }
     
     // Getters
+    
     public Status getStatus() {
         return status;
     }
@@ -72,8 +75,8 @@ public class CollectorResult {
         return data;
     }
     
-    public String getErrorMessage() {
-        return errorMessage;
+    public String getMessage() {
+        return message;
     }
     
     public long getTimestamp() {
@@ -94,5 +97,15 @@ public class CollectorResult {
     
     public boolean isCancelled() {
         return status == Status.CANCELLED;
+    }
+    
+    @Override
+    public String toString() {
+        return "CollectorResult{" +
+                "status=" + status +
+                ", dataType='" + dataType + '\'' +
+                ", hasData=" + (data != null) +
+                ", message='" + message + '\'' +
+                '}';
     }
 }

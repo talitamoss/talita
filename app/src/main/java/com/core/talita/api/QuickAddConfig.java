@@ -17,7 +17,9 @@ public class QuickAddConfig {
         BUTTON,         // Simple button style
         MULTI_CHOICE,   // Multiple choice selector
         NUMERIC_INPUT,  // Number input with +/- buttons
-        TEXT_INPUT      // Text input field
+        TEXT_INPUT,     // Text input field
+        GRID,           // Grid layout for multiple options
+        SIMPLE_TAP     // Just tap to log default value
     }
     
     private final String title;
@@ -29,7 +31,8 @@ public class QuickAddConfig {
     private final Object maxValue;
     private final String[] choices;
     
-    private QuickAddConfig(String title, String description, QuickAddStyle style,
+    // Constructor that accepts all parameters (for compatibility)
+    public QuickAddConfig(String title, String description, QuickAddStyle style,
                           boolean showInDashboard, Object defaultValue,
                           Object minValue, Object maxValue, String[] choices) {
         this.title = title;
@@ -40,6 +43,24 @@ public class QuickAddConfig {
         this.minValue = minValue;
         this.maxValue = maxValue;
         this.choices = choices;
+    }
+    
+    // Simplified constructor for basic configs (4 parameters)
+    public QuickAddConfig(String title, String description, QuickAddStyle style, boolean showInDashboard) {
+        this(title, description, style, showInDashboard, null, null, null, null);
+    }
+    
+    // String-based style constructor for compatibility
+    public QuickAddConfig(String title, String description, String styleString, boolean showInDashboard) {
+        this(title, description, parseStyle(styleString), showInDashboard, null, null, null, null);
+    }
+    
+    private static QuickAddStyle parseStyle(String style) {
+        try {
+            return QuickAddStyle.valueOf(style.toUpperCase());
+        } catch (Exception e) {
+            return QuickAddStyle.TILE; // Default
+        }
     }
     
     /**
@@ -77,7 +98,7 @@ public class QuickAddConfig {
          */
         public Builder setStyle(String style) {
             try {
-                this.style = QuickAddStyle.valueOf(style);
+                this.style = QuickAddStyle.valueOf(style.toUpperCase());
             } catch (IllegalArgumentException e) {
                 this.style = QuickAddStyle.TILE;
             }

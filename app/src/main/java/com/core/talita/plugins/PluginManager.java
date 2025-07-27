@@ -3,36 +3,31 @@ package com.core.talita.plugins;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
+import com.core.talita.plugins.core.WaterPlugin;
 import java.util.*;
 
 /**
- * PluginManager - Central manager for all data collector plugins
- * Fixed to handle missing plugin classes gracefully
+ * PluginManager - Manages all data collector plugins
  * 
- * File path: app/src/main/java/com/core/talita/plugins/PluginManager.java
+ * SIMPLIFIED VERSION: Starting with just WaterPlugin for MVP.
+ * Other plugins can be added once water tracking is working perfectly.
  */
 public class PluginManager {
     private static final String TAG = "PluginManager";
-    private static final String PREFS_NAME = "plugin_settings";
+    private static final String PREFS_NAME = "plugin_manager";
+    private static final String PREF_ENABLED_PLUGINS = "enabled_plugins";
+    
     private static PluginManager instance;
     
     private final Context context;
-    private final SharedPreferences prefs;
-    private final Map<String, DataCollectorPlugin> plugins;
-    private final Set<String> enabledPluginIds;
-    private final List<PluginListener> listeners;
+    private final Map<String, DataCollectorPlugin> plugins = new HashMap<>();
+    private final Set<String> enabledPluginIds = new HashSet<>();
+    private final List<PluginListener> listeners = new ArrayList<>();
     
     private PluginManager(Context context) {
         this.context = context.getApplicationContext();
-        this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        this.plugins = new LinkedHashMap<>();
-        this.enabledPluginIds = new HashSet<>();
-        this.listeners = new ArrayList<>();
-        
+        initializePlugins();
         loadEnabledState();
-        loadBuiltInPlugins();
-        loadDynamicCollectors();
-        loadExternalPlugins();
     }
     
     public static synchronized PluginManager getInstance(Context context) {
@@ -43,98 +38,40 @@ public class PluginManager {
     }
     
     /**
+     * Initialize built-in plugins
+     * For MVP, we're only including WaterPlugin
+     */
+    private void initializePlugins() {
+        Log.d(TAG, "Initializing plugins...");
+        
+        // Register only WaterPlugin for now
+        registerPlugin(new WaterPlugin());
+        
+        Log.d(TAG, "Initialized " + plugins.size() + " plugins");
+    }
+    
+    /**
      * Load enabled state from preferences
      */
     private void loadEnabledState() {
-        Map<String, ?> allPrefs = prefs.getAll();
-        for (Map.Entry<String, ?> entry : allPrefs.entrySet()) {
-            if (entry.getKey().startsWith("plugin_") && entry.getKey().endsWith("_enabled")) {
-                if (Boolean.TRUE.equals(entry.getValue())) {
-                    String pluginId = entry.getKey()
-                        .replace("plugin_", "")
-                        .replace("_enabled", "");
-                    enabledPluginIds.add(pluginId);
-                }
-            }
-        }
-        Log.d(TAG, "Loaded " + enabledPluginIds.size() + " enabled plugins from preferences");
-    }
-    
-    /**
-     * Load all built-in plugins
-     */
-    private void loadBuiltInPlugins() {
-        // "I" category - Personal/self plugins
-        try {
-            registerPlugin(new com.core.talita.plugins.i.WaterPlugin());
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to load WaterPlugin: " + e.getMessage());
-        }
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        Set<String> enabled = prefs.getStringSet(PREF_ENABLED_PLUGINS, new HashSet<>());
         
-        try {
-            registerPlugin(new com.core.talita.plugins.i.MoodPlugin());
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to load MoodPlugin: " + e.getMessage());
-        }
-        
-        try {
-            registerPlugin(new com.core.talita.plugins.i.ExercisePlugin());
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to load ExercisePlugin: " + e.getMessage());
-        }
-        
-        try {
-            registerPlugin(new com.core.talita.plugins.i.SleepPlugin());
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to load SleepPlugin: " + e.getMessage());
-        }
-        
-        // Note: NutritionPlugin and SubstancePlugin are referenced but don't exist yet
-        // They should be created or removed from references
-        
-        // Dynamic Collector Plugin - allows users to create custom collectors
-        try {
-            registerPlugin(new DynamicCollectorPlugin());
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to load DynamicCollectorPlugin: " + e.getMessage());
-        }
-        
-        // "We" category - Relationship/connection plugins
-        try {
-            registerPlugin(new com.core.talita.plugins.we.FocusPlugin());
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to load FocusPlugin: " + e.getMessage());
-        }
-        
-        try {
-            registerPlugin(new com.core.talita.plugins.we.RelationshipsPlugin());
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to load RelationshipsPlugin: " + e.getMessage());
-        }
-        
-        Log.d(TAG, "Loaded " + plugins.size() + " built-in plugins");
-    }
-    
-    /**
-     * Load user-created dynamic collectors as plugins
-     */
-    private void loadDynamicCollectors() {
-        try {
-            List<DataCollectorPlugin> dynamicPlugins = DynamicCollectorPlugin.getDynamicCollectorPlugins(context);
-            for (DataCollectorPlugin plugin : dynamicPlugins) {
-                registerPlugin(plugin);
-            }
-            Log.d(TAG, "Loaded " + dynamicPlugins.size() + " dynamic collectors");
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading dynamic collectors", e);
+        if (enabled.isEmpty()) {
+            // First run - enable water by default
+            enabledPluginIds.add("core.water");
+            saveEnabledState();
+        } else {
+            enabledPluginIds.addAll(enabled);
         }
     }
     
     /**
-     * Load external plugins (future feature)
+     * Save enabled state to preferences
      */
-    private void loadExternalPlugins() {
-        // TODO: Implement plugin discovery from external sources
+    private void saveEnabledState() {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putStringSet(PREF_ENABLED_PLUGINS, enabledPluginIds).apply();
     }
     
     /**
@@ -142,57 +79,119 @@ public class PluginManager {
      */
     public void registerPlugin(DataCollectorPlugin plugin) {
         if (plugin == null) {
-            Log.w(TAG, "Attempted to register null plugin");
+            Log.w(TAG, "Cannot register null plugin");
             return;
         }
         
         String pluginId = plugin.getPluginId();
-        if (pluginId == null || pluginId.isEmpty()) {
-            Log.w(TAG, "Plugin has invalid ID: " + plugin.getClass().getName());
+        if (plugins.containsKey(pluginId)) {
+            Log.w(TAG, "Plugin already registered: " + pluginId);
             return;
         }
         
+        // Initialize plugin
+        plugin.initialize(createPluginContext(plugin));
+        
+        // Store plugin
         plugins.put(pluginId, plugin);
         
-        // Check if enabled by default
-        if (!prefs.contains("plugin_" + pluginId + "_enabled")) {
-            // Enable by default for certain categories
-            boolean enableByDefault = "i".equals(plugin.getCategory());
-            setPluginEnabled(pluginId, enableByDefault);
+        // Check if enabled
+        if (enabledPluginIds.contains(pluginId)) {
+            plugin.setEnabled(true);
         }
         
         // Notify listeners
         for (PluginListener listener : listeners) {
             listener.onPluginRegistered(plugin);
+            if (plugin.isEnabled()) {
+                listener.onPluginEnabled(plugin);
+            }
         }
         
-        Log.d(TAG, "Registered plugin: " + pluginId);
+        Log.d(TAG, "Registered plugin: " + plugin.getPluginName());
     }
     
     /**
      * Unregister a plugin
      */
     public void unregisterPlugin(String pluginId) {
-        DataCollectorPlugin plugin = plugins.remove(pluginId);
-        if (plugin != null) {
-            enabledPluginIds.remove(pluginId);
+        DataCollectorPlugin plugin = plugins.get(pluginId);
+        if (plugin == null) {
+            return;
+        }
+        
+        // Disable first
+        if (plugin.isEnabled()) {
+            disablePlugin(pluginId);
+        }
+        
+        // Remove from registry
+        plugins.remove(pluginId);
+        
+        // Notify listeners
+        for (PluginListener listener : listeners) {
+            listener.onPluginUnregistered(plugin);
+        }
+        
+        Log.d(TAG, "Unregistered plugin: " + pluginId);
+    }
+    
+    /**
+     * Enable a plugin
+     */
+    public void enablePlugin(String pluginId) {
+        DataCollectorPlugin plugin = plugins.get(pluginId);
+        if (plugin == null) {
+            Log.w(TAG, "Plugin not found: " + pluginId);
+            return;
+        }
+        
+        if (!enabledPluginIds.contains(pluginId)) {
+            enabledPluginIds.add(pluginId);
+            plugin.setEnabled(true);
+            saveEnabledState();
             
             // Notify listeners
             for (PluginListener listener : listeners) {
-                listener.onPluginUnregistered(plugin);
+                listener.onPluginEnabled(plugin);
             }
+            
+            Log.d(TAG, "Enabled plugin: " + plugin.getPluginName());
         }
     }
     
     /**
-     * Get plugin by ID
+     * Disable a plugin
+     */
+    public void disablePlugin(String pluginId) {
+        DataCollectorPlugin plugin = plugins.get(pluginId);
+        if (plugin == null) {
+            return;
+        }
+        
+        if (enabledPluginIds.contains(pluginId)) {
+            enabledPluginIds.remove(pluginId);
+            plugin.setEnabled(false);
+            saveEnabledState();
+            
+            // Notify listeners
+            for (PluginListener listener : listeners) {
+                listener.onPluginDisabled(plugin);
+            }
+            
+            Log.d(TAG, "Disabled plugin: " + plugin.getPluginName());
+        }
+    }
+    
+    /**
+     * Get a specific plugin
      */
     public DataCollectorPlugin getPlugin(String pluginId) {
         return plugins.get(pluginId);
     }
     
     /**
-     * Get all plugins
+     * Get all registered plugins
      */
     public List<DataCollectorPlugin> getAllPlugins() {
         return new ArrayList<>(plugins.values());
@@ -202,52 +201,13 @@ public class PluginManager {
      * Get enabled plugins
      */
     public List<DataCollectorPlugin> getEnabledPlugins() {
-        List<DataCollectorPlugin> result = new ArrayList<>();
-        for (String pluginId : enabledPluginIds) {
-            DataCollectorPlugin plugin = plugins.get(pluginId);
-            if (plugin != null) {
-                result.add(plugin);
+        List<DataCollectorPlugin> enabled = new ArrayList<>();
+        for (DataCollectorPlugin plugin : plugins.values()) {
+            if (plugin.isEnabled()) {
+                enabled.add(plugin);
             }
         }
-        return result;
-    }
-    
-    /**
-     * Enable/disable a plugin
-     */
-    public void setPluginEnabled(String pluginId, boolean enabled) {
-        DataCollectorPlugin plugin = plugins.get(pluginId);
-        if (plugin == null) {
-            return;
-        }
-        
-        if (enabled) {
-            enabledPluginIds.add(pluginId);
-            
-            // Notify listeners
-            for (PluginListener listener : listeners) {
-                listener.onPluginEnabled(plugin);
-            }
-        } else {
-            enabledPluginIds.remove(pluginId);
-            
-            // Notify listeners
-            for (PluginListener listener : listeners) {
-                listener.onPluginDisabled(plugin);
-            }
-        }
-        
-        // Save to preferences
-        prefs.edit()
-            .putBoolean("plugin_" + pluginId + "_enabled", enabled)
-            .apply();
-    }
-    
-    /**
-     * Check if a plugin is enabled
-     */
-    public boolean isPluginEnabled(String pluginId) {
-        return enabledPluginIds.contains(pluginId);
+        return enabled;
     }
     
     /**
@@ -281,6 +241,40 @@ public class PluginManager {
     }
     
     /**
+     * Reload all plugins
+     */
+    public void reloadPlugins() {
+        Log.d(TAG, "Reloading all plugins...");
+        
+        // Clear existing plugins
+        plugins.clear();
+        enabledPluginIds.clear();
+        
+        // Re-initialize
+        initializePlugins();
+        loadEnabledState();
+        
+        // Notify listeners
+        for (PluginListener listener : listeners) {
+            for (DataCollectorPlugin plugin : plugins.values()) {
+                listener.onPluginRegistered(plugin);
+                if (enabledPluginIds.contains(plugin.getPluginId())) {
+                    listener.onPluginEnabled(plugin);
+                }
+            }
+        }
+        
+        Log.d(TAG, "Reloaded " + plugins.size() + " plugins");
+    }
+    
+    /**
+     * Create plugin context
+     */
+    private PluginContext createPluginContext(DataCollectorPlugin plugin) {
+        return new PluginContextImpl(context, plugin);
+    }
+    
+    /**
      * Add a plugin listener
      */
     public void addPluginListener(PluginListener listener) {
@@ -304,25 +298,5 @@ public class PluginManager {
         void onPluginUnregistered(DataCollectorPlugin plugin);
         void onPluginEnabled(DataCollectorPlugin plugin);
         void onPluginDisabled(DataCollectorPlugin plugin);
-    }
-    
-    /**
-     * Reload dynamic collectors (call this when a new schema is created)
-     */
-    public void reloadDynamicCollectors() {
-        // Remove existing dynamic collectors
-        List<String> dynamicIds = new ArrayList<>();
-        for (String pluginId : plugins.keySet()) {
-            if (pluginId.startsWith("dynamic.")) {
-                dynamicIds.add(pluginId);
-            }
-        }
-        
-        for (String pluginId : dynamicIds) {
-            unregisterPlugin(pluginId);
-        }
-        
-        // Reload
-        loadDynamicCollectors();
     }
 }

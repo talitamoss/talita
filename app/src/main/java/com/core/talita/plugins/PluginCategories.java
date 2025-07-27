@@ -1,85 +1,88 @@
 package com.core.talita.plugins;
 
 /**
- * Simplified plugin categories based on relationships
- * I • We • All - From individual to universal
+ * PluginCategories - Defines the three categories of data collection
+ * 
+ * Based on the sovereignty philosophy:
+ * - I: Personal/Individual data
+ * - We: Social/Relationship data  
+ * - IT/All: Universal/Environmental data
  */
 public class PluginCategories {
     
-    // Main categories
-    public static final String I = "I";
-    public static final String WE = "We"; 
-    public static final String ALL = "All";
+    // Category constants
+    public static final String I = "i";      // Personal sovereignty
+    public static final String WE = "we";    // Social sovereignty
+    public static final String ALL = "all";  // Universal data
+    public static final String IT = "all";   // Alias for ALL (for compatibility)
+    
+    // Display names
+    public static final String I_DISPLAY = "Personal";
+    public static final String WE_DISPLAY = "Social";
+    public static final String ALL_DISPLAY = "Universal";
+    
+    // Descriptions
+    public static final String I_DESC = "Your personal data - health, mood, habits";
+    public static final String WE_DESC = "Relationships and social interactions";
+    public static final String ALL_DESC = "Environmental and contextual data";
     
     /**
-     * Get category description
+     * Get display name for category
      */
-    public static String getCategoryDescription(String category) {
-        switch (category) {
+    public static String getDisplayName(String category) {
+        switch (category.toLowerCase()) {
             case I:
-                return "Your relationship with yourself";
+                return I_DISPLAY;
             case WE:
-                return "Your relationships with others";
+                return WE_DISPLAY;
             case ALL:
-                return "Your relationship with everything";
+            case "it":
+                return ALL_DISPLAY;
+            default:
+                return category;
+        }
+    }
+    
+    /**
+     * Get description for category
+     */
+    public static String getDescription(String category) {
+        switch (category.toLowerCase()) {
+            case I:
+                return I_DESC;
+            case WE:
+                return WE_DESC;
+            case ALL:
+            case "it":
+                return ALL_DESC;
             default:
                 return "";
         }
     }
     
     /**
-     * Get category emoji
+     * Validate category
      */
-    public static String getCategoryEmoji(String category) {
-        switch (category) {
-            case I:
-                return "💫";
-            case WE:
-                return "🤝";
-            case ALL:
-                return "🌍";
-            default:
-                return "📊";
-        }
+    public static boolean isValidCategory(String category) {
+        if (category == null) return false;
+        String lower = category.toLowerCase();
+        return lower.equals(I) || lower.equals(WE) || lower.equals(ALL) || lower.equals("it");
     }
     
     /**
-     * Get category color
+     * Normalize category (handle variations)
      */
-    public static int getCategoryColor(String category) {
-        switch (category) {
-            case I:
-                return android.graphics.Color.parseColor("#9C27B0"); // Purple
-            case WE:
-                return android.graphics.Color.parseColor("#FF5722"); // Deep Orange  
-            case ALL:
-                return android.graphics.Color.parseColor("#00BCD4"); // Cyan
-            default:
-                return android.graphics.Color.parseColor("#757575"); // Grey
-        }
-    }
-    
-    /**
-     * Get all categories in order
-     */
-    public static String[] getAllCategories() {
-        return new String[] { I, WE, ALL };
-    }
-    
-    /**
-     * Allow users to customize category names
-     */
-    public static class CustomCategories {
-        public String i = I;
-        public String we = WE;
-        public String all = ALL;
+    public static String normalize(String category) {
+        if (category == null) return I; // Default to personal
         
-        public CustomCategories() {}
+        String lower = category.toLowerCase();
+        if (lower.equals("it")) return ALL; // Normalize IT to ALL
+        if (isValidCategory(lower)) return lower;
         
-        public CustomCategories(String i, String we, String all) {
-            this.i = i;
-            this.we = we;
-            this.all = all;
-        }
+        return I; // Default to personal
+    }
+    
+    private PluginCategories() {
+        // Utility class, prevent instantiation
     }
 }

@@ -1,106 +1,57 @@
 package com.core.talita.api;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * CollectorSettings - Configuration for a data collector
  * 
- * Stores all settings for how a collector should behave
+ * Stores user preferences for how a collector should behave,
+ * including automation, notifications, and collection frequency.
  */
 public class CollectorSettings {
     
-    // Core settings
+    private final boolean enabled;
     private final boolean automatedCollection;
-    private final int collectionFrequency; // in minutes
     private final boolean notificationsEnabled;
-    
-    // Advanced settings
-    private final boolean backgroundCollection;
-    private final boolean wifiOnlySync;
-    private final int dataRetentionDays;
-    private final Map<String, Object> customSettings;
+    private final long collectionFrequency; // milliseconds
+    private final long notificationInterval; // milliseconds
+    private final int dailyGoal;
+    private final String preferredUnit;
     
     private CollectorSettings(Builder builder) {
+        this.enabled = builder.enabled;
         this.automatedCollection = builder.automatedCollection;
-        this.collectionFrequency = builder.collectionFrequency;
         this.notificationsEnabled = builder.notificationsEnabled;
-        this.backgroundCollection = builder.backgroundCollection;
-        this.wifiOnlySync = builder.wifiOnlySync;
-        this.dataRetentionDays = builder.dataRetentionDays;
-        this.customSettings = new HashMap<>(builder.customSettings);
-    }
-    
-    // Getters
-    
-    public boolean isAutomatedCollection() {
-        return automatedCollection;
-    }
-    
-    public int getCollectionFrequency() {
-        return collectionFrequency;
-    }
-    
-    public boolean isNotificationsEnabled() {
-        return notificationsEnabled;
-    }
-    
-    public boolean isBackgroundCollection() {
-        return backgroundCollection;
-    }
-    
-    public boolean isWifiOnlySync() {
-        return wifiOnlySync;
-    }
-    
-    public int getDataRetentionDays() {
-        return dataRetentionDays;
-    }
-    
-    public Map<String, Object> getCustomSettings() {
-        return new HashMap<>(customSettings);
-    }
-    
-    public Object getCustomSetting(String key) {
-        return customSettings.get(key);
-    }
-    
-    public boolean hasCustomSetting(String key) {
-        return customSettings.containsKey(key);
+        this.collectionFrequency = builder.collectionFrequency;
+        this.notificationInterval = builder.notificationInterval;
+        this.dailyGoal = builder.dailyGoal;
+        this.preferredUnit = builder.preferredUnit;
     }
     
     /**
-     * Builder for CollectorSettings
+     * Get default settings for a collector
+     */
+    public static CollectorSettings getDefault() {
+        return new Builder().build();
+    }
+    
+    /**
+     * Builder for creating CollectorSettings
      */
     public static class Builder {
+        private boolean enabled = true;
         private boolean automatedCollection = false;
-        private int collectionFrequency = 60; // Default 60 minutes
         private boolean notificationsEnabled = false;
-        private boolean backgroundCollection = false;
-        private boolean wifiOnlySync = true;
-        private int dataRetentionDays = 0; // 0 = keep forever
-        private Map<String, Object> customSettings = new HashMap<>();
+        private long collectionFrequency = 0; // 0 = manual only
+        private long notificationInterval = 0; // 0 = no notifications
+        private int dailyGoal = 0; // 0 = no goal
+        private String preferredUnit = "";
         
-        public Builder() {
-        }
-        
-        public Builder(CollectorSettings existing) {
-            this.automatedCollection = existing.automatedCollection;
-            this.collectionFrequency = existing.collectionFrequency;
-            this.notificationsEnabled = existing.notificationsEnabled;
-            this.backgroundCollection = existing.backgroundCollection;
-            this.wifiOnlySync = existing.wifiOnlySync;
-            this.dataRetentionDays = existing.dataRetentionDays;
-            this.customSettings = new HashMap<>(existing.customSettings);
-        }
-        
-        public Builder setAutomatedCollection(boolean automatedCollection) {
-            this.automatedCollection = automatedCollection;
+        public Builder setEnabled(boolean enabled) {
+            this.enabled = enabled;
             return this;
         }
         
-        public Builder setCollectionFrequency(int minutes) {
-            this.collectionFrequency = minutes;
+        public Builder setAutomatedCollection(boolean automated) {
+            this.automatedCollection = automated;
             return this;
         }
         
@@ -109,28 +60,23 @@ public class CollectorSettings {
             return this;
         }
         
-        public Builder setBackgroundCollection(boolean enabled) {
-            this.backgroundCollection = enabled;
+        public Builder setCollectionFrequency(long frequencyMs) {
+            this.collectionFrequency = frequencyMs;
             return this;
         }
         
-        public Builder setWifiOnlySync(boolean wifiOnly) {
-            this.wifiOnlySync = wifiOnly;
+        public Builder setNotificationInterval(long intervalMs) {
+            this.notificationInterval = intervalMs;
             return this;
         }
         
-        public Builder setDataRetentionDays(int days) {
-            this.dataRetentionDays = days;
+        public Builder setDailyGoal(int goal) {
+            this.dailyGoal = goal;
             return this;
         }
         
-        public Builder putCustomSetting(String key, Object value) {
-            this.customSettings.put(key, value);
-            return this;
-        }
-        
-        public Builder putAllCustomSettings(Map<String, Object> settings) {
-            this.customSettings.putAll(settings);
+        public Builder setPreferredUnit(String unit) {
+            this.preferredUnit = unit;
             return this;
         }
         
@@ -139,16 +85,58 @@ public class CollectorSettings {
         }
     }
     
+    // Getters
+    
+    public boolean isEnabled() {
+        return enabled;
+    }
+    
+    public boolean isAutomatedCollection() {
+        return automatedCollection;
+    }
+    
+    public boolean isNotificationsEnabled() {
+        return notificationsEnabled;
+    }
+    
+    public long getCollectionFrequency() {
+        return collectionFrequency;
+    }
+    
+    public long getNotificationInterval() {
+        return notificationInterval;
+    }
+    
+    public int getDailyGoal() {
+        return dailyGoal;
+    }
+    
+    public String getPreferredUnit() {
+        return preferredUnit;
+    }
+    
+    /**
+     * Create a copy with modifications
+     */
+    public Builder toBuilder() {
+        return new Builder()
+            .setEnabled(enabled)
+            .setAutomatedCollection(automatedCollection)
+            .setNotificationsEnabled(notificationsEnabled)
+            .setCollectionFrequency(collectionFrequency)
+            .setNotificationInterval(notificationInterval)
+            .setDailyGoal(dailyGoal)
+            .setPreferredUnit(preferredUnit);
+    }
+    
     @Override
     public String toString() {
         return "CollectorSettings{" +
-                "automated=" + automatedCollection +
-                ", frequency=" + collectionFrequency + "min" +
+                "enabled=" + enabled +
+                ", automated=" + automatedCollection +
                 ", notifications=" + notificationsEnabled +
-                ", background=" + backgroundCollection +
-                ", wifiOnly=" + wifiOnlySync +
-                ", retention=" + dataRetentionDays + "days" +
-                ", customCount=" + customSettings.size() +
+                ", frequency=" + collectionFrequency +
+                ", goal=" + dailyGoal +
                 '}';
     }
 }

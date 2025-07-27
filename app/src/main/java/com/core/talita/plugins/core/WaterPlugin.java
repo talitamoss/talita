@@ -1,23 +1,31 @@
 package com.core.talita.plugins.core;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.util.Log;
-import com.core.talita.api.*;
+import com.core.talita.api.DataCollector;
+import com.core.talita.api.QuickAddConfig;
+import com.core.talita.api.CollectorResult;
+import com.core.talita.api.CollectorSettings;
 import com.core.talita.plugins.DataCollectorPlugin;
-import java.util.Map;
+import com.core.talita.plugins.base.BaseDataCollector;
+import com.core.talita.PersonalData;
+import com.core.talita.UniversalDataService;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+import android.util.Log;
 
 /**
- * WaterPlugin - Core plugin for water intake tracking
+ * WaterPlugin - Core water intake tracking plugin
  * 
- * This replaces the old WaterCollector class with a plugin-based approach.
- * Uses SimpleDataCollector for easy implementation.
+ * This is our reference implementation showing the complete vertical slice
+ * of how plugins should work with the new architecture.
  */
 public class WaterPlugin extends DataCollectorPlugin {
+    private static final String TAG = "WaterPlugin";
     
-    private static final String PREFS_NAME = "water_tracking";
+    // ===== Plugin Identity (Required by DataCollectorPlugin) =====
     
     @Override
     public String getPluginId() {
@@ -30,8 +38,8 @@ public class WaterPlugin extends DataCollectorPlugin {
     }
     
     @Override
-    public String getPluginVersion() {
-        return "1.0.0";
+    public String getDescription() {
+        return "Track your daily water consumption to stay hydrated";
     }
     
     @Override
@@ -40,13 +48,13 @@ public class WaterPlugin extends DataCollectorPlugin {
     }
     
     @Override
-    public String getCategory() {
-        return "i"; // Personal category
+    public String getVersion() {
+        return "1.0.0";
     }
     
     @Override
-    public int getPriority() {
-        return 100; // High priority - essential tracker
+    public String getCategory() {
+        return "i"; // Personal category
     }
     
     @Override
@@ -54,24 +62,11 @@ public class WaterPlugin extends DataCollectorPlugin {
         return "💧";
     }
     
-    @Override
-    public int getAccentColor() {
-        return Color.parseColor("#3B82F6"); // Blue
-    }
+    // ===== Plugin Configuration =====
     
     @Override
-    public int getIconResource() {
-        return 0; // Use emoji instead
-    }
-    
-    @Override
-    public String[] getRequiredPermissions() {
-        return new String[0]; // No permissions needed
-    }
-    
-    @Override
-    public boolean requiresBackgroundTracking() {
-        return false;
+    public int getPriority() {
+        return 100; // High priority - water is essential
     }
     
     @Override
@@ -80,15 +75,199 @@ public class WaterPlugin extends DataCollectorPlugin {
     }
     
     @Override
-    public boolean supportsScheduling() {
-        return true; // For reminders
+    public QuickAddConfig getQuickAddConfig() {
+        // Using the proper Builder pattern with correct constructor
+        return new QuickAddConfig.Builder()
+            .setTitle("Water")
+            .setDescription("Log water intake")
+            .setStyle(QuickAddConfig.QuickAddStyle.NUMERIC_INPUT)
+            .defaultValue(250) // Default 250ml
+            .range(50, 1000)   // Range from 50ml to 1L
+            .build();
     }
     
     @Override
     public DataCollector createCollector(Context context) {
-        // Create a custom water collector that extends SimpleDataCollector
-        return new WaterDataCollector(context);
+        WaterDataCollector collector = new WaterDataCollector();
+        collector.initialize(context);
+        return collector;
     }
+    
+    @Override
+    public void onQuickAddTapped(Context context) {
+        // For water, we'll use the default numeric input behavior
+        DataCollector collector = createCollector(context);
+        if (collector != null) {
+            Map<String, Object> quickData = new HashMap<>();
+            quickData.put("amount", 250); // Default amount
+            quickData.put("unit", "ml");
+            collector.collectQuick(quickData);
+        }
+    }
+    
+    // ===== The Actual Water Data Collector =====
+    
+    /**
+     * Inner class that implements the actual data collection logic
+     */
+    private static class WaterDataCollector extends BaseDataCollector {
+        private static final String TAG = "WaterDataCollector";
+        
+        @Override
+        public String getDataType() {
+            return "water";
+        }
+        
+        @Override
+        public String getDisplayName() {
+            return "Water Intake";
+        }
+        
+        @Override
+        public String getDescription() {
+            return "Track daily water consumption";
+        }
+        
+        @Override
+        public String getEmoji() {
+            return "💧";
+        }
+        
+        @Override
+        public String getCategory() {
+            return "i";
+        }
+        
+        @Override
+        public boolean isAvailable() {
+            // Water tracking is always available - no special sensors needed
+            return true;
+        }
+        
+        @Override
+        public List<String> getRequiredPermissions() {
+            // No special permissions needed for manual water tracking
+            return new ArrayList<>();
+        }
+        
+        @Override
+        public CollectorResult collect() {
+            // For manual collection, we'd show a dialog
+            // For now, return pending as the UI will handle it
+            Log.d(TAG, "Manual water collection requested");
+            return CollectorResult.pending(getDataType());
+        }
+        
+        @Override
+        public CollectorResult collectQuick(Map<String, Object> data) {
+            if (!validateData(data)) {
+                return CollectorResult.failure(getDataType(), "Invalid water data");
+            }
+            
+            try {
+                // Extract amount and unit
+                int amount = getIntValue(data, "amount", 250);
+                String unit = getStringValue(data, "unit", "ml");
+                
+                // Normalize to ml if needed
+                int amountMl = convertToMl(amount, unit);
+                
+                // Create the data map for storage
+                Map<String, Object> waterData = new HashMap<>();
+                waterData.put("amount", amountMl);
+                waterData.put("unit", "ml");
+                waterData.put("originalAmount", amount);
+                waterData.put("originalUnit", unit);
+                waterData.put("timestamp", System.currentTimeMillis());
+                
+                // Save using the base class method
+                saveData(waterData);
+                
+                Log.d(TAG, "Water intake recorded: " + amountMl + "ml");
+                return CollectorResult.success(getDataType(), waterData);
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to collect water data", e);
+                return CollectorResult.failure(getDataType(), e.getMessage());
+            }
+        }
+        
+        @Override
+        protected CollectorSettings getDefaultSettings() {
+            return new CollectorSettings.Builder()
+                .setAutomatedCollection(false) // Water is manually logged
+                .setNotificationsEnabled(true)  // But we can remind users
+                .setNotificationInterval(2 * 60 * 60 * 1000) // Every 2 hours
+                .build();
+        }
+        
+        @Override
+        public boolean validateData(Map<String, Object> data) {
+            if (data == null || data.isEmpty()) {
+                return false;
+            }
+            
+            // Must have amount
+            if (!data.containsKey("amount")) {
+                return false;
+            }
+            
+            // Amount must be positive
+            try {
+                int amount = getIntValue(data, "amount", 0);
+                return amount > 0;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        
+        // ===== Helper Methods =====
+        
+        private int getIntValue(Map<String, Object> data, String key, int defaultValue) {
+            Object value = data.get(key);
+            if (value == null) return defaultValue;
+            
+            if (value instanceof Integer) {
+                return (Integer) value;
+            } else if (value instanceof Number) {
+                return ((Number) value).intValue();
+            } else if (value instanceof String) {
+                try {
+                    return Integer.parseInt((String) value);
+                } catch (NumberFormatException e) {
+                    return defaultValue;
+                }
+            }
+            return defaultValue;
+        }
+        
+        private String getStringValue(Map<String, Object> data, String key, String defaultValue) {
+            Object value = data.get(key);
+            return value != null ? value.toString() : defaultValue;
+        }
+        
+        private int convertToMl(int amount, String unit) {
+            switch (unit.toLowerCase()) {
+                case "ml":
+                    return amount;
+                case "l":
+                case "liter":
+                case "litre":
+                    return amount * 1000;
+                case "oz":
+                case "fl oz":
+                    return (int) (amount * 29.5735);
+                case "cup":
+                    return amount * 237;
+                case "glass":
+                    return amount * 250; // Assume standard glass
+                default:
+                    return amount; // Assume ml if unknown
+            }
+        }
+    }
+    
+    // ===== Optional Features =====
     
     @Override
     public boolean hasSettings() {
@@ -97,157 +276,17 @@ public class WaterPlugin extends DataCollectorPlugin {
     
     @Override
     public void openSettings(Context context) {
-        // TODO: Open water settings activity
-        // For now, just show a toast
-        android.widget.Toast.makeText(context, 
-            "Water settings: Daily goal, reminders, etc.", 
-            android.widget.Toast.LENGTH_SHORT).show();
+        // TODO: Create WaterSettingsActivity
+        Log.d(TAG, "Water settings requested");
     }
     
     @Override
-    public QuickAddConfig getQuickAddConfig() {
-        return new QuickAddConfig(
-            "Water",
-            "Track hydration",
-            "GRID",
-            true // Show in main grid
-        );
+    public boolean supportsScheduling() {
+        return true; // Support reminder notifications
     }
     
-    /**
-     * Custom water collector with additional functionality
-     */
-    private static class WaterDataCollector extends SimpleDataCollector {
-        private final Context context;
-        
-        public WaterDataCollector(Context context) {
-            super(new SimpleDataCollector.Builder("water", "Water Intake")
-                .description("Track your daily water consumption")
-                .emoji("💧")
-                .category("i")
-                .inputHint("Amount in ml")
-                .inputType(SimpleDataCollector.InputType.NUMBER)
-                .unit("ml")
-                .quickOptions("100", "250", "500", "750")
-                .build());
-            
-            this.context = context;
-        }
-        
-        @Override
-        public void initialize(Context context) {
-            super.initialize(context);
-            // Additional initialization if needed
-        }
-        
-        @Override
-        protected CollectorResult performQuickCollection(Map<String, Object> data) {
-            // First do the normal collection
-            CollectorResult result = super.performQuickCollection(data);
-            
-            if (result.isSuccess()) {
-                // Update daily total
-                updateDailyTotal(data);
-            }
-            
-            return result;
-        }
-        
-        /**
-         * Update the daily total (replaces WaterCollector.logWater)
-         */
-        private void updateDailyTotal(Map<String, Object> data) {
-            try {
-                Object value = data.get("value");
-                int amount = 0;
-                
-                if (value instanceof Number) {
-                    amount = ((Number) value).intValue();
-                } else if (value instanceof String) {
-                    amount = Integer.parseInt(value.toString());
-                }
-                
-                if (amount > 0) {
-                    SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-                    String todayKey = "water_" + getTodayDateString();
-                    int currentTotal = prefs.getInt(todayKey, 0);
-                    int newTotal = currentTotal + amount;
-                    
-                    prefs.edit().putInt(todayKey, newTotal).apply();
-                    
-                    // Log for debugging
-                    Log.d("WaterPlugin", 
-                        "Updated daily total: " + currentTotal + " + " + amount + " = " + newTotal + "ml");
-                }
-            } catch (Exception e) {
-                Log.e("WaterPlugin", "Failed to update daily total", e);
-            }
-        }
-        
-        /**
-         * Get today's date as string (replaces date logic from WaterCollector)
-         */
-        private String getTodayDateString() {
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
-            return sdf.format(new java.util.Date());
-        }
-    }
-    
-    /**
-     * Static helper methods for backward compatibility during migration
-     * These replace the old WaterCollector static methods
-     */
-    public static class WaterHelper {
-        
-        /**
-         * Get today's water total (replaces WaterCollector.getTodayTotal)
-         */
-        public static int getTodayTotal(Context context) {
-            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            String todayKey = "water_" + getTodayDateString();
-            return prefs.getInt(todayKey, 0);
-        }
-        
-        /**
-         * Log water amount (replaces WaterCollector.logWater)
-         * @deprecated Use DataCollectorManager.quickLog instead
-         */
-        @Deprecated
-        public static void logWater(Context context, int amount) {
-            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            String todayKey = "water_" + getTodayDateString();
-            int currentTotal = prefs.getInt(todayKey, 0);
-            prefs.edit().putInt(todayKey, currentTotal + amount).apply();
-        }
-        
-        /**
-         * Clear today's data (for testing)
-         */
-        public static void clearTodayData(Context context) {
-            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            String todayKey = "water_" + getTodayDateString();
-            prefs.edit().remove(todayKey).apply();
-        }
-        
-        /**
-         * Check if water tracking is enabled
-         */
-        public static boolean isEnabled(Context context) {
-            SharedPreferences prefs = context.getSharedPreferences("collector_settings", Context.MODE_PRIVATE);
-            return prefs.getBoolean("water_enabled", true);
-        }
-        
-        /**
-         * Enable/disable water tracking
-         */
-        public static void setEnabled(Context context, boolean enabled) {
-            SharedPreferences prefs = context.getSharedPreferences("collector_settings", Context.MODE_PRIVATE);
-            prefs.edit().putBoolean("water_enabled", enabled).apply();
-        }
-        
-        private static String getTodayDateString() {
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
-            return sdf.format(new java.util.Date());
-        }
+    @Override
+    public boolean requiresBackgroundTracking() {
+        return false; // Water is manually tracked
     }
 }
